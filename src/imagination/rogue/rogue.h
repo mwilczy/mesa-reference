@@ -1177,6 +1177,8 @@ enum rogue_ctrl_op_mod {
 
    ROGUE_CTRL_OP_MOD_END,
 
+   ROGUE_CTRL_OP_MOD_NOWDF, /* Don't schedule WDF. */
+
    ROGUE_CTRL_OP_MOD_COUNT,
 };
 
@@ -1453,6 +1455,8 @@ enum rogue_backend_op_mod {
    ROGUE_BACKEND_OP_MOD_SAT, /* Saturate output. */
 
    ROGUE_BACKEND_OP_MOD_FREEP, /* Free partition. */
+
+   ROGUE_BACKEND_OP_MOD_NOWDF, /* Don't schedule WDF. */
 
    ROGUE_BACKEND_OP_MOD_COUNT,
 };
