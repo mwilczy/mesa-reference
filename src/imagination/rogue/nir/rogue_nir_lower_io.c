@@ -89,6 +89,45 @@ static void lower_load_global_constant_to_scalar(nir_builder *b,
    nir_instr_remove(&intr->instr);
 }
 
+static void lower_load_push_constant_to_scalar(nir_builder *b,
+                                               nir_intrinsic_instr *intr)
+{
+   /* Scalarize the load_global_constant. */
+   b->cursor = nir_before_instr(&intr->instr);
+
+   assert(intr->num_components > 1);
+
+   nir_def *loads[NIR_MAX_VEC_COMPONENTS];
+
+   for (uint8_t i = 0; i < intr->num_components; i++) {
+      nir_intrinsic_instr *chan_intr =
+         nir_intrinsic_instr_create(b->shader, intr->intrinsic);
+      nir_def_init(&chan_intr->instr,
+                   &chan_intr->def,
+                   1,
+                   intr->def.bit_size);
+      chan_intr->num_components = 1;
+
+      nir_intrinsic_set_base(chan_intr, nir_intrinsic_base(intr));
+      nir_intrinsic_set_range(chan_intr, nir_intrinsic_range(intr));
+      nir_intrinsic_set_align_mul(chan_intr, nir_intrinsic_align_mul(intr));
+      nir_intrinsic_set_align_offset(chan_intr,
+                                     nir_intrinsic_align_offset(intr) + i * 4);
+
+      /* Offset. */
+      chan_intr->src[0] =
+         nir_src_for_ssa(nir_iadd_imm(b, intr->src[0].ssa, i * 4));
+
+      nir_builder_instr_insert(b, &chan_intr->instr);
+
+      loads[i] = &chan_intr->def;
+   }
+
+   nir_def_rewrite_uses(&intr->def,
+                        nir_vec(b, loads, intr->num_components));
+   nir_instr_remove(&intr->instr);
+}
+
 static bool lower_intrinsic(nir_builder *b, nir_intrinsic_instr *instr)
 {
    switch (instr->intrinsic) {
@@ -98,6 +137,10 @@ static bool lower_intrinsic(nir_builder *b, nir_intrinsic_instr *instr)
 
    case nir_intrinsic_load_global_constant:
       lower_load_global_constant_to_scalar(b, instr);
+      return true;
+
+   case nir_intrinsic_load_push_constant:
+      lower_load_push_constant_to_scalar(b, instr);
       return true;
 
    default:
