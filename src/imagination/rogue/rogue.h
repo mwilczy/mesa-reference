@@ -1387,6 +1387,12 @@ typedef struct rogue_ctrl_op_info {
 
    uint64_t dst_repeat_mask;
    uint64_t src_repeat_mask;
+
+   unsigned valnum_src;
+   uint64_t dst_valnum_mask;
+   uint64_t src_valnum_mask;
+
+   unsigned max_repeat;
 } rogue_ctrl_op_info;
 
 extern const rogue_ctrl_op_info rogue_ctrl_op_infos[ROGUE_CTRL_OP_COUNT];
@@ -1436,6 +1442,12 @@ typedef struct rogue_alu_op_info {
 
    uint64_t dst_repeat_mask;
    uint64_t src_repeat_mask;
+
+   unsigned valnum_src;
+   uint64_t dst_valnum_mask;
+   uint64_t src_valnum_mask;
+
+   unsigned max_repeat;
 } rogue_alu_op_info;
 
 extern const rogue_alu_op_info rogue_alu_op_infos[ROGUE_ALU_OP_COUNT];
@@ -1568,6 +1580,12 @@ typedef struct rogue_backend_op_info {
 
    uint64_t dst_repeat_mask;
    uint64_t src_repeat_mask;
+
+   unsigned valnum_src;
+   uint64_t dst_valnum_mask;
+   uint64_t src_valnum_mask;
+
+   unsigned max_repeat;
 } rogue_backend_op_info;
 
 extern const rogue_backend_op_info
@@ -1778,6 +1796,12 @@ typedef struct rogue_bitwise_op_info {
 
    uint64_t dst_repeat_mask;
    uint64_t src_repeat_mask;
+
+   unsigned valnum_src;
+   uint64_t dst_valnum_mask;
+   uint64_t src_valnum_mask;
+
+   unsigned max_repeat;
 } rogue_bitwise_op_info;
 
 extern const rogue_bitwise_op_info
