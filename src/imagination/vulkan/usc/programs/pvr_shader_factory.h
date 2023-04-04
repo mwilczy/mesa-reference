@@ -72,12 +72,12 @@ enum pvr_clear_attachment_const {
 
 #define PVR_CLEAR_ATTACHMENT_DEST_ID_UNUSED (~0U)
 
-/* 8 + 8 = 16 <- 1 Dword, 8 offsets, to registers/tile buffers
- * 7 + 7 = 14 <- 2 Dwords, 7 offsets, to registers/tile buffers
- * 6 + 6 = 12 <- 3 Dwords, 6 offsets, to registers/tile buffers
- * 5 + 5 = 10 <- 4 Dwords, 5 offsets, to registers/tile buffers
+/* 4 + 4 = 8 <- 1 Dword, 4 offsets, to registers/tile buffers
+ * 3 + 3 = 6 <- 2 Dwords, 3 offsets, to registers/tile buffers
+ * 2 + 2 = 4 <- 3 Dwords, 2 offsets, to registers/tile buffers
+ * 1 + 1 = 2 <- 4 Dwords, 1 offsets, to registers/tile buffers
  */
-#define PVR_CLEAR_ATTACHMENT_PROGRAM_COUNT 52
+#define PVR_CLEAR_ATTACHMENT_PROGRAM_COUNT 20
 
 /* This defines the max theoretic number of clear attachment programs. In cases
  * where the dword count goes past the number of on-chip on-tile-buffer targets
