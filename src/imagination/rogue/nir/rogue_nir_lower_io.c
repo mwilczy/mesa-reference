@@ -64,7 +64,8 @@ static bool lower_load_global_constant_to_scalar(nir_builder *b,
    /* Scalarize the load_global_constant. */
    b->cursor = nir_before_instr(&intr->instr);
 
-   assert(intr->num_components > 1);
+   if (intr->num_components == 1)
+      return false;
 
    nir_def *loads[NIR_MAX_VEC_COMPONENTS];
 
@@ -105,7 +106,8 @@ static bool lower_load_push_constant_to_scalar(nir_builder *b,
    /* Scalarize the load_global_constant. */
    b->cursor = nir_before_instr(&intr->instr);
 
-   assert(intr->num_components > 1);
+   if (intr->num_components == 1)
+      return false;
 
    nir_def *loads[NIR_MAX_VEC_COMPONENTS];
 
