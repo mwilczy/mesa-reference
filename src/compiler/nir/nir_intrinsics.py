@@ -1943,3 +1943,8 @@ intrinsic("enqueue_node_payloads", src_comp=[-1])
 
 # Returns true if it has been called for every payload.
 intrinsic("finalize_incoming_node_payload", src_comp=[-1], dest_comp=1)
+
+# Imagination-specific compute intrinsics.
+# Local invocation ID has a 32-bit x component and packed 2x16-bit y and z components.
+intrinsic("load_local_invocation_id_x_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+intrinsic("load_local_invocation_id_yz_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
