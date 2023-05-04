@@ -2594,6 +2594,10 @@ static inline bool rogue_src_reg_replace(rogue_reg_use *use, rogue_reg *new_reg)
       ref = &rogue_instr_as_ctrl(instr)->src[src_index].ref;
       break;
 
+   case ROGUE_INSTR_TYPE_BITWISE:
+      ref = &rogue_instr_as_bitwise(instr)->src[src_index].ref;
+      break;
+
    default:
       unreachable("Unsupported instruction type.");
       return false;
@@ -2691,6 +2695,10 @@ static inline bool rogue_src_regarray_replace(rogue_regarray_use *use,
 
    case ROGUE_INSTR_TYPE_CTRL:
       ref = &rogue_instr_as_ctrl(instr)->src[src_index].ref;
+      break;
+
+   case ROGUE_INSTR_TYPE_BITWISE:
+      ref = &rogue_instr_as_bitwise(instr)->src[src_index].ref;
       break;
 
    default:
