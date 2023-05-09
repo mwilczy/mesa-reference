@@ -41,6 +41,9 @@ lower_point_size_intrin(nir_builder *b, nir_intrinsic_instr *intr, void *data)
       return false;
 
    nir_deref_instr *deref = nir_src_as_deref(intr->src[0]);
+   if (!nir_deref_mode_is(deref, nir_var_shader_out))
+      return false;
+
    nir_variable *var = nir_deref_instr_get_variable(deref);
    if (var->data.location != VARYING_SLOT_PSIZ)
       return false;
