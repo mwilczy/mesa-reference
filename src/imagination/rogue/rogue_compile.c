@@ -950,7 +950,8 @@ static void trans_nir_alu_pack_unorm_4x8(rogue_builder *b, nir_alu_instr *alu)
 }
 
 static void rogue_apply_alu_src_mods(rogue_alu_instr *rogue_alu,
-                                     nir_alu_instr *nir_alu)
+                                     nir_alu_instr *nir_alu,
+                                     bool reverse)
 {
    unsigned num_srcs = rogue_alu_op_infos[rogue_alu->op].num_srcs;
    assert(num_srcs == nir_op_infos[nir_alu->op].num_inputs);
@@ -958,10 +959,14 @@ static void rogue_apply_alu_src_mods(rogue_alu_instr *rogue_alu,
    for (unsigned u = 0; u < num_srcs; ++u) {
 #if 0
       if (nir_alu->src[u].negate)
-         rogue_set_alu_src_mod(rogue_alu, u, ROGUE_ALU_SRC_MOD_NEG);
+         rogue_set_alu_src_mod(rogue_alu,
+                               reverse ? (num_srcs - 1) - u : u,
+                               ROGUE_ALU_SRC_MOD_NEG);
 
       if (nir_alu->src[u].abs)
-         rogue_set_alu_src_mod(rogue_alu, u, ROGUE_ALU_SRC_MOD_ABS);
+         rogue_set_alu_src_mod(rogue_alu,
+                               reverse ? (num_srcs - 1) - u : u,
+                               ROGUE_ALU_SRC_MOD_ABS);
 #endif
    }
 }
@@ -975,8 +980,14 @@ static void trans_nir_alu_fadd(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
    rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
 
-   rogue_alu_instr *fadd = rogue_FADD(b, dst, src0, src1);
-   rogue_apply_alu_src_mods(fadd, alu);
+   rogue_alu_instr *fadd;
+   if (/*alu->src[1].negate && !alu->src[0].negate*/ 0) {
+      fadd = rogue_FADD(b, dst, src1, src0);
+      rogue_apply_alu_src_mods(fadd, alu, true);
+   } else {
+      fadd = rogue_FADD(b, dst, src0, src1);
+      rogue_apply_alu_src_mods(fadd, alu, false);
+   }
 }
 
 static void trans_nir_alu_fmul(rogue_builder *b, nir_alu_instr *alu)
@@ -988,8 +999,14 @@ static void trans_nir_alu_fmul(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
    rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
 
-   rogue_alu_instr *fmul = rogue_FMUL(b, dst, src0, src1);
-   rogue_apply_alu_src_mods(fmul, alu);
+   rogue_alu_instr *fmul;
+   if (/* alu->src[1].negate && !alu->src[0].negate*/ 0) {
+      fmul = rogue_FMUL(b, dst, src1, src0);
+      rogue_apply_alu_src_mods(fmul, alu, true);
+   } else {
+      fmul = rogue_FMUL(b, dst, src0, src1);
+      rogue_apply_alu_src_mods(fmul, alu, false);
+   }
 }
 
 static void trans_nir_alu_ffma(rogue_builder *b, nir_alu_instr *alu)
@@ -1003,7 +1020,7 @@ static void trans_nir_alu_ffma(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src2 = nir_ssa_reg_alu_src32(b->shader, alu, 2);
 
    rogue_alu_instr *ffma = rogue_FMAD(b, dst, src0, src1, src2);
-   rogue_apply_alu_src_mods(ffma, alu);
+   rogue_apply_alu_src_mods(ffma, alu, false);
 }
 
 static void trans_nir_alu_frcp(rogue_builder *b, nir_alu_instr *alu)
@@ -1015,7 +1032,7 @@ static void trans_nir_alu_frcp(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src = nir_ssa_reg_alu_src32(b->shader, alu, 0);
 
    rogue_alu_instr *frcp = rogue_FRCP(b, dst, src);
-   rogue_apply_alu_src_mods(frcp, alu);
+   rogue_apply_alu_src_mods(frcp, alu, false);
 }
 
 static void trans_nir_alu_frsq(rogue_builder *b, nir_alu_instr *alu)
@@ -1027,7 +1044,7 @@ static void trans_nir_alu_frsq(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src = nir_ssa_reg_alu_src32(b->shader, alu, 0);
 
    rogue_alu_instr *frsq = rogue_FRSQ(b, dst, src);
-   rogue_apply_alu_src_mods(frsq, alu);
+   rogue_apply_alu_src_mods(frsq, alu, false);
 }
 
 static void trans_nir_alu_flog2(rogue_builder *b, nir_alu_instr *alu)
@@ -1039,7 +1056,7 @@ static void trans_nir_alu_flog2(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src = nir_ssa_reg_alu_src32(b->shader, alu, 0);
 
    rogue_alu_instr *flog2 = rogue_FLOG2(b, dst, src);
-   rogue_apply_alu_src_mods(flog2, alu);
+   rogue_apply_alu_src_mods(flog2, alu, false);
 }
 
 static void trans_nir_alu_fexp2(rogue_builder *b, nir_alu_instr *alu)
@@ -1051,7 +1068,7 @@ static void trans_nir_alu_fexp2(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src = nir_ssa_reg_alu_src32(b->shader, alu, 0);
 
    rogue_alu_instr *fexp2 = rogue_FEXP2(b, dst, src);
-   rogue_apply_alu_src_mods(fexp2, alu);
+   rogue_apply_alu_src_mods(fexp2, alu, false);
 }
 
 /* Conditionally sets the output to src0 or src1 depending on whether the
