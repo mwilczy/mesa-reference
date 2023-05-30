@@ -1302,9 +1302,60 @@ static uint16_t pvr_get_descriptor_primary_offset(
    uint32_t offset;
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
-   assert(desc_idx < binding->descriptor_count);
 
    pvr_descriptor_size_info_init(device, binding->type, &size_info);
+
+#if defined(DEBUG)
+   if (desc_idx >= binding->descriptor_count) {
+      const struct pvr_descriptor_set_layout_binding *current_binding = NULL;
+      int64_t adjusted_desc_idx;
+      uint32_t binding_idx;
+
+      /* For vkUpdateDescriptorSets() we need to patch the descriptors in the
+       * subsequent bindings if the count exceeds the current binding's
+       * descriptor amount, so let's make sure that the descriptors were
+       * allocated next to each other.
+       */
+
+      for (uint32_t i = 0; i < layout->binding_count; i++) {
+         if (&layout->bindings[i] == binding) {
+            current_binding = binding;
+            binding_idx = i;
+            break;
+         }
+      }
+
+      assert(current_binding);
+
+      adjusted_desc_idx = desc_idx - current_binding->descriptor_count;
+
+      while (adjusted_desc_idx >= 0) {
+         const struct pvr_descriptor_set_layout_binding *next_binding;
+         uint32_t next_binding_idx;
+         uint32_t expected_offset;
+
+         next_binding_idx = binding_idx + 1;
+
+         assert(next_binding_idx < layout->binding_count);
+         next_binding = &layout->bindings[next_binding_idx];
+
+         assert(next_binding);
+         assert(next_binding->type == current_binding->type);
+
+         expected_offset =
+            current_binding->per_stage_offset_in_dwords[stage].primary;
+         expected_offset +=
+            current_binding->descriptor_count * size_info.primary;
+         assert(next_binding->per_stage_offset_in_dwords[stage].primary ==
+                expected_offset);
+
+         adjusted_desc_idx -= current_binding->descriptor_count;
+
+         current_binding = next_binding;
+         binding_idx = next_binding_idx;
+      }
+   }
+#endif
 
    offset = layout->memory_layout_in_dwords_per_stage[stage].primary_offset;
    offset += binding->per_stage_offset_in_dwords[stage].primary;
@@ -1327,9 +1378,60 @@ static uint16_t pvr_get_descriptor_secondary_offset(
    uint32_t offset;
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
-   assert(desc_idx < binding->descriptor_count);
 
    pvr_descriptor_size_info_init(device, binding->type, &size_info);
+
+#if defined(DEBUG)
+   if (desc_idx >= binding->descriptor_count) {
+      const struct pvr_descriptor_set_layout_binding *current_binding = NULL;
+      int64_t remaining_descriptor_idx;
+      uint32_t binding_idx;
+
+      /* For vkUpdateDescriptorSets() we need to patch the descriptors in the
+       * subsequent bindings if the count exceeds the current binding's
+       * descriptor amount, so let's make sure that the descriptors were
+       * allocated next to each other.
+       */
+
+      for (uint32_t i = 0; i < layout->binding_count; i++) {
+         if (&layout->bindings[i] == binding) {
+            current_binding = binding;
+            binding_idx = i;
+            break;
+         }
+      }
+
+      assert(current_binding);
+
+      remaining_descriptor_idx = desc_idx - current_binding->descriptor_count;
+
+      while (remaining_descriptor_idx >= 0) {
+         const struct pvr_descriptor_set_layout_binding *next_binding;
+         uint32_t next_binding_idx;
+         uint32_t expected_offset;
+
+         next_binding_idx = binding_idx + 1;
+
+         assert(next_binding_idx < layout->binding_count);
+         next_binding = &layout->bindings[next_binding_idx];
+
+         assert(next_binding);
+         assert(next_binding->type == current_binding->type);
+
+         expected_offset =
+            current_binding->per_stage_offset_in_dwords[stage].secondary;
+         expected_offset +=
+            current_binding->descriptor_count * size_info.secondary;
+         assert(next_binding->per_stage_offset_in_dwords[stage].secondary ==
+                expected_offset);
+
+         remaining_descriptor_idx -= current_binding->descriptor_count;
+
+         current_binding = next_binding;
+         binding_idx = next_binding_idx;
+      }
+   }
+#endif
 
    offset = layout->memory_layout_in_dwords_per_stage[stage].secondary_offset;
    offset += binding->per_stage_offset_in_dwords[stage].secondary;
@@ -1353,7 +1455,6 @@ static uint16_t pvr_get_required_descriptor_primary_offset(
    uint32_t offset;
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
-   assert(desc_idx < binding->descriptor_count);
 
    pvr_descriptor_size_info_init(device, binding->type, &size_info);
 
@@ -1381,7 +1482,6 @@ static uint16_t pvr_get_required_descriptor_secondary_offset(
    uint32_t offset;
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
-   assert(desc_idx < binding->descriptor_count);
 
    pvr_descriptor_size_info_init(device, binding->type, &size_info);
 

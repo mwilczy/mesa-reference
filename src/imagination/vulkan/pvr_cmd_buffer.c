@@ -3508,7 +3508,6 @@ static uint16_t pvr_get_dynamic_descriptor_primary_offset(
 
    assert(binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
           binding->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
-   assert(desc_idx < binding->descriptor_count);
 
    pvr_descriptor_size_info_init(device, binding->type, &size_info);
 
@@ -3538,7 +3537,6 @@ static uint16_t pvr_get_dynamic_descriptor_secondary_offset(
 
    assert(binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
           binding->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
-   assert(desc_idx < binding->descriptor_count);
 
    pvr_descriptor_size_info_init(device, binding->type, &size_info);
 
