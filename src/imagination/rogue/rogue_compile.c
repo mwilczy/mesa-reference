@@ -1368,15 +1368,7 @@ static void trans_nir_alu_iand(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
    rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
 
-   rogue_instr *byp0s =
-      &rogue_BYP0S(b, rogue_ref_io(ROGUE_IO_FT2), src0)->instr;
-   rogue_set_instr_group_next(byp0s, true);
-   rogue_AND(b,
-             dst,
-             rogue_none(),
-             rogue_ref_io(ROGUE_IO_FT2),
-             rogue_none(),
-             src1);
+   rogue_IAND(b, dst, src0, src1);
 }
 
 static void trans_nir_alu_ior(rogue_builder *b, nir_alu_instr *alu)
@@ -1388,15 +1380,19 @@ static void trans_nir_alu_ior(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
    rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
 
-   rogue_instr *byp0s =
-      &rogue_BYP0S(b, rogue_ref_io(ROGUE_IO_FT2), src0)->instr;
-   rogue_set_instr_group_next(byp0s, true);
-   rogue_OR(b,
-            dst,
-            rogue_none(),
-            rogue_ref_io(ROGUE_IO_FT2),
-            rogue_none(),
-            src1);
+   rogue_IOR(b, dst, src0, src1);
+}
+
+static void trans_nir_alu_ixor(rogue_builder *b, nir_alu_instr *alu)
+{
+   unsigned dst_components;
+   rogue_ref dst = nir_ssa_reg_alu_dst32(b->shader, alu, &dst_components);
+   assert(dst_components == 1);
+
+   rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
+   rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
+
+   rogue_IXOR(b, dst, src0, src1);
 }
 
 static void trans_nir_alu_inot(rogue_builder *b, nir_alu_instr *alu)
@@ -1422,15 +1418,7 @@ static void trans_nir_ishr(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
    rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
 
-   rogue_bitwise_instr *byp0b = rogue_BYP0B(b,
-                                            rogue_ref_io(ROGUE_IO_FT0),
-                                            rogue_ref_io(ROGUE_IO_FT1),
-                                            rogue_ref_io(ROGUE_IO_S0),
-                                            src0);
-   rogue_set_instr_group_next(&byp0b->instr, true);
-   rogue_bitwise_instr *asr =
-      rogue_ASR(b, dst, rogue_ref_io(ROGUE_IO_FT4), src1);
-   rogue_set_bitwise_op_mod(asr, ROGUE_BITWISE_OP_MOD_TWB);
+   rogue_ISHR(b, dst, src0, src1);
 }
 
 static void trans_nir_ishl(rogue_builder *b, nir_alu_instr *alu)
@@ -1442,13 +1430,7 @@ static void trans_nir_ishl(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
    rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
 
-   rogue_bitwise_instr *byp0b = rogue_BYP0B(b,
-                                            rogue_ref_io(ROGUE_IO_FT0),
-                                            rogue_ref_io(ROGUE_IO_FT1),
-                                            rogue_ref_io(ROGUE_IO_S0),
-                                            src0);
-   rogue_set_instr_group_next(&byp0b->instr, true);
-   rogue_LSL2(b, dst, rogue_ref_io(ROGUE_IO_FT4), src1);
+   rogue_ISHL(b, dst, src0, src1);
 }
 
 static void trans_nir_ushr(rogue_builder *b, nir_alu_instr *alu)
@@ -1460,13 +1442,7 @@ static void trans_nir_ushr(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src0 = nir_ssa_reg_alu_src32(b->shader, alu, 0);
    rogue_ref src1 = nir_ssa_reg_alu_src32(b->shader, alu, 1);
 
-   rogue_bitwise_instr *byp0b = rogue_BYP0B(b,
-                                            rogue_ref_io(ROGUE_IO_FT0),
-                                            rogue_ref_io(ROGUE_IO_FT1),
-                                            rogue_ref_io(ROGUE_IO_S0),
-                                            src0);
-   rogue_set_instr_group_next(&byp0b->instr, true);
-   rogue_SHR(b, dst, rogue_ref_io(ROGUE_IO_FT4), src1);
+   rogue_USHR(b, dst, src0, src1);
 }
 
 static void
@@ -1637,6 +1613,9 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 
    case nir_op_ior:
       return trans_nir_alu_ior(b, alu);
+
+   case nir_op_ixor:
+      return trans_nir_alu_ixor(b, alu);
 
    case nir_op_inot:
       return trans_nir_alu_inot(b, alu);
