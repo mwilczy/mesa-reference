@@ -135,6 +135,18 @@ static rogue_ref nir_intr_dst32(rogue_shader *shader,
    return rogue_ref_reg(rogue_ssa_reg(shader, intr->def.index));
 }
 
+static rogue_ref nir_intr_dst32_component(rogue_shader *shader,
+                                          const nir_intrinsic_instr *intr,
+                                          unsigned component)
+{
+   assert(intr->def.bit_size == 32);
+
+   unsigned num_components = intr->def.num_components;
+   assert(num_components > 1 || component == 0);
+   return rogue_ref_regarray(
+      rogue_ssa_vec_regarray(shader, 1, intr->def.index, component));
+}
+
 /* 64-bit restricted to scalars. */
 static rogue_ref64 nir_ssa_alu_src64(rogue_shader *shader,
                                      const nir_alu_instr *alu,
@@ -342,7 +354,7 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
    unsigned component = nir_intrinsic_component(intr);
 
    if (io_semantics.location == VARYING_SLOT_POS && component < 2) {
-      rogue_reg *src;
+      rogue_reg *src = NULL;
 
       switch (component) {
       case 0:
@@ -353,6 +365,7 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
          src = rogue_special_reg(b->shader, ROGUE_SPECIAL_REG_Y_P);
          break;
       }
+      assert(src);
 
       rogue_instr *instr = &rogue_MOV(b, dst, rogue_ref_reg(src))->instr;
       rogue_add_instr_commentf(instr,
@@ -383,44 +396,53 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
       rogue_regarray *wcoeffs =
          rogue_coeff_regarray(b->shader, ROGUE_COEFF_ALIGN, wcoeff_index);
 
-      rogue_instr *instr = &rogue_FITRP_PIXEL(b,
-                                              dst,
-                                              rogue_ref_drc(0),
-                                              rogue_ref_regarray(coeffs),
-                                              rogue_ref_regarray(wcoeffs),
-                                              rogue_ref_val(load_size))
-                               ->instr;
-      rogue_add_instr_comment(instr, "load_input_fs_smooth");
+      rogue_backend_instr *fitrp =
+         rogue_FITRP_PIXEL(b,
+                           dst,
+                           rogue_ref_drc(0),
+                           rogue_ref_regarray(coeffs),
+                           rogue_ref_regarray(wcoeffs),
+                           rogue_ref_val(load_size));
+      rogue_add_instr_comment(&fitrp->instr, "load_input_fs_smooth");
       break;
    }
+
    case INTERP_MODE_NOPERSPECTIVE: {
       rogue_regarray *coeffs =
          rogue_coeff_regarray(b->shader,
                               ROGUE_COEFF_ALIGN * load_size,
                               coeff_index);
 
-      rogue_instr *instr = &rogue_FITR_PIXEL(b,
-                                             dst,
-                                             rogue_ref_drc(0),
-                                             rogue_ref_regarray(coeffs),
-                                             rogue_ref_val(load_size))
-                               ->instr;
-      rogue_add_instr_comment(instr, "load_input_fs_npc");
+      rogue_backend_instr *fitr = rogue_FITR_PIXEL(b,
+                                                   dst,
+                                                   rogue_ref_drc(0),
+                                                   rogue_ref_regarray(coeffs),
+                                                   rogue_ref_val(load_size));
+      rogue_add_instr_comment(&fitr->instr, "load_input_fs_npc");
       break;
    }
+
    case INTERP_MODE_FLAT:
-      for (int i = 0; i < load_size; ++i) {
-         rogue_reg *coeff_c = rogue_coeff_reg(
-            b->shader,
-            coeff_index + i * ROGUE_COEFF_ALIGN + ROGUE_COEFF_COMPONENT_C);
-         rogue_reg *dst_i = rogue_ssa_reg(b->shader, intr->def.index + i);
+      for (unsigned u = 0; u < load_size; ++u) {
+         unsigned coeff_c_index =
+            coeff_index + u * ROGUE_COEFF_ALIGN + ROGUE_COEFF_COMPONENT_C;
+         rogue_reg *coeff_c = rogue_coeff_reg(b->shader, coeff_c_index);
 
-         rogue_instr *instr =
-            &rogue_MOV(b, rogue_ref_reg(dst_i), rogue_ref_reg(coeff_c))->instr;
-
-         rogue_add_instr_comment(instr, "load_input_fs_flat");
+         rogue_alu_instr *mov;
+         if (load_size > 1) {
+            rogue_ref dst_component =
+               nir_intr_dst32_component(b->shader, intr, u);
+            mov = rogue_MOV(b, dst_component, rogue_ref_reg(coeff_c));
+            rogue_add_instr_commentf(&mov->instr,
+                                     "load_input_fs_flat.%c",
+                                     'x' + u);
+         } else {
+            mov = rogue_MOV(b, dst, rogue_ref_reg(coeff_c));
+            rogue_add_instr_comment(&mov->instr, "load_input_fs_flat");
+         }
       }
       break;
+
    default:
       unreachable("Unsupported Interpolation mode");
    }
@@ -515,7 +537,10 @@ static void trans_nir_intrinsic_store_output_fs(rogue_builder *b,
 
    unsigned store_size;
    rogue_ref src = nir_intr_src32(b->shader, intr, 0, &store_size);
-   assert(store_size == 1); /* TODO: support "burst writes". */
+   /* Pixel output registers can't be used with repeat > 1, so store_size
+    * will always be limited to 1.
+    */
+   assert(store_size == 1);
 
    rogue_alu_instr *mov = rogue_MOV(b, rogue_ref_reg(dst), src);
    rogue_add_instr_commentf(&mov->instr, "store_output_fs");
