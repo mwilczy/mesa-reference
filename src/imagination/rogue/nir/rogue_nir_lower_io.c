@@ -162,33 +162,6 @@ static bool lower_load_push_constant_to_scalar(nir_builder *b,
    return true;
 }
 
-/* Scalarize/convert load_local_invocation_id to our custom intrinsics.
- * Unused components will get DCEd later.
- */
-static bool lower_load_local_invocation_id(nir_builder *b,
-                                           nir_intrinsic_instr *intr)
-{
-   assert(intr->def.num_components == 3);
-   assert(intr->def.bit_size == 32);
-
-   b->cursor = nir_before_instr(&intr->instr);
-
-   /* x component is 32-bit OOTB. */
-   nir_def *lid_x = nir_load_local_invocation_id_x_img(b);
-
-   /* yz components are 16-bit and supplied packed into a 32-bit reg. */
-   nir_def *lid_yz_packed32 = nir_load_local_invocation_id_yz_img(b);
-   nir_def *lid_yz_2x16 = nir_unpack_32_2x16(b, lid_yz_packed32);
-   nir_def *lid_yz = nir_i2i32(b, lid_yz_2x16);
-
-   nir_def_rewrite_uses(
-      &intr->def,
-      nir_vec3(b, lid_x, nir_channel(b, lid_yz, 0), nir_channel(b, lid_yz, 1)));
-   nir_instr_remove(&intr->instr);
-
-   return true;
-}
-
 /*
  * Scalarize/convert load_workgroup_id to our custom intrinsics.
  * Unused components will get DCEd later.
@@ -396,9 +369,6 @@ static bool lower_intrinsic(nir_builder *b,
 
       case nir_intrinsic_load_push_constant:
          return lower_load_push_constant_to_scalar(b, instr);
-
-      case nir_intrinsic_load_local_invocation_id:
-         return lower_load_local_invocation_id(b, instr);
 
       default:
          break;
