@@ -75,96 +75,6 @@ static bool lower_load_vulkan_descriptor(nir_builder *b,
    return true;
 }
 
-static bool lower_load_global_constant_to_scalar(nir_builder *b,
-                                                 nir_intrinsic_instr *intr)
-{
-   if (ROGUE_DEBUG(BURST_LOADS))
-      return false;
-
-   /* Scalarize the load_global_constant. */
-   b->cursor = nir_before_instr(&intr->instr);
-
-   if (intr->num_components == 1)
-      return false;
-
-   unsigned bit_size = intr->def.bit_size;
-   unsigned byte_size = bit_size / 8;
-
-   nir_def *loads[NIR_MAX_VEC_COMPONENTS];
-
-   for (uint8_t i = 0; i < intr->num_components; i++) {
-      nir_intrinsic_instr *chan_intr =
-         nir_intrinsic_instr_create(b->shader, intr->intrinsic);
-      nir_def_init(&chan_intr->instr, &chan_intr->def, 1, bit_size);
-      chan_intr->num_components = 1;
-
-      nir_intrinsic_set_access(chan_intr, nir_intrinsic_access(intr));
-      nir_intrinsic_set_align_mul(chan_intr, nir_intrinsic_align_mul(intr));
-      nir_intrinsic_set_align_offset(chan_intr,
-                                     nir_intrinsic_align_offset(intr));
-
-      /* Address. */
-      chan_intr->src[0] =
-         nir_src_for_ssa(nir_iadd_imm(b, intr->src[0].ssa, i * byte_size));
-
-      nir_builder_instr_insert(b, &chan_intr->instr);
-
-      loads[i] = &chan_intr->def;
-   }
-
-   nir_def_rewrite_uses(&intr->def,
-                            nir_vec(b, loads, intr->num_components));
-   nir_instr_remove(&intr->instr);
-
-   return true;
-}
-
-static bool lower_load_push_constant_to_scalar(nir_builder *b,
-                                               nir_intrinsic_instr *intr)
-{
-   if (ROGUE_DEBUG(BURST_LOADS))
-      return false;
-
-   /* Scalarize the load_push_constant. */
-   b->cursor = nir_before_instr(&intr->instr);
-
-   if (intr->num_components == 1)
-      return false;
-
-   unsigned bit_size = intr->def.bit_size;
-   unsigned byte_size = bit_size / 8;
-
-   nir_def *loads[NIR_MAX_VEC_COMPONENTS];
-
-   for (uint8_t i = 0; i < intr->num_components; i++) {
-      nir_intrinsic_instr *chan_intr =
-         nir_intrinsic_instr_create(b->shader, intr->intrinsic);
-      nir_def_init(&chan_intr->instr, &chan_intr->def, 1, bit_size);
-      chan_intr->num_components = 1;
-
-      nir_intrinsic_set_base(chan_intr, nir_intrinsic_base(intr));
-      nir_intrinsic_set_range(chan_intr, nir_intrinsic_range(intr));
-      nir_intrinsic_set_align_mul(chan_intr, nir_intrinsic_align_mul(intr));
-      nir_intrinsic_set_align_offset(chan_intr,
-                                     nir_intrinsic_align_offset(intr) +
-                                        i * byte_size);
-
-      /* Offset. */
-      chan_intr->src[0] =
-         nir_src_for_ssa(nir_iadd_imm(b, intr->src[0].ssa, i * byte_size));
-
-      nir_builder_instr_insert(b, &chan_intr->instr);
-
-      loads[i] = &chan_intr->def;
-   }
-
-   nir_def_rewrite_uses(&intr->def,
-                        nir_vec(b, loads, intr->num_components));
-   nir_instr_remove(&intr->instr);
-
-   return true;
-}
-
 /*
  * Scalarize/convert load_workgroup_id to our custom intrinsics.
  * Unused components will get DCEd later.
@@ -366,12 +276,6 @@ static bool lower_intrinsic(nir_builder *b,
       switch (instr->intrinsic) {
       case nir_intrinsic_load_vulkan_descriptor:
          return lower_load_vulkan_descriptor(b, instr);
-
-      case nir_intrinsic_load_global_constant:
-         return lower_load_global_constant_to_scalar(b, instr);
-
-      case nir_intrinsic_load_push_constant:
-         return lower_load_push_constant_to_scalar(b, instr);
 
       default:
          break;
