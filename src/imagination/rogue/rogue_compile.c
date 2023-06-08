@@ -778,6 +778,7 @@ static void trans_nir_load_const(rogue_builder *b,
    unsigned bit_size = load_const->def.bit_size;
 
    switch (bit_size) {
+   case 8:
    case 16:
    case 32:
       return trans_nir_load_const_bits(b, load_const, bit_size);
@@ -1079,6 +1080,7 @@ static void trans_nir_intrinsic_load_global(rogue_builder *b,
 
    unsigned burst_len;
    switch (bit_size) {
+   case 8:
    case 16:
       burst_len = 1;
       break;
@@ -1140,6 +1142,11 @@ static void trans_nir_intrinsic_store_global(rogue_builder *b,
    unsigned burst_len;
    unsigned data_size;
    switch (bit_size) {
+   case 8:
+      burst_len = 1;
+      data_size = 0;
+      break;
+
    case 16:
       burst_len = 1;
       data_size = 1;
@@ -2098,6 +2105,10 @@ static void trans_nir_alu_minmax(rogue_builder *b, nir_alu_instr *alu)
    case nir_op_imin:
    case nir_op_imax:
       switch (bit_size) {
+      case 8:
+         rogue_set_alu_op_mod(minmax, OM(S8));
+         break;
+
       case 16:
          rogue_set_alu_op_mod(minmax, OM(S16));
          break;
@@ -2114,6 +2125,10 @@ static void trans_nir_alu_minmax(rogue_builder *b, nir_alu_instr *alu)
    case nir_op_umin:
    case nir_op_umax:
       switch (bit_size) {
+      case 8:
+         rogue_set_alu_op_mod(minmax, OM(U8));
+         break;
+
       case 16:
          rogue_set_alu_op_mod(minmax, OM(U16));
          break;
@@ -2386,6 +2401,10 @@ static void trans_nir_alu_iadd(rogue_builder *b, nir_alu_instr *alu)
    rogue_alu_instr *iadd;
 
    switch (bit_size) {
+   case 8:
+      iadd = rogue_IADD8(b, dst, src0, src1);
+      break;
+
    case 16:
       iadd = rogue_IADD16(b, dst, src0, src1);
       break;
@@ -2425,6 +2444,10 @@ static void trans_nir_alu_imul(rogue_builder *b, nir_alu_instr *alu)
    rogue_alu_instr *imul;
 
    switch (bit_size) {
+   case 8:
+      imul = rogue_IMUL8(b, dst, src0, src1);
+      break;
+
    case 16:
       imul = rogue_IMUL16(b, dst, src0, src1);
       break;
@@ -2482,6 +2505,9 @@ static void trans_nir_alu_ineg(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src = alu_src(b->shader, alu, 0, NULL, bit_size);
 
    switch (bit_size) {
+   case 8:
+      rogue_INEG8(b, dst, src);
+      return;
 
    case 16:
       rogue_INEG16(b, dst, src);
@@ -2513,6 +2539,9 @@ static void trans_nir_alu_iabs(rogue_builder *b, nir_alu_instr *alu)
    rogue_ref src = alu_src(b->shader, alu, 0, NULL, bit_size);
 
    switch (bit_size) {
+   case 8:
+      rogue_IABS8(b, dst, src);
+      return;
 
    case 16:
       rogue_IABS16(b, dst, src);
@@ -2598,6 +2627,10 @@ static void trans_nir_alu_cmp(rogue_builder *b, nir_alu_instr *alu)
    case nir_op_ieq32:
    case nir_op_ine32:
       switch (bit_size) {
+      case 8:
+         rogue_set_alu_op_mod(cmp, OM(S8));
+         break;
+
       case 16:
          rogue_set_alu_op_mod(cmp, OM(S16));
          break;
@@ -2614,6 +2647,10 @@ static void trans_nir_alu_cmp(rogue_builder *b, nir_alu_instr *alu)
    case nir_op_ult32:
    case nir_op_uge32:
       switch (bit_size) {
+      case 8:
+         rogue_set_alu_op_mod(cmp, OM(U8));
+         break;
+
       case 16:
          rogue_set_alu_op_mod(cmp, OM(U16));
          break;
