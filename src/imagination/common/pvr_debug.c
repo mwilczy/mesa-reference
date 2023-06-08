@@ -38,6 +38,8 @@ static const struct debug_named_value debug_control[] = {
      "Dump descriptor set and pipeline layouts." },
    { "info", PVR_DEBUG_INFO,
      "Display information about the driver and device." },
+   { "loadop_nir", PVR_DEBUG_LOADOP_NIR,
+	 "Use NIR generated load op shaders instead of directly using Rogue IR." },
    DEBUG_NAMED_VALUE_END
 };
 /* clang-format on */
