@@ -157,6 +157,8 @@ static void pvr_physical_device_get_supported_extensions(
    struct vk_device_extension_table *extensions)
 {
    *extensions = (struct vk_device_extension_table){
+      .KHR_8bit_storage = true,
+      .KHR_16bit_storage = true,
       .KHR_copy_commands2 = true,
       /* TODO: enable this extension when the conformance tests get
        * updated to version 1.3.6.0, the current version does not
@@ -168,6 +170,8 @@ static void pvr_physical_device_get_supported_extensions(
       .KHR_external_memory_fd = true,
       .KHR_format_feature_flags2 = true,
       .KHR_get_memory_requirements2 = true,
+      .KHR_shader_float16_int8 = true,
+      .KHR_storage_buffer_storage_class = true,
       .KHR_swapchain = PVR_USE_WSI_PLATFORM,
       .KHR_timeline_semaphore = true,
       .EXT_external_memory_dma_buf = true,
@@ -222,8 +226,15 @@ static void pvr_physical_device_get_supported_features(
       .shaderClipDistance = false,
       .shaderCullDistance = false,
       .shaderFloat64 = false,
-      .shaderInt64 = true,
+      .shaderInt64 = false,
       .shaderInt16 = true,
+      .shaderInt8 = true,
+      .storageBuffer16BitAccess = true,
+      .uniformAndStorageBuffer16BitAccess = true,
+      .storagePushConstant16 = true,
+      .storageBuffer8BitAccess = true,
+      .uniformAndStorageBuffer8BitAccess = true,
+      .storagePushConstant8 = true,
       .shaderResourceResidency = false,
       .shaderResourceMinLod = false,
       .sparseBinding = false,
