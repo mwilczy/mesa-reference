@@ -40,6 +40,8 @@ static const struct debug_named_value debug_control[] = {
      "Display information about the driver and device." },
    { "loadop_nir", PVR_DEBUG_LOADOP_NIR,
 	 "Use NIR generated load op shaders instead of directly using Rogue IR." },
+   { "tq_nir", PVR_DEBUG_TQ_NIR,
+     "Use transfer queue frag shaders run-timed compiled with NIR." },
    DEBUG_NAMED_VALUE_END
 };
 /* clang-format on */
