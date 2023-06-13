@@ -4459,7 +4459,8 @@ void pvr_compute_update_kernel_private(
        */
       coeff_regs = dev_runtime_info->cdm_max_local_mem_size_regs;
    } else {
-      coeff_regs = pipeline->coeff_regs_count;
+      coeff_regs =
+         pipeline->coeff_regs_count + pipeline->const_shared_regs_count;
    }
 
    info.usc_common_size =
@@ -4468,8 +4469,6 @@ void pvr_compute_update_kernel_private(
 
    /* Use a whole slot per workgroup. */
    work_size = MAX2(work_size, ROGUE_MAX_INSTANCES_PER_TASK);
-
-   coeff_regs += pipeline->const_shared_regs_count;
 
    if (pipeline->const_shared_regs_count > 0)
       info.sd_type = PVRX(CDMCTRL_SD_TYPE_USC);
@@ -4542,7 +4541,8 @@ static void pvr_compute_update_kernel(
        */
       coeff_regs = dev_runtime_info->cdm_max_local_mem_size_regs;
    } else {
-      coeff_regs = shader_state->coefficient_register_count;
+      coeff_regs = shader_state->coefficient_register_count +
+                   shader_state->const_shared_reg_count;
    }
 
    info.usc_common_size =
@@ -4551,8 +4551,6 @@ static void pvr_compute_update_kernel(
 
    /* Use a whole slot per workgroup. */
    work_size = MAX2(work_size, ROGUE_MAX_INSTANCES_PER_TASK);
-
-   coeff_regs += shader_state->const_shared_reg_count;
 
    if (shader_state->const_shared_reg_count > 0)
       info.sd_type = PVRX(CDMCTRL_SD_TYPE_USC);
