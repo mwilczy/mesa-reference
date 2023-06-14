@@ -176,6 +176,8 @@ static void pvr_physical_device_get_supported_extensions(
       .KHR_timeline_semaphore = true,
       .EXT_external_memory_dma_buf = true,
       .EXT_private_data = true,
+      .EXT_shader_atomic_float = true,
+      .EXT_shader_atomic_float2 = true,
       .EXT_tooling_info = true,
    };
 }
@@ -254,6 +256,16 @@ static void pvr_physical_device_get_supported_features(
 
       /* Vulkan 1.3 / VK_EXT_private_data */
       .privateData = true,
+
+      /* EXT_shader_atomic_float */
+      .shaderBufferFloat32Atomics = true,
+      .shaderBufferFloat32AtomicAdd = true,
+      .shaderSharedFloat32Atomics = true,
+      .shaderSharedFloat32AtomicAdd = true,
+
+      /* EXT_shader_atomic_float2 */
+      .shaderBufferFloat32AtomicMinMax = true,
+      .shaderSharedFloat32AtomicMinMax = true,
    };
 }
 
