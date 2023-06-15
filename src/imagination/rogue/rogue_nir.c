@@ -53,13 +53,14 @@ static const struct spirv_to_nir_options spirv_options = {
    },
 
    .ubo_addr_format = nir_address_format_64bit_global,
-   .phys_ssbo_addr_format = nir_address_format_64bit_global,
    .ssbo_addr_format = nir_address_format_64bit_global,
+   .phys_ssbo_addr_format = nir_address_format_64bit_global,
    /* TODO:
     * nir_address_format_64bit_bounded_global if robust
     * nir_address_format_64bit_global_32bit_offset otherwise
     */
    .push_const_addr_format = nir_address_format_32bit_offset,
+   .shared_addr_format = nir_address_format_32bit_offset,
 };
 
 static const nir_shader_compiler_options nir_options = {
@@ -203,6 +204,18 @@ static void rogue_setup_lower_atomic_options(unsigned *atomic_op_mask,
       *atomic_op_modes |= nir_var_mem_shared;
    }
 }
+
+static void
+shared_var_info(const struct glsl_type *type, unsigned *size, unsigned *align)
+{
+   assert(glsl_type_is_vector_or_scalar(type));
+
+   uint32_t comp_size =
+      glsl_type_is_boolean(type) ? 4 : glsl_get_bit_size(type) / 8;
+   unsigned length = glsl_get_vector_elements(type);
+   *size = comp_size * length, *align = comp_size;
+}
+
 /**
  * \brief Applies optimizations and passes required to lower the NIR shader into
  * a form suitable for lowering to Rogue IR.
@@ -342,6 +355,18 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
               nir_var_mem_ssbo,
               spirv_options.ssbo_addr_format);
    NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_mem_ssbo, NULL, NULL);
+
+   if (!nir->info.shared_memory_explicit_layout)
+      NIR_PASS_V(nir,
+                 nir_lower_vars_to_explicit_types,
+                 nir_var_mem_shared,
+                 shared_var_info);
+
+   NIR_PASS_V(nir,
+              nir_lower_explicit_io,
+              nir_var_mem_shared,
+              spirv_options.shared_addr_format);
+   NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_mem_shared, NULL, NULL);
 
    if (nir->info.stage == MESA_SHADER_COMPUTE)
       NIR_PASS_V(nir,
