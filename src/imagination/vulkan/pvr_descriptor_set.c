@@ -79,74 +79,6 @@ static const char *descriptor_names[] = { "VK SAMPLER",
                                           "VK STORAGE_BUFFER_DYNAMIC",
                                           "VK INPUT_ATTACHMENT" };
 
-void pvr_descriptor_size_info_init(
-   const struct pvr_device *device,
-   VkDescriptorType type,
-   struct pvr_descriptor_size_info *const size_info_out)
-{
-   /* UINT_MAX is a place holder. These values will be filled by calling the
-    * init function, and set appropriately based on device features.
-    */
-   /* clang-format off */
-   static const struct pvr_descriptor_size_info template_size_infos[] = {
-      /* VK_DESCRIPTOR_TYPE_SAMPLER */
-      { PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, PVR_SMP_DESCRIPTOR_ALIGNMENT },
-      /* VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER */
-      { PVR_IMAGE_DESCRIPTOR_SIZE + PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, PVR_SMP_DESCRIPTOR_ALIGNMENT },
-      /* VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE */
-      { 4, UINT_MAX, 4 },
-      /* VK_DESCRIPTOR_TYPE_STORAGE_IMAGE */
-      { 4, UINT_MAX, 4 },
-      /* VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER */
-      { 4, UINT_MAX, 4 },
-      /* VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER */
-      { 4, UINT_MAX, 4 },
-      /* VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER */
-      { 2, UINT_MAX, 2 },
-      /* VK_DESCRIPTOR_TYPE_STORAGE_BUFFER */
-      { 2, 1, 2 },
-      /* VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC */
-      { 2, UINT_MAX, 2 },
-      /* VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC */
-      { 2, 1, 2 },
-      /* VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT */
-      { 8, UINT_MAX, 4 }
-   };
-   /* clang-format on */
-
-   *size_info_out = template_size_infos[type];
-
-   switch (type) {
-   case VK_DESCRIPTOR_TYPE_SAMPLER:
-      size_info_out->secondary =
-         PVR_DESC_IMAGE_SECONDARY_TOTAL_SIZE(&device->pdevice->dev_info);
-      break;
-
-   case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-   case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-      break;
-
-   case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-   case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-   case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-   case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-   case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-   case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-      size_info_out->secondary =
-         PVR_DESC_IMAGE_SECONDARY_TOTAL_SIZE(&device->pdevice->dev_info);
-      break;
-
-   case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-   case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-      size_info_out->secondary =
-         (uint32_t)device->vk.enabled_features.robustBufferAccess;
-      break;
-
-   default:
-      unreachable("Unknown descriptor type");
-   }
-}
-
 static uint8_t vk_to_pvr_shader_stage_flags(VkShaderStageFlags vk_flags)
 {
    uint8_t flags = 0;
@@ -527,7 +459,11 @@ pvr_setup_required_in_memory_layout(struct pvr_device *device,
          continue;
       }
 
-      pvr_descriptor_size_info_init(device, binding->type, &size_info);
+      pvr_descriptor_size_info_init(
+         &device->pdevice->dev_info,
+         device->vk.enabled_features.robustBufferAccess,
+         binding->type,
+         &size_info);
 
       u_foreach_bit (stage, binding->shader_stage_mask) {
          STATIC_ASSERT(
@@ -736,7 +672,11 @@ VkResult pvr_CreateDescriptorSetLayout(
              descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC) {
             struct pvr_descriptor_size_info size_info;
 
-            pvr_descriptor_size_info_init(device, descriptor_type, &size_info);
+            pvr_descriptor_size_info_init(
+               &device->pdevice->dev_info,
+               device->vk.enabled_features.robustBufferAccess,
+               descriptor_type,
+               &size_info);
 
             STATIC_ASSERT(
                ARRAY_SIZE(reg_usage) ==
@@ -782,7 +722,11 @@ VkResult pvr_CreateDescriptorSetLayout(
          if (!(internal_binding->shader_stage_mask & BITFIELD_BIT(stage)))
             continue;
 
-         pvr_descriptor_size_info_init(device, descriptor_type, &size_info);
+         pvr_descriptor_size_info_init(
+            &device->pdevice->dev_info,
+            device->vk.enabled_features.robustBufferAccess,
+            descriptor_type,
+            &size_info);
 
          /* TODO: align primary like we did with other descriptors? */
          internal_binding->per_stage_offset_in_dwords[stage].primary =
@@ -1021,6 +965,9 @@ VkResult pvr_CreatePipelineLayout(VkDevice _device,
    if (!layout)
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
+   layout->robust_buffer_access =
+      device->vk.enabled_features.robustBufferAccess;
+
    layout->set_count = pCreateInfo->setLayoutCount;
    layout->shader_stage_mask = 0;
    for (uint32_t stage = 0; stage < PVR_STAGE_ALLOCATION_COUNT; stage++) {
@@ -1208,9 +1155,11 @@ VkResult pvr_CreateDescriptorPool(VkDevice _device,
       const uint32_t descriptor_count =
          pCreateInfo->pPoolSizes[i].descriptorCount;
 
-      pvr_descriptor_size_info_init(device,
-                                    pCreateInfo->pPoolSizes[i].type,
-                                    &size_info);
+      pvr_descriptor_size_info_init(
+         &device->pdevice->dev_info,
+         device->vk.enabled_features.robustBufferAccess,
+         pCreateInfo->pPoolSizes[i].type,
+         &size_info);
 
       const uint32_t secondary = ALIGN_POT(size_info.secondary, 4);
       const uint32_t primary = ALIGN_POT(size_info.primary, 4);
@@ -1288,7 +1237,10 @@ static uint16_t pvr_get_descriptor_primary_offset(
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
 #if defined(DEBUG)
    if (desc_idx >= binding->descriptor_count) {
@@ -1364,7 +1316,10 @@ static uint16_t pvr_get_descriptor_secondary_offset(
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
 #if defined(DEBUG)
    if (desc_idx >= binding->descriptor_count) {
@@ -1441,7 +1396,10 @@ static uint16_t pvr_get_required_descriptor_primary_offset(
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    mem_layout = &layout->required_in_memory_layout_in_dwords_per_stage[stage];
 
@@ -1468,7 +1426,10 @@ static uint16_t pvr_get_required_descriptor_secondary_offset(
 
    assert(stage < ARRAY_SIZE(layout->memory_layout_in_dwords_per_stage));
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    mem_layout = &layout->required_in_memory_layout_in_dwords_per_stage[stage];
 
@@ -1699,7 +1660,10 @@ static void pvr_descriptor_update_buffer_info(
    is_dynamic = (binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) ||
                 (binding->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    for (uint32_t i = 0; i < write_set->descriptorCount; i++) {
       const VkDescriptorBufferInfo *buffer_info = &write_set->pBufferInfo[i];
@@ -1768,7 +1732,10 @@ static void pvr_descriptor_update_sampler(
    uint32_t *required_mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
    struct pvr_descriptor_size_info size_info;
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    for (uint32_t i = 0; i < write_set->descriptorCount; i++) {
       PVR_FROM_HANDLE(pvr_sampler, sampler, write_set->pImageInfo[i].sampler);
@@ -1911,7 +1878,10 @@ static void pvr_descriptor_update_sampler_texture(
    const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
    struct pvr_descriptor_size_info size_info;
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    for (uint32_t i = 0; i < write_set->descriptorCount; i++) {
       PVR_FROM_HANDLE(pvr_image_view,
@@ -2170,7 +2140,10 @@ static void pvr_descriptor_update_buffer_view(
    const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
    struct pvr_descriptor_size_info size_info;
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    for (uint32_t i = 0; i < write_set->descriptorCount; i++) {
       PVR_FROM_HANDLE(pvr_buffer_view, bview, write_set->pTexelBufferView[i]);
@@ -2254,7 +2227,10 @@ static void pvr_descriptor_update_input_attachment(
    const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
    struct pvr_descriptor_size_info size_info;
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    for (uint32_t i = 0; i < write_set->descriptorCount; i++) {
       PVR_FROM_HANDLE(pvr_image_view,
@@ -2509,7 +2485,10 @@ static void pvr_copy_descriptor_set(struct pvr_device *device,
     * So both bindings have the same descriptor size and we don't need to
     * handle size differences.
     */
-   pvr_descriptor_size_info_init(device, src_binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 src_binding->type,
+                                 &size_info);
 
    assert(src_binding->shader_stage_mask == dst_binding->shader_stage_mask);
 

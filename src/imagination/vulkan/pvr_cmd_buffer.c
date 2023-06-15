@@ -3540,7 +3540,10 @@ static uint16_t pvr_get_dynamic_descriptor_primary_offset(
    assert(binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
           binding->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    offset = layout->total_size_in_dwords;
    offset += binding->per_stage_offset_in_dwords[stage].primary;
@@ -3569,7 +3572,10 @@ static uint16_t pvr_get_dynamic_descriptor_secondary_offset(
    assert(binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
           binding->type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
 
-   pvr_descriptor_size_info_init(device, binding->type, &size_info);
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
+                                 binding->type,
+                                 &size_info);
 
    offset = layout->total_size_in_dwords;
    offset +=
@@ -3613,10 +3619,12 @@ static VkResult pvr_cmd_buffer_upload_patched_desc_set(
 
    assert(desc_set->layout->dynamic_buffer_count > 0);
 
-   pvr_descriptor_size_info_init(device,
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
                                  VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                                  &dynamic_uniform_buffer_size_info);
-   pvr_descriptor_size_info_init(device,
+   pvr_descriptor_size_info_init(&device->pdevice->dev_info,
+                                 device->vk.enabled_features.robustBufferAccess,
                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
                                  &dynamic_storage_buffer_size_info);
 

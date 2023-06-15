@@ -607,6 +607,8 @@ struct pvr_sh_reg_layout {
 struct pvr_pipeline_layout {
    struct vk_object_base base;
 
+   bool robust_buffer_access;
+
    uint32_t set_count;
    /* Contains set_count amount of descriptor set layouts. */
    struct pvr_descriptor_set_layout *set_layout[PVR_MAX_DESCRIPTOR_SETS];
@@ -769,6 +771,72 @@ static uint32_t pvr_get_sampler_descriptor_secondary_sh_reg(
     */
 
    return primary_offset;
+}
+
+static void pvr_descriptor_size_info_init(
+   const struct pvr_device_info *dev_info,
+   bool robust_buffer,
+   VkDescriptorType type,
+   struct pvr_descriptor_size_info *const size_info_out)
+{
+   /* UINT_MAX is a place holder. These values will be filled by calling the
+    * init function, and set appropriately based on device features.
+    */
+   /* clang-format off */
+   static const struct pvr_descriptor_size_info template_size_infos[] = {
+      /* VK_DESCRIPTOR_TYPE_SAMPLER */
+      { PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, PVR_SMP_DESCRIPTOR_ALIGNMENT },
+      /* VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER */
+      { PVR_IMAGE_DESCRIPTOR_SIZE + PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, PVR_SMP_DESCRIPTOR_ALIGNMENT },
+      /* VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE */
+      { 4, UINT_MAX, 4 },
+      /* VK_DESCRIPTOR_TYPE_STORAGE_IMAGE */
+      { 4, UINT_MAX, 4 },
+      /* VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER */
+      { 4, UINT_MAX, 4 },
+      /* VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER */
+      { 4, UINT_MAX, 4 },
+      /* VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER */
+      { 2, UINT_MAX, 2 },
+      /* VK_DESCRIPTOR_TYPE_STORAGE_BUFFER */
+      { 2, 1, 2 },
+      /* VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC */
+      { 2, UINT_MAX, 2 },
+      /* VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC */
+      { 2, 1, 2 },
+      /* VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT */
+      { 8, UINT_MAX, 4 }
+   };
+   /* clang-format on */
+
+   *size_info_out = template_size_infos[type];
+
+   switch (type) {
+   case VK_DESCRIPTOR_TYPE_SAMPLER:
+      size_info_out->secondary = PVR_DESC_IMAGE_SECONDARY_TOTAL_SIZE(dev_info);
+      break;
+
+   case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+   case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+      break;
+
+   case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+   case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+   case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+   case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+   case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+   case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+      size_info_out->secondary = PVR_DESC_IMAGE_SECONDARY_TOTAL_SIZE(dev_info);
+      break;
+
+   case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+   case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+      size_info_out->secondary = !!robust_buffer;
+      break;
+
+   default:
+      unreachable("Unknown descriptor type");
+   }
 }
 
 #endif /* PVR_COMMON_H */

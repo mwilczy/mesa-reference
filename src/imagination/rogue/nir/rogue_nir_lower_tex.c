@@ -75,35 +75,20 @@ static void get_tex_deref_layout(nir_builder *b,
       pvr_get_descriptor_binding(set_layout, binding);
 
    unsigned desc_size;
-   switch (binding_layout->type) {
-   case VK_DESCRIPTOR_TYPE_SAMPLER:
-      assert(sampler);
-      desc_size = PVR_SAMPLER_DESCRIPTOR_SIZE;
-      break;
-
-   case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-      desc_size = PVR_SAMPLER_DESCRIPTOR_SIZE + PVR_IMAGE_DESCRIPTOR_SIZE;
-      break;
-
-   case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-   case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-   case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-   case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-   case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-      assert(!sampler);
-      desc_size = PVR_IMAGE_DESCRIPTOR_SIZE;
-      break;
-
-   default:
-      unreachable("Descriptor is not located in the shareds");
-   }
+   struct pvr_descriptor_size_info desc_size_info;
+   pvr_descriptor_size_info_init(ctx->compiler->dev_info,
+                                 pipeline_layout->robust_buffer_access,
+                                 binding_layout->type,
+                                 &desc_size_info);
 
    if (primary) {
+      desc_size = desc_size_info.primary;
       sh_imm_index = pvr_get_required_descriptor_primary_sh_reg(pipeline_layout,
                                                                 pvr_stage,
                                                                 desc_set,
                                                                 binding_layout);
    } else {
+      desc_size = desc_size_info.secondary;
       sh_imm_index =
          pvr_get_sampler_descriptor_secondary_sh_reg(pipeline_layout,
                                                      pvr_stage,

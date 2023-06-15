@@ -1457,11 +1457,6 @@ void pvr_reset_graphics_dirty_state(struct pvr_cmd_buffer *const cmd_buffer,
 const struct pvr_renderpass_hwsetup_subpass *
 pvr_get_hw_subpass(const struct pvr_render_pass *pass, const uint32_t subpass);
 
-void pvr_descriptor_size_info_init(
-   const struct pvr_device *device,
-   VkDescriptorType type,
-   struct pvr_descriptor_size_info *const size_info_out);
-
 void pvr_collect_io_data_fs(struct rogue_common_build_data *common_data,
                             struct rogue_fs_build_data *fs_data,
                             nir_shader *nir,
