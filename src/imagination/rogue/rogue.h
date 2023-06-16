@@ -1923,6 +1923,7 @@ enum rogue_backend_op_mod {
 
    ROGUE_BACKEND_OP_MOD_TILED, /* Tiled LD/ST. */
 
+   ROGUE_BACKEND_OP_MOD_NORMAL, /* MCU cache mode (read): normal. */
    ROGUE_BACKEND_OP_MOD_BYPASS, /* MCU cache mode (read): bypass. */
    ROGUE_BACKEND_OP_MOD_FORCELINEFILL, /* MCU cache mode (read): force line
                                         * fill.
@@ -3624,6 +3625,7 @@ enum rogue_debug {
    ROGUE_DEBUG_SKIP_CF_OPTS = BITFIELD_BIT(9),
    ROGUE_DEBUG_DUMP_BINARY = BITFIELD_BIT(10),
    ROGUE_DEBUG_ATOMIC_EMU = BITFIELD_BIT(11),
+   ROGUE_DEBUG_CACHE = BITFIELD_BIT(12),
 };
 
 extern unsigned long rogue_debug;

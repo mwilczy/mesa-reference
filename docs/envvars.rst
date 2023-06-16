@@ -1745,6 +1745,8 @@ PowerVR driver environment variables
       Dump shader binaries after compilation.
    ``atomic_emu``
       Emulate all atomic ops.
+   ``cache``
+      Use cache modifiers.
 
 .. envvar:: ROGUE_COLOR
 

@@ -542,10 +542,7 @@ static void rogue_collect_early_vs_build_data(rogue_build_ctx *ctx,
       }
    }
 
-   /* TODO */
-   assert(!info->uses_control_barrier);
-   assert(!info->uses_memory_barrier);
-   vs_data->has.barrier = false;
+   assert(!info->uses_control_barrier && !info->uses_memory_barrier);
 }
 
 static void rogue_collect_early_fs_build_data(rogue_build_ctx *ctx,
@@ -577,10 +574,7 @@ static void rogue_collect_early_fs_build_data(rogue_build_ctx *ctx,
       }
    }
 
-   /* TODO */
-   assert(!info->uses_control_barrier);
-   assert(!info->uses_memory_barrier);
-   fs_data->has.barrier = false;
+   assert(!info->uses_control_barrier && !info->uses_memory_barrier);
 }
 
 static void rogue_collect_early_cs_build_data(rogue_build_ctx *ctx,
@@ -632,13 +626,11 @@ static void rogue_collect_early_cs_build_data(rogue_build_ctx *ctx,
       }
    }
 
-   /* TODO */
-   assert(!info->uses_control_barrier);
-   assert(!info->uses_memory_barrier);
-   cs_data->has.barrier = false;
-
    cs_data->work_size = info->workgroup_size[0] * info->workgroup_size[1] *
                         info->workgroup_size[2];
+
+   cs_data->has.barrier = info->uses_control_barrier &&
+                          (cs_data->work_size > 32);
 }
 
 static void rogue_collect_early_build_data(rogue_build_ctx *ctx,

@@ -1028,6 +1028,7 @@ pvr_compute_pipeline_alloc_coeffs(struct rogue_cs_build_data *cs_data)
 {
    uint32_t next_free_reg = 0;
 
+   /* Workgroup ID regs need to be 128-bit (4-byte) aligned. */
    if (cs_data->has.work_group_id_x)
       cs_data->workgroup_regs[0] = next_free_reg++;
    else
@@ -1042,6 +1043,14 @@ pvr_compute_pipeline_alloc_coeffs(struct rogue_cs_build_data *cs_data)
       cs_data->workgroup_regs[2] = next_free_reg++;
    else
       cs_data->workgroup_regs[2] = ROGUE_REG_UNUSED;
+
+   /* Barrier coefficient needs to be 128-bit aligned. */
+   next_free_reg = ALIGN_POT(next_free_reg, 4);
+
+   if (cs_data->has.barrier)
+      cs_data->barrier_reg = next_free_reg++;
+   else
+      cs_data->barrier_reg = ROGUE_REG_UNUSED;
 
    return next_free_reg;
 }
@@ -1175,10 +1184,6 @@ static VkResult pvr_compute_pipeline_compile(
     */
    STATIC_ASSERT(ROGUE_REG_UNUSED == PVR_PDS_COMPUTE_INPUT_REG_UNUSED);
 
-   /* TODO: Add proper handling for this. */
-   assert(cs_data->has.barrier == false);
-   cs_data->barrier_reg = ROGUE_REG_UNUSED;
-
    if (!cs_data->has.work_group_id_x)
       assert(cs_data->workgroup_regs[0] == PVR_PDS_COMPUTE_INPUT_REG_UNUSED);
 
@@ -1187,6 +1192,9 @@ static VkResult pvr_compute_pipeline_compile(
 
    if (!cs_data->has.work_group_id_z)
       assert(cs_data->workgroup_regs[2] == PVR_PDS_COMPUTE_INPUT_REG_UNUSED);
+
+   if (!cs_data->has.barrier)
+      assert(cs_data->barrier_reg == PVR_PDS_COMPUTE_INPUT_REG_UNUSED);
 
    /* TODO: Get rid of this copy when removing the hard coding path. */
    local_input_regs[0] = cs_data->local_id_regs[0];

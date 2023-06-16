@@ -53,6 +53,7 @@ static const struct debug_named_value rogue_debug_options[] = {
      "Skip some control-flow optimisations" },
    { "dump_binary", ROGUE_DEBUG_DUMP_BINARY, "Dump shader binaries" },
    { "atomic_emu", ROGUE_DEBUG_ATOMIC_EMU, "Emulate all atomic ops" },
+   { "cache", ROGUE_DEBUG_CACHE, "Use cache modifiers" },
    DEBUG_NAMED_VALUE_END,
 };
 

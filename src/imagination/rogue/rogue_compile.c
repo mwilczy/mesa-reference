@@ -1743,6 +1743,13 @@ static void trans_nir_intrinsic_load_global(rogue_builder *b,
    rogue_backend_instr *ld =
       rogue_load_global(b, &dst, &src_addr, bit_size, load_components, constant);
 
+   if (ROGUE_DEBUG(CACHE)) {
+      if (nir_intrinsic_access(intr) & ACCESS_COHERENT)
+         rogue_set_backend_op_mod(ld, ROGUE_BACKEND_OP_MOD_NORMAL);
+      else
+         rogue_set_backend_op_mod(ld, ROGUE_BACKEND_OP_MOD_BYPASS);
+   }
+
    rogue_add_instr_commentf(&ld->instr,
                             "load_global%s%ux%u",
                             constant ? "_constant" : "",
@@ -1763,7 +1770,13 @@ static void trans_nir_intrinsic_store_global(rogue_builder *b,
    rogue_backend_instr *st =
       rogue_store_global(b, &dst_addr, &src, bit_size, store_components);
 
-   /* TODO: cache flags */
+   if (ROGUE_DEBUG(CACHE)) {
+      if (nir_intrinsic_access(intr) & ACCESS_COHERENT)
+         rogue_set_backend_op_mod(st, ROGUE_BACKEND_OP_MOD_WRITETHROUGH);
+      else
+         rogue_set_backend_op_mod(st, ROGUE_BACKEND_OP_MOD_WRITEBACK);
+   }
+
    rogue_add_instr_commentf(&st->instr,
                             "store_global%ux%u",
                             bit_size,

@@ -502,7 +502,8 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
          .src_set[1] = IO(S0) | IO(S1) | IO(S2) | IO(S4) | IO(S5),
          .src_set[2] = IO(S0) | IO(S1) | IO(S2) | IO(S4) | IO(S5),
       },
-      .supported_op_mods = OM(BYPASS) | OM(FORCELINEFILL) | OM(SLCBYPASS) | OM(SLCNOALLOC),
+      .supported_op_mods = OM(NORMAL) | OM(BYPASS) | OM(FORCELINEFILL)
+         /* | OM(SLCBYPASS) | OM(SLCNOALLOC) */,
       .supported_dst_types = { [0] = T(REG) | T(REGARRAY), },
       .supported_src_types = {
          [0] = T(DRC),
@@ -523,7 +524,8 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
          .src_set[5] = IO(S0) | IO(S1) | IO(S2) | IO(S4) | IO(S5),
       },
       .supported_op_mods = OM(TILED) | OM(WRITETHROUGH) | OM(WRITEBACK) | OM(LAZYWRITEBACK) |
-         OM(SLCBYPASS) | OM(SLCWRITEBACK) | OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | OM(NOWDF),
+         /* OM(SLCBYPASS) | OM(SLCWRITEBACK) | OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | */
+         OM(NOWDF),
       .supported_src_types = {
          [0] = T(REG) | T(REGARRAY),
          [1] = T(VAL),
@@ -589,8 +591,9 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       .supported_op_mods = OM(PROJ) | OM(FCNORM) | OM(NNCOORDS) | OM(BIAS) | OM(REPLACE) |
          OM(GRADIENT) | OM(PPLOD) | OM(TAO) | OM(SOO) | OM(SNO) | OM(WRT) | OM(DATA) |
          OM(INFO) | OM(BOTH) | OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) |
-         OM(WRITEBACK) | OM(LAZYWRITEBACK) | OM(SLCBYPASS) | OM(SLCWRITEBACK) |
-         OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | OM(ARRAY) | OM(INTEGER) | OM(SCHEDSWAP) |
+         OM(WRITEBACK) | OM(LAZYWRITEBACK) |
+         /* OM(SLCBYPASS) | OM(SLCWRITEBACK) | OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | */
+         OM(ARRAY) | OM(INTEGER) | OM(SCHEDSWAP) |
          OM(F16),
       .supported_dst_types = { [0] = T(REG) | T(REGARRAY), },
       .supported_src_types = {
@@ -619,8 +622,9 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       .supported_op_mods = OM(PROJ) | OM(FCNORM) | OM(NNCOORDS) | OM(BIAS) | OM(REPLACE) |
          OM(GRADIENT) | OM(PPLOD) | OM(TAO) | OM(SOO) | OM(SNO) | OM(WRT) | OM(DATA) |
          OM(INFO) | OM(BOTH) | OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) |
-         OM(WRITEBACK) | OM(LAZYWRITEBACK) | OM(SLCBYPASS) | OM(SLCWRITEBACK) |
-         OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | OM(ARRAY) | OM(INTEGER) | OM(SCHEDSWAP) |
+         OM(WRITEBACK) | OM(LAZYWRITEBACK) |
+         /* OM(SLCBYPASS) | OM(SLCWRITEBACK) | OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | */
+         OM(ARRAY) | OM(INTEGER) | OM(SCHEDSWAP) |
          OM(F16),
       .supported_dst_types = { [0] = T(REG) | T(REGARRAY), },
       .supported_src_types = {
@@ -649,8 +653,9 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       .supported_op_mods = OM(PROJ) | OM(FCNORM) | OM(NNCOORDS) | OM(BIAS) | OM(REPLACE) |
          OM(GRADIENT) | OM(PPLOD) | OM(TAO) | OM(SOO) | OM(SNO) | OM(WRT) | OM(DATA) |
          OM(INFO) | OM(BOTH) | OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) |
-         OM(WRITEBACK) | OM(LAZYWRITEBACK) | OM(SLCBYPASS) | OM(SLCWRITEBACK) |
-         OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | OM(ARRAY) | OM(INTEGER) | OM(SCHEDSWAP) |
+         OM(WRITEBACK) | OM(LAZYWRITEBACK) |
+         /* OM(SLCBYPASS) | OM(SLCWRITEBACK) | OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) | */
+         OM(ARRAY) | OM(INTEGER) | OM(SCHEDSWAP) |
          OM(F16),
       .supported_dst_types = { [0] = T(REG) | T(REGARRAY), },
       .supported_src_types = {
@@ -721,11 +726,12 @@ const rogue_backend_op_mod_info rogue_backend_op_mod_infos[ROGUE_BACKEND_OP_MOD_
    [ROGUE_BACKEND_OP_MOD_ICMI] = { .str = "icmi", .exclude = OM(VM) | OM(ICM) | OM(ICMOC) | OM(CAXY) },
    [ROGUE_BACKEND_OP_MOD_CAXY] = { .str = "caxy", .exclude = OM(VM) | OM(ICM) | OM(ICMOC) | OM(ICMI) },
    [ROGUE_BACKEND_OP_MOD_TILED] = { .str = "tiled", },
-   [ROGUE_BACKEND_OP_MOD_BYPASS]  = { .str = "bypass", .exclude = OM(FORCELINEFILL) | OM(WRITETHROUGH) | OM(WRITEBACK) | OM(LAZYWRITEBACK) },
-   [ROGUE_BACKEND_OP_MOD_FORCELINEFILL]  = { .str = "forcelinefill", .exclude = OM(BYPASS) | OM(WRITETHROUGH) | OM(WRITEBACK) | OM(LAZYWRITEBACK) },
-   [ROGUE_BACKEND_OP_MOD_WRITETHROUGH]  = { .str = "writethrough", .exclude = OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITEBACK) | OM(LAZYWRITEBACK) },
-   [ROGUE_BACKEND_OP_MOD_WRITEBACK]  = { .str = "writeback", .exclude = OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) | OM(LAZYWRITEBACK) },
-   [ROGUE_BACKEND_OP_MOD_LAZYWRITEBACK]  = { .str = "lazywriteback", .exclude = OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) | OM(WRITEBACK) },
+   [ROGUE_BACKEND_OP_MOD_NORMAL]  = { .str = "normal", .exclude = OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) | OM(WRITEBACK) | OM(LAZYWRITEBACK) },
+   [ROGUE_BACKEND_OP_MOD_BYPASS]  = { .str = "bypass", .exclude = OM(NORMAL) | OM(FORCELINEFILL) | OM(WRITETHROUGH) | OM(WRITEBACK) | OM(LAZYWRITEBACK) },
+   [ROGUE_BACKEND_OP_MOD_FORCELINEFILL]  = { .str = "forcelinefill", .exclude = OM(NORMAL) | OM(BYPASS) | OM(WRITETHROUGH) | OM(WRITEBACK) | OM(LAZYWRITEBACK) },
+   [ROGUE_BACKEND_OP_MOD_WRITETHROUGH]  = { .str = "writethrough", .exclude = OM(NORMAL) | OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITEBACK) | OM(LAZYWRITEBACK) },
+   [ROGUE_BACKEND_OP_MOD_WRITEBACK]  = { .str = "writeback", .exclude = OM(NORMAL) | OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) | OM(LAZYWRITEBACK) },
+   [ROGUE_BACKEND_OP_MOD_LAZYWRITEBACK]  = { .str = "lazywriteback", .exclude = OM(NORMAL) | OM(BYPASS) | OM(FORCELINEFILL) | OM(WRITETHROUGH) | OM(WRITEBACK) },
    [ROGUE_BACKEND_OP_MOD_SLCBYPASS]  = { .str = "slcbypass", .exclude = OM(SLCWRITEBACK) | OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) },
    [ROGUE_BACKEND_OP_MOD_SLCWRITEBACK]  = { .str = "slcwriteback", .exclude = OM(SLCBYPASS) | OM(SLCWRITETHROUGH) | OM(SLCNOALLOC) },
    [ROGUE_BACKEND_OP_MOD_SLCWRITETHROUGH]  = { .str = "slcwritethrough", .exclude = OM(SLCBYPASS) | OM(SLCWRITEBACK) | OM(SLCNOALLOC) },
@@ -1462,11 +1468,11 @@ const rogue_alu_op_info rogue_alu_op_infos[ROGUE_ALU_OP_COUNT] = {
          [1] = SM(ABS) | SM(NEG),
          [2] = SM(ABS) | SM(NEG),
       },
-      .supported_dst_types = { [0] = T(REG) | T(REGARRAY), [1] = T(REG) | T(REGARRAY) | T(IO) },
+      .supported_dst_types = { [0] = T(REG) | T(REGARRAY) | T(IO), [1] = T(REG) | T(REGARRAY) | T(IO) },
       .supported_src_types = {
-         [0] = T(REG) | T(REGARRAY) | T(IMM),
-         [1] = T(REG) | T(REGARRAY) | T(IMM),
-         [2] = T(REG) | T(REGARRAY) | T(IMM),
+         [0] = T(REG) | T(REGARRAY) | T(IMM) | T(IO),
+         [1] = T(REG) | T(REGARRAY) | T(IMM) | T(IO),
+         [2] = T(REG) | T(REGARRAY) | T(IMM) | T(IO),
          [3] = T(IO),
       },
    },
