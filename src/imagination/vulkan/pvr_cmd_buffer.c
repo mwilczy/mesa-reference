@@ -3496,7 +3496,7 @@ static VkResult pvr_setup_descriptor_mappings_old(
    struct pvr_cmd_buffer *const cmd_buffer,
    enum pvr_stage_allocation stage,
    const struct pvr_stage_allocation_descriptor_state *descriptor_state,
-   const pvr_dev_addr_t *const num_worgroups_buff_addr,
+   const pvr_dev_addr_t *const num_workgroups_buff_addr,
    uint32_t *const descriptor_data_offset_out)
 {
    const struct pvr_pds_info *const pds_info = &descriptor_state->pds_info;
@@ -3694,13 +3694,13 @@ static VkResult pvr_setup_descriptor_mappings_old(
              * setup at pipeline creation when creating the descriptor program.
              */
             if (stage == PVR_STAGE_ALLOCATION_COMPUTE) {
-               assert(num_worgroups_buff_addr->addr);
+               assert(num_workgroups_buff_addr->addr);
 
                /* TODO: Check if we need to offset this (e.g. for just y and z),
                 * or cope with any reordering?
                 */
                PVR_WRITE(qword_buffer,
-                         num_worgroups_buff_addr->addr,
+                         num_workgroups_buff_addr->addr,
                          special_buff_entry->const_offset,
                          pds_info->data_size_in_dwords);
             } else {
@@ -4038,6 +4038,7 @@ static VkResult
 pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
                          enum pvr_pds_addr_literal_type addr_literal_type,
                          enum pvr_stage_allocation stage,
+                         const pvr_dev_addr_t *const num_workgroups_buff_addr,
                          pvr_dev_addr_t *addr_out)
 {
    VkResult result;
@@ -4090,6 +4091,12 @@ pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
       break;
    }
 
+   case PVR_PDS_ADDR_LITERAL_NUM_WORKGROUPS: {
+      assert(stage == PVR_STAGE_ALLOCATION_COMPUTE);
+      *addr_out = *num_workgroups_buff_addr;
+      break;
+   }
+
    default:
       unreachable("Invalid add literal type.");
    }
@@ -4103,6 +4110,7 @@ static VkResult pvr_setup_descriptor_mappings_new(
    struct pvr_cmd_buffer *const cmd_buffer,
    enum pvr_stage_allocation stage,
    const struct pvr_stage_allocation_descriptor_state *descriptor_state,
+   const pvr_dev_addr_t *const num_workgroups_buff_addr,
    uint32_t *const descriptor_data_offset_out)
 {
    const struct pvr_pds_info *const pds_info = &descriptor_state->pds_info;
@@ -4198,6 +4206,7 @@ static VkResult pvr_setup_descriptor_mappings_new(
             result = pvr_process_addr_literal(cmd_buffer,
                                               addr_literal->addr_type,
                                               stage,
+                                              num_workgroups_buff_addr,
                                               &dev_addr);
             if (result != VK_SUCCESS)
                return result;
@@ -4231,7 +4240,7 @@ static VkResult pvr_setup_descriptor_mappings(
    struct pvr_cmd_buffer *const cmd_buffer,
    enum pvr_stage_allocation stage,
    const struct pvr_stage_allocation_descriptor_state *descriptor_state,
-   const pvr_dev_addr_t *const num_worgroups_buff_addr,
+   const pvr_dev_addr_t *const num_workgroups_buff_addr,
    uint32_t *const descriptor_data_offset_out)
 {
    const bool old_path =
@@ -4241,13 +4250,14 @@ static VkResult pvr_setup_descriptor_mappings(
       return pvr_setup_descriptor_mappings_old(cmd_buffer,
                                                stage,
                                                descriptor_state,
-                                               num_worgroups_buff_addr,
+                                               num_workgroups_buff_addr,
                                                descriptor_data_offset_out);
    }
 
    return pvr_setup_descriptor_mappings_new(cmd_buffer,
                                             stage,
                                             descriptor_state,
+                                            num_workgroups_buff_addr,
                                             descriptor_data_offset_out);
 }
 
