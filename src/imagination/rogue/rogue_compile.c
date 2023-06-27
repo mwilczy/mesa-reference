@@ -2387,6 +2387,14 @@ static void trans_nir_intrinsic_mutex_img(rogue_builder *b,
       mod = ROGUE_CTRL_OP_MOD_RELEASE;
       break;
 
+   case ROGUE_MUTEX_OP_RELEASE_SLEEP:
+      mod = ROGUE_CTRL_OP_MOD_RELEASE_SLEEP;
+      break;
+
+   case ROGUE_MUTEX_OP_RELEASE_WAKEUP:
+      mod = ROGUE_CTRL_OP_MOD_RELEASE_WAKEUP;
+      break;
+
    default:
       unreachable();
    }

@@ -1358,6 +1358,10 @@ static void rogue_encode_ctrl_instr(const rogue_ctrl_instr *ctrl,
          instr_encoding->ctrl.mutex.lr = LR_LOCK;
       else if (rogue_ctrl_op_mod_is_set(ctrl, OM(RELEASE)))
          instr_encoding->ctrl.mutex.lr = LR_RELEASE;
+      else if (rogue_ctrl_op_mod_is_set(ctrl, OM(RELEASE_SLEEP)))
+         instr_encoding->ctrl.mutex.lr = LR_RELEASE_SLEEP;
+      else if (rogue_ctrl_op_mod_is_set(ctrl, OM(RELEASE_WAKEUP)))
+         instr_encoding->ctrl.mutex.lr = LR_RELEASE_WAKEUP;
       else
          unreachable("Missing mutex op.");
 
