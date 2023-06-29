@@ -273,4 +273,50 @@ static void rogue_fence_coeff_write(rogue_builder *b)
    rogue_NOP(b);
 }
 
+static void rogue_fence_local(rogue_builder *b)
+{
+   rogue_ref fence_reg =
+      rogue_ref_reg(rogue_ssa_reg(b->shader, b->shader->ctx->next_ssa_idx++));
+
+   /* mov fence_reg, imm(1) */
+   /* mov rogue_none(), fence_reg */
+
+   /* Issue a write to the fence reg. */
+   rogue_alu_instr *mbyp0 =
+      rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), rogue_ref_imm(1));
+   rogue_set_instr_group_next(&mbyp0->instr, true);
+   rogue_MOVC(b,
+              fence_reg,
+              rogue_none(),
+              rogue_none(),
+              rogue_ref_io(ROGUE_IO_FT0),
+              rogue_none(),
+              rogue_none(),
+              rogue_none());
+
+   rogue_add_instr_comment(&mbyp0->instr, "fence_local_w");
+
+   /* Create a data hazard by using the fence reg, dummy read. */
+   mbyp0 = rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), fence_reg);
+   rogue_add_instr_comment(&mbyp0->instr, "fence_local_r");
+}
+
+static void rogue_fence_global(rogue_builder *b)
+{
+   /* TODO */
+   return rogue_fence_local(b);
+}
+
+static void rogue_fence_image(rogue_builder *b)
+{
+   /* TODO */
+   return rogue_fence_local(b);
+}
+
+/* TODO: implement in NIR instead. */
+static void rogue_barrier(rogue_builder *b)
+{
+   unreachable("Unimplemented.");
+}
+
 #endif /* ROGUE_OP_HELPERS_H */

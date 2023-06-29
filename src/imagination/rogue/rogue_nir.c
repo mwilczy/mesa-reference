@@ -304,6 +304,8 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
    /* TODO: does always_precise need to be true? */
    NIR_PASS_V(nir, nir_lower_flrp, 16 | 32 | 64, true);
 
+   /* NIR_PASS_V(nir, nir_lower_memcpy); */
+
    /* Additional I/O lowering. */
    NIR_PASS_V(nir,
               nir_lower_explicit_io,
@@ -366,6 +368,9 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
    /* Lower atomic ops that aren't supported in hardware. */
    NIR_PASS_V(nir, rogue_nir_lower_atomics);
 
+   NIR_PASS_V(nir, nir_opt_combine_barriers, NULL, NULL);
+   NIR_PASS_V(nir, rogue_nir_lower_barriers);
+
    rogue_nir_opt_loop(ctx, nir);
 
    nir_lower_idiv_options idiv_options = {
@@ -400,7 +405,6 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
    NIR_PASS_V(nir, nir_lower_bool_to_int32);
    NIR_PASS_V(nir, rogue_nir_lower_alu_conversion_to_intrinsic);
    NIR_PASS_V(nir, nir_opt_constant_folding);
-   NIR_PASS_V(nir, nir_opt_combine_barriers, NULL, NULL);
 
    NIR_PASS_V(nir, nir_lower_load_const_to_scalar);
 
@@ -444,6 +448,15 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
 		.threshold = ROGUE_MAX_REG_TEMP / 2,
 	};
 	NIR_PASS_V(nir, nir_schedule, &schedule_options);
+#endif
+
+#if 0
+   nir_move_options move_all = nir_move_const_undef | nir_move_load_ubo |
+                               nir_move_load_input | nir_move_comparisons |
+                               nir_move_copies | nir_move_load_ssbo | nir_move_load_uniform;
+
+   NIR_PASS_V(nir, nir_opt_sink, move_all);
+   NIR_PASS_V(nir, nir_opt_move, move_all);
 #endif
 
    /* Assign I/O locations. */

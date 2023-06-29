@@ -39,6 +39,7 @@
 #define ROGUE_INST_CHK_FUNC_NAME "__rogue_inst_chk_func__"
 
 /* Inserts an instance check for compute shaders. */
+/* TODO: can this be skipped if workgroup is a multiple of 32? */
 PUBLIC
 bool rogue_nir_compute_instance_check(nir_shader *shader)
 {

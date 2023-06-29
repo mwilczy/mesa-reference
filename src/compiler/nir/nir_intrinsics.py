@@ -297,6 +297,8 @@ index("nir_resource_data_intel", "resource_access_intel")
 index("unsigned", "mutex_id_img")
 index("unsigned", "mutex_op_img")
 
+index("unsigned", "fence_op_img")
+
 # Register metadata
 # number of vector components
 index("unsigned", "num_components")
@@ -1976,6 +1978,9 @@ intrinsic("load_instance_num_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDE
 # Perform a mutex operation (slot granularity).
 intrinsic("mutex_img", indices=[MUTEX_ID_IMG, MUTEX_OP_IMG])
 
+# Performs a fence operation.
+intrinsic("fence_img", indices=[FENCE_OP_IMG])
+
 # Shared memory load/store functions, DWORD offsets/addressing
 intrinsic("load_shared_img", src_comp=[1], dest_comp=1, bit_sizes=[32])
 intrinsic("store_shared_img", src_comp=[1, 1], bit_sizes=[32])
@@ -1983,3 +1988,7 @@ intrinsic("store_shared_img", src_comp=[1, 1], bit_sizes=[32])
 # Shared memory atomic functions, DWORD offsets/addressing
 intrinsic("shared_atomic_img",  src_comp=[1, 1], dest_comp=1, indices=[ATOMIC_OP], bit_sizes=[32])
 intrinsic("shared_atomic_swap_img",  src_comp=[1, 1, 1], dest_comp=1, indices=[ATOMIC_OP], bit_sizes=[32])
+
+# TODO: commonise these into special case load_shared_img, since it's just a coeff reg.
+intrinsic("load_barrier_counter_img", dest_comp=1, bit_sizes=[32])
+intrinsic("store_barrier_counter_img", src_comp=[1], bit_sizes=[32])

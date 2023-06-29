@@ -398,3 +398,191 @@ bool rogue_nir_lower_atomics(nir_shader *shader)
                                         lower_atomic,
                                         &options);
 }
+
+static bool is_barrier(const nir_instr *instr, UNUSED const void *data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   return intr->intrinsic == nir_intrinsic_barrier;
+}
+
+static nir_def *
+lower_barrier(struct nir_builder *b, nir_instr *instr, void *data)
+{
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+
+   mesa_scope exec_scope = nir_intrinsic_execution_scope(intr);
+   mesa_scope mem_scope = nir_intrinsic_memory_scope(intr);
+   nir_memory_semantics mem_smnt = nir_intrinsic_memory_semantics(intr);
+   nir_variable_mode mem_modes = nir_intrinsic_memory_modes(intr);
+
+   switch (exec_scope) {
+   case SCOPE_NONE:
+      break;
+
+   case SCOPE_INVOCATION:
+      break;
+
+   case SCOPE_SUBGROUP:
+      break;
+
+   case SCOPE_SHADER_CALL:
+      break;
+
+   case SCOPE_WORKGROUP:
+      break;
+
+   case SCOPE_QUEUE_FAMILY:
+      break;
+
+   case SCOPE_DEVICE:
+      break;
+
+   default:
+      unreachable();
+   }
+
+   switch (mem_scope) {
+   case SCOPE_NONE:
+      break;
+
+   case SCOPE_INVOCATION:
+      break;
+
+   case SCOPE_SUBGROUP:
+      break;
+
+   case SCOPE_SHADER_CALL:
+      break;
+
+   case SCOPE_WORKGROUP:
+      break;
+
+   case SCOPE_QUEUE_FAMILY:
+      break;
+
+   case SCOPE_DEVICE:
+      break;
+
+   default:
+      unreachable();
+   }
+
+   if (mem_smnt & NIR_MEMORY_ACQUIRE) {
+   } else if (mem_smnt & NIR_MEMORY_RELEASE) {
+   } else if (mem_smnt & NIR_MEMORY_MAKE_AVAILABLE) {
+   } else if (mem_smnt & NIR_MEMORY_MAKE_VISIBLE) {
+   } else
+      unreachable();
+
+   if (mem_modes & nir_var_mem_shared) {
+   } else if (mem_modes & nir_var_mem_global) {
+   } else
+      unreachable();
+
+      /*
+      #define barrier_counter cf<n>
+      #define slot_count 32 WAIT this isn't 32!
+
+      mutex_lock();
+      if (sr51 == 0)
+           ++barrier_counter;
+
+      if (barrier_counter == slot_count) {
+           if (sr51 == 0) {
+               barrier_counter = 0;
+           }
+           mutex_release_wakeup()
+       } else {
+          do {
+             mutex_release_sleep();
+             mutex_lock();
+             if (barrier_counter == 0) {
+                mutex_release();
+                break;
+             }
+          } while (1);
+       }
+      */
+
+      /* intrinsic barrier () (execution_scope=WORKGROUP,
+       * memory_scope=DEVICE, mem_semantics=ACQ|REL, mem_modes=shared) */
+
+      /* nir_register *nir_local_reg_create(nir_function_impl *impl); */
+#if 0
+   nir_ssa_def *barrier_counter = nir_load_barrier_coeff_img(b);
+
+   nir_mutex_img(b,
+                 .mutex_op_img = ROGUE_MUTEX_OP_LOCK,
+                 .mutex_id_img = ROGUE_MUTEX_ID_BARRIER);
+
+   nir_ssa_def *inst_num = nir_load_instance_num_img(b);
+   nir_ssa_def *cnd_inst_num_zero = nir_ieq(b, inst_num, nir_imm_int(b, 0));
+
+   nir_if *nif_inst_num_0 = nir_push_if(b, cnd_inst_num_zero);
+   nif_inst_num_0->control = nir_selection_control_dont_flatten;
+   {
+      nir_store_barrier_coeff_img(b, nir_iadd_imm(b, barrier_counter, 1));
+   }
+   nir_pop_if(b, nif_inst_num_0);
+
+   nir_ssa_def *cnd_counter_is_slot_count =
+      nir_ieq(b, barrier_counter, nir_imm_int(b, 32)); /* slot_count == 32 */
+   nir_if *nif_counter_is_slot_count = nir_push_if(
+      b,
+      cnd_counter_is_slot_count); /* nif_counter_is_slot_count->control
+                                     =
+                                     nir_selection_control_dont_flatten;
+                                   */
+   {
+      nif_inst_num_0 = nir_push_if(b, cnd_inst_num_zero);
+      nif_inst_num_0->control = nir_selection_control_dont_flatten;
+      {
+         nir_store_barrier_coeff_img(b, nir_imm_int(b, 0));
+      }
+      nir_pop_if(b, nif_inst_num_0);
+
+      nir_mutex_img(b,
+                    .mutex_op_img = ROGUE_MUTEX_OP_RELEASE_WAKEUP,
+                    .mutex_id_img = ROGUE_MUTEX_ID_BARRIER);
+   }
+   nir_push_else(b, nif_counter_is_slot_count);
+   {
+      nir_loop *nloop_sleep = nir_push_loop(b);
+      {
+         nir_mutex_img(b,
+                       .mutex_op_img = ROGUE_MUTEX_OP_RELEASE_SLEEP,
+                       .mutex_id_img = ROGUE_MUTEX_ID_BARRIER);
+         nir_mutex_img(b,
+                       .mutex_op_img = ROGUE_MUTEX_OP_LOCK,
+                       .mutex_id_img = ROGUE_MUTEX_ID_BARRIER);
+
+         barrier_counter = nir_load_barrier_coeff_img(b);
+         nir_ssa_def *cnd_counter_is_zero =
+            nir_ieq(b, barrier_counter, nir_imm_int(b, 32)); /* slot_count == 32
+                                                              */
+         nir_if *nif_counter_is_zero = nir_push_if(b, cnd_counter_is_zero);
+         nif_counter_is_zero->control = nir_selection_control_dont_flatten;
+         {
+            nir_mutex_img(b,
+                          .mutex_op_img = ROGUE_MUTEX_OP_RELEASE,
+                          .mutex_id_img = ROGUE_MUTEX_ID_BARRIER);
+            nir_jump(b, nir_jump_break);
+         }
+         nir_pop_if(b, nif_counter_is_zero);
+      }
+      nir_pop_loop(b, nloop_sleep);
+   }
+   nir_pop_if(b, nif_counter_is_slot_count);
+
+#endif
+   return NIR_LOWER_INSTR_PROGRESS_REPLACE;
+}
+
+PUBLIC
+bool rogue_nir_lower_barriers(nir_shader *shader)
+{
+   return nir_shader_lower_instructions(shader, is_barrier, lower_barrier, NULL);
+}

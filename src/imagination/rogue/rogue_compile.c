@@ -2687,6 +2687,45 @@ static void trans_nir_intrinsic_global_atomic(rogue_builder *b,
    }
 }
 
+#if 0
+static void trans_nir_intrinsic_barrier(rogue_builder *b,
+                                        nir_intrinsic_instr *intr)
+{
+   const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
+
+   nir_intrinsic_execution_scope(intr);
+   nir_intrinsic_memory_scope(intr);
+   nir_intrinsic_memory_semantics(intr);
+   nir_intrinsic_memory_modes(intr);
+
+   switch (intr->intrinsic) {
+   case nir_intrinsic_memory_barrier:
+   case nir_intrinsic_memory_barrier_atomic_counter:
+   case nir_intrinsic_memory_barrier_buffer:
+      return rogue_fence_global(b);
+
+   case nir_intrinsic_memory_barrier_image:
+      return rogue_fence_image(b);
+
+   case nir_intrinsic_memory_barrier_shared:
+      return rogue_fence_local(b);
+
+   case nir_intrinsic_group_memory_barrier:
+      rogue_fence_local(b);
+      return rogue_fence_global(b);
+
+   case nir_intrinsic_control_barrier:
+      if (cs_data->work_size > ROGUE_MAX_INSTANCES_PER_TASK)
+         return rogue_barrier(b);
+      else
+         return rogue_fence_local(b);
+
+   default:
+      unreachable();
+   }
+}
+#endif
+
 static void trans_nir_intrinsic_mutex_img(rogue_builder *b,
                                           nir_intrinsic_instr *intr)
 {
@@ -2845,6 +2884,11 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    case nir_intrinsic_bindless_image_samples:
    case nir_intrinsic_bindless_image_texel_address:
       return trans_nir_intrinsic_image(b, intr);
+
+#if 0
+   case nir_intrinsic_barrier:
+      return trans_nir_intrinsic_barrier(b, intr);
+#endif
 
    case nir_intrinsic_mutex_img:
       return trans_nir_intrinsic_mutex_img(b, intr);

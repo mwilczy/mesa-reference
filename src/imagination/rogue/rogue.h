@@ -222,6 +222,13 @@ enum rogue_mutex_id {
 };
 static_assert(ROGUE_MUTEX_ID_COUNT <= 16, "Too many mutex IDs.");
 
+enum rogue_fence_op {
+   ROGUE_FENCE_OP_LOCAL,
+   ROGUE_FENCE_OP_GLOBAL,
+   ROGUE_FENCE_OP_IMAGE,
+   ROGUE_FENCE_OP_BARRIER,
+};
+
 #define ROGUE_ISA_DSTS 2
 #define ROGUE_ISA_SRCS 6
 #define ROGUE_ISA_ISSS 6
@@ -4078,6 +4085,8 @@ bool rogue_nir_lower_fquantize2f16(nir_shader *shader);
 
 bool rogue_nir_lower_input_attachments(nir_shader *shader,
                                        rogue_build_ctx *ctx);
+
+bool rogue_nir_lower_barriers(nir_shader *shader);
 
 bool rogue_nir_lower_tex(nir_shader *shader, rogue_build_ctx *ctx);
 
