@@ -377,6 +377,8 @@ struct pvr_sampler {
 
    union pvr_sampler_descriptor descriptor;
    union pvr_sampler_descriptor gather_descriptor;
+
+   uint32_t border_color_table_index;
 };
 
 struct pvr_descriptor_size_info {
