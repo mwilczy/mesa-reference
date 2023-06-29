@@ -526,7 +526,9 @@ static void rogue_collect_early_vs_build_data(rogue_build_ctx *ctx,
             case nir_instr_type_intrinsic:
                switch (nir_instr_as_intrinsic(instr)->intrinsic) {
                case nir_intrinsic_global_atomic:
+               case nir_intrinsic_shared_atomic_img:
                case nir_intrinsic_global_atomic_swap:
+               case nir_intrinsic_shared_atomic_swap_img:
                   vs_data->has.atomic_ops = true;
                   break;
 
@@ -558,7 +560,9 @@ static void rogue_collect_early_fs_build_data(rogue_build_ctx *ctx,
             case nir_instr_type_intrinsic:
                switch (nir_instr_as_intrinsic(instr)->intrinsic) {
                case nir_intrinsic_global_atomic:
+               case nir_intrinsic_shared_atomic_img:
                case nir_intrinsic_global_atomic_swap:
+               case nir_intrinsic_shared_atomic_swap_img:
                   fs_data->has.atomic_ops = true;
                   break;
 
@@ -610,7 +614,9 @@ static void rogue_collect_early_cs_build_data(rogue_build_ctx *ctx,
                   break;
 
                case nir_intrinsic_global_atomic:
+               case nir_intrinsic_shared_atomic_img:
                case nir_intrinsic_global_atomic_swap:
+               case nir_intrinsic_shared_atomic_swap_img:
                   cs_data->has.atomic_ops = true;
                   break;
 
@@ -633,7 +639,7 @@ static void rogue_collect_early_cs_build_data(rogue_build_ctx *ctx,
                         info->workgroup_size[2];
 
    cs_data->has.barrier = info->uses_control_barrier &&
-                          (cs_data->work_size > 32);
+                          (cs_data->work_size > ROGUE_MAX_INSTANCES_PER_TASK);
 }
 
 static void rogue_collect_early_build_data(rogue_build_ctx *ctx,

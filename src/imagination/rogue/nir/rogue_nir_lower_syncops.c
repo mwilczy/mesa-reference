@@ -146,19 +146,10 @@ lower_atomic(nir_builder *b, nir_instr *instr, UNUSED void *_data)
    nir_atomic_op op = nir_intrinsic_atomic_op(intr);
    nir_alu_type type = nir_atomic_op_type(op) | bit_size;
 
-   bool is_swap;
-   switch (intr->intrinsic) {
-   case nir_intrinsic_global_atomic:
-      is_swap = false;
-      break;
-
-   case nir_intrinsic_global_atomic_swap:
-      is_swap = true;
-      break;
-
-   default:
-      unreachable();
-   }
+   bool is_shared = intr->intrinsic == nir_intrinsic_shared_atomic_img ||
+                    intr->intrinsic == nir_intrinsic_shared_atomic_swap_img;
+   bool is_swap = intr->intrinsic == nir_intrinsic_global_atomic_swap ||
+                  intr->intrinsic == nir_intrinsic_shared_atomic_swap_img;
 
    nir_def *offset = intr->src[0].ssa;
    nir_def *value = intr->src[1].ssa;
@@ -172,9 +163,12 @@ lower_atomic(nir_builder *b, nir_instr *instr, UNUSED void *_data)
       rogue_per_instance_loop(b, true, num_components, bit_size);
    b->cursor = nir_after_instr(op_result->parent_instr);
 
-   nir_def *pre_val, *post_val;
-   pre_val = nir_load_global(b, offset, bit_size / 8, num_components, bit_size);
+   nir_def *pre_val =
+      is_shared
+         ? pre_val = nir_load_shared_img(b, offset)
+         : nir_load_global(b, offset, bit_size / 8, num_components, bit_size);
 
+   nir_def *post_val = NULL;
    switch (op) {
    case nir_atomic_op_iadd:
       assert(type == nir_type_uint32);
@@ -253,11 +247,15 @@ lower_atomic(nir_builder *b, nir_instr *instr, UNUSED void *_data)
    nir_def_rewrite_uses(op_result, post_val);
    assert(nir_def_is_unused(op_result));
 
-   nir_store_global(b,
-                    offset,
-                    bit_size / 8,
-                    post_val,
-                    BITFIELD_MASK(num_components));
+   if (is_shared) {
+      nir_store_shared_img(b, post_val, offset);
+   } else {
+      nir_store_global(b,
+                       offset,
+                       bit_size / 8,
+                       post_val,
+                       BITFIELD_MASK(num_components));
+   }
 
    return pre_val;
 }
@@ -271,10 +269,24 @@ static bool is_lowerable_atomic(const nir_instr *instr, const void *data)
 
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
    switch (intr->intrinsic) {
+   case nir_intrinsic_shared_atomic:
+   case nir_intrinsic_shared_atomic_swap:
+      unreachable(
+         "shared_atomic(_swap) should've been lowered before this pass.");
+      break;
+
    case nir_intrinsic_global_atomic:
    case nir_intrinsic_global_atomic_swap:
       if (!(options->modes & nir_var_mem_global))
          return false;
+
+      break;
+
+   case nir_intrinsic_shared_atomic_img:
+   case nir_intrinsic_shared_atomic_swap_img:
+      if (!(options->modes & nir_var_mem_shared))
+         return false;
+
       break;
 
    default:

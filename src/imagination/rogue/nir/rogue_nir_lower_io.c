@@ -313,6 +313,51 @@ lower_load_store_shared(nir_builder *b, nir_intrinsic_instr *intr, bool store)
    return true;
 }
 
+/* Convert shared_atomic{,_swap} intrinsics to their img-specific versions.
+ * These utilise the coefficient registers, and so require DWORD offsets.
+ *
+ * TODO: Coefficient register spilling support.
+ */
+static bool
+lower_shared_atomic(nir_builder *b, nir_intrinsic_instr *intr, bool swap)
+{
+   b->cursor = nir_before_instr(&intr->instr);
+
+   assert(nir_intrinsic_base(intr) == 0);
+
+   nir_def *offset = intr->src[0].ssa;
+
+   /* To DWORD offset/addressing. */
+   offset = nir_ushr_imm(b, offset, 2);
+
+   assert(nir_src_num_components(intr->src[1]) == 1);
+   nir_def *value = intr->src[1].ssa;
+
+   nir_def *value_swap = swap ? intr->src[2].ssa : NULL;
+
+   nir_def *shared_atomic;
+   if (swap) {
+      shared_atomic =
+         nir_shared_atomic_swap_img(b,
+                                    offset,
+                                    value,
+                                    value_swap,
+                                    .atomic_op = nir_intrinsic_atomic_op(intr));
+   } else {
+      shared_atomic =
+         nir_shared_atomic_img(b,
+                               offset,
+                               value,
+                               .atomic_op = nir_intrinsic_atomic_op(intr));
+   }
+
+   nir_def_rewrite_uses(&intr->def, shared_atomic);
+
+   nir_instr_remove(&intr->instr);
+
+   return true;
+}
+
 static bool lower_intrinsic(nir_builder *b,
                             nir_intrinsic_instr *instr,
                             rogue_build_ctx *ctx,
@@ -354,6 +399,12 @@ static bool lower_intrinsic(nir_builder *b,
 
       case nir_intrinsic_store_shared:
          return lower_load_store_shared(b, instr, true);
+
+      case nir_intrinsic_shared_atomic:
+         return lower_shared_atomic(b, instr, false);
+
+      case nir_intrinsic_shared_atomic_swap:
+         return lower_shared_atomic(b, instr, true);
 
       default:
          break;

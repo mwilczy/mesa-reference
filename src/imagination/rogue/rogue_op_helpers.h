@@ -252,4 +252,25 @@ static rogue_alu_instr *rogue_csel(rogue_builder *b,
    return csel;
 }
 
+static void rogue_fence_coeff_write(rogue_builder *b)
+{
+   /* Instruction writing to a predicate. */
+   rogue_ref p0_val =
+      rogue_ref_reg(rogue_ssa_reg(b->shader, b->shader->ctx->next_ssa_idx++));
+   rogue_GETPRED(b, p0_val, rogue_ref_io(ROGUE_IO_P0));
+   rogue_SETPRED(b, rogue_ref_io(ROGUE_IO_P0), p0_val);
+
+   /* Prepare a block to branch to. */
+   rogue_cursor cursor = b->cursor;
+   rogue_block *nop_block = rogue_push_block(b);
+   b->cursor = cursor;
+
+   /* Branch to next instruction. */
+   rogue_BR(b, nop_block);
+
+   /* NOP. */
+   b->cursor = rogue_cursor_after_block(nop_block);
+   rogue_NOP(b);
+}
+
 #endif /* ROGUE_OP_HELPERS_H */

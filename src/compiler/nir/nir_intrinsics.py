@@ -1951,6 +1951,7 @@ intrinsic("finalize_incoming_node_payload", src_comp=[-1], dest_comp=1)
 # Most compute system vars can be supplied as their individual components, allowing
 # us to skip setting up unused ones.
 
+# TODO: commonise these into special case load_shared_img, since they just use a coeff reg.
 # Workgroup IDs (all 32-bit components).
 intrinsic("load_workgroup_id_x_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 intrinsic("load_workgroup_id_y_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
@@ -1978,3 +1979,7 @@ intrinsic("mutex_img", indices=[MUTEX_ID_IMG, MUTEX_OP_IMG])
 # Shared memory load/store functions, DWORD offsets/addressing
 intrinsic("load_shared_img", src_comp=[1], dest_comp=1, bit_sizes=[32])
 intrinsic("store_shared_img", src_comp=[1, 1], bit_sizes=[32])
+
+# Shared memory atomic functions, DWORD offsets/addressing
+intrinsic("shared_atomic_img",  src_comp=[1, 1], dest_comp=1, indices=[ATOMIC_OP], bit_sizes=[32])
+intrinsic("shared_atomic_swap_img",  src_comp=[1, 1, 1], dest_comp=1, indices=[ATOMIC_OP], bit_sizes=[32])

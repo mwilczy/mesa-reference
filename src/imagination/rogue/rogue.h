@@ -2408,6 +2408,7 @@ enum rogue_mutex_state {
    ROGUE_MUTEX_STATE_RELEASED = 0,
 
    ROGUE_MUTEX_STATE_LOCKED = BITFIELD_BIT(0),
+   ROGUE_MUTEX_STATE_WROTE_COEFF = BITFIELD_BIT(1),
 };
 
 /** Rogue shader object. */

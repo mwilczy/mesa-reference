@@ -1861,6 +1861,10 @@ static void trans_nir_intrinsic_load_store_shared_img(rogue_builder *b,
                             "%s_shared%u",
                             store ? "store" : "load",
                             bit_size);
+
+   /* If we wrote to shared memory/a coeff reg while in a mutex, track this. */
+   if (store && b->shader->mutex_state & ROGUE_MUTEX_STATE_LOCKED)
+      b->shader->mutex_state |= ROGUE_MUTEX_STATE_WROTE_COEFF;
 }
 
 static void trans_nir_load_helper_invocation(rogue_builder *b,
@@ -2398,6 +2402,226 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
 
 #undef CONV
 
+static rogue_instr *shared_atomic_alu(rogue_builder *b,
+                                      nir_atomic_op op,
+                                      nir_alu_type type,
+                                      rogue_ref *dst,
+                                      rogue_ref *coeff,
+                                      rogue_ref *data,
+                                      rogue_ref *data_swap)
+{
+   /* Copy existing value to destination (and/via FT1). */
+   rogue_alu_instr *mbyp1 = rogue_MBYP1(b, *dst, *coeff);
+   rogue_set_instr_group_next(&mbyp1->instr, true);
+   rogue_set_instr_atom(&mbyp1->instr, true);
+
+   rogue_alu_instr *atom;
+   /* TODO: Double-check if source mods need to be applied. */
+   switch (op) {
+   case nir_atomic_op_iadd:
+      assert(type == nir_type_uint32);
+      atom = rogue_ADD64_32(b,
+                            *coeff,
+                            rogue_none(),
+                            *coeff,
+                            rogue_ref_imm(0),
+                            *data,
+                            rogue_none());
+      break;
+
+   case nir_atomic_op_imin:
+   case nir_atomic_op_umin:
+   case nir_atomic_op_imax:
+   case nir_atomic_op_umax:
+   case nir_atomic_op_fmin:
+   case nir_atomic_op_fmax: {
+      rogue_alu_instr *mbyp0 =
+         rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), *data);
+      rogue_set_instr_group_next(&mbyp0->instr, true);
+      rogue_set_instr_atom(&mbyp0->instr, true);
+
+      rogue_alu_instr *tst2 = rogue_TST2(b,
+                                         rogue_ref_io(ROGUE_IO_FTT),
+                                         rogue_none(),
+                                         rogue_ref_io(ROGUE_IO_FT0),
+                                         rogue_ref_io(ROGUE_IO_FT1));
+
+      rogue_set_alu_op_mod(tst2,
+                           (op == nir_atomic_op_imin ||
+                            op == nir_atomic_op_umin ||
+                            op == nir_atomic_op_fmin)
+                              ? ROGUE_ALU_OP_MOD_L
+                              : ROGUE_ALU_OP_MOD_G);
+
+      switch (type) {
+      case nir_type_float32:
+         rogue_set_alu_op_mod(tst2, ROGUE_ALU_OP_MOD_F32);
+         break;
+
+      case nir_type_int32:
+         rogue_set_alu_op_mod(tst2, ROGUE_ALU_OP_MOD_S32);
+         break;
+
+      case nir_type_uint32:
+         rogue_set_alu_op_mod(tst2, ROGUE_ALU_OP_MOD_U32);
+         break;
+
+      default:
+         unreachable();
+      }
+
+      rogue_set_instr_group_next(&tst2->instr, true);
+      rogue_set_instr_atom(&tst2->instr, true);
+
+      atom = rogue_MOVC(b,
+                        *coeff,
+                        rogue_none(),
+                        rogue_ref_io(ROGUE_IO_FTT),
+                        rogue_ref_io(ROGUE_IO_FT0),
+                        rogue_ref_io(ROGUE_IO_FT1),
+                        rogue_none(),
+                        rogue_none());
+
+      break;
+   }
+
+   case nir_atomic_op_xchg:
+      assert(type == nir_type_uint32);
+      atom = rogue_MBYP0(b, *coeff, *data);
+      break;
+
+   case nir_atomic_op_fadd:
+      assert(type == nir_type_float32);
+      atom = rogue_FADD(b, *coeff, *coeff, *data);
+      break;
+
+   case nir_atomic_op_cmpxchg:
+   case nir_atomic_op_fcmpxchg: {
+      assert(type == nir_type_uint32 || type == nir_type_float32);
+
+      rogue_alu_instr *mbyp0 =
+         rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), *data_swap);
+      rogue_set_instr_group_next(&mbyp0->instr, true);
+      rogue_set_instr_atom(&mbyp0->instr, true);
+
+      rogue_alu_instr *tst2 = rogue_TST2(b,
+                                         rogue_ref_io(ROGUE_IO_FTT),
+                                         rogue_none(),
+                                         rogue_ref_io(ROGUE_IO_FT0),
+                                         rogue_ref_io(ROGUE_IO_FT1));
+
+      rogue_set_alu_op_mod(tst2, ROGUE_ALU_OP_MOD_E);
+      rogue_set_alu_op_mod(tst2,
+                           type == nir_type_uint32 ? ROGUE_ALU_OP_MOD_U32
+                                                   : ROGUE_ALU_OP_MOD_F32);
+      rogue_set_instr_group_next(&tst2->instr, true);
+      rogue_set_instr_atom(&tst2->instr, true);
+
+      atom = rogue_MOVC(b,
+                        *coeff,
+                        rogue_none(),
+                        rogue_ref_io(ROGUE_IO_FTT),
+                        *data,
+                        rogue_ref_io(ROGUE_IO_FT1),
+                        rogue_none(),
+                        rogue_none());
+
+      break;
+   }
+
+   default:
+      unreachable("Unsupported shared atomic alu op.");
+   }
+
+   return &atom->instr;
+}
+
+static rogue_instr *shared_atomic_bitwise(rogue_builder *b,
+                                          nir_atomic_op op,
+                                          nir_alu_type type,
+                                          rogue_ref *dst,
+                                          rogue_ref *coeff,
+                                          rogue_ref *data)
+{
+   /* Copy existing value to destination (and/via FT3). */
+   rogue_bitwise_instr *byp0c = rogue_BYP0C(b, *dst, *coeff);
+   rogue_set_instr_group_next(&byp0c->instr, true);
+   rogue_set_instr_atom(&byp0c->instr, true);
+
+   /* Setup I/O feedthrough for bitwise op. */
+   rogue_instr *byp0s =
+      &rogue_BYP0S(b, rogue_ref_io(ROGUE_IO_FT2), *data)->instr;
+   rogue_set_instr_group_next(byp0s, true);
+   rogue_set_instr_atom(&byp0c->instr, true);
+
+   rogue_bitwise_instr *atom;
+   /* TODO: Double-check if source mods need to be applied. */
+   switch (op) {
+   case nir_atomic_op_iand:
+      assert(type == nir_type_uint32);
+      atom = rogue_AND(b,
+                       *coeff,
+                       rogue_none(),
+                       rogue_ref_io(ROGUE_IO_FT2),
+                       rogue_none(),
+                       *coeff);
+      break;
+
+   case nir_atomic_op_ior:
+      assert(type == nir_type_uint32);
+      atom = rogue_OR(b,
+                      *coeff,
+                      rogue_none(),
+                      rogue_ref_io(ROGUE_IO_FT2),
+                      rogue_none(),
+                      *coeff);
+      break;
+
+   case nir_atomic_op_ixor:
+      assert(type == nir_type_uint32);
+      atom = rogue_XOR(b,
+                       *coeff,
+                       rogue_none(),
+                       rogue_ref_io(ROGUE_IO_FT2),
+                       rogue_none(),
+                       *coeff);
+      break;
+
+   default:
+      unreachable("Unsupported shared atomic bitwise op.");
+   }
+
+   return &atom->instr;
+}
+
+/* All in one instruction group, to ensure it's an atomic op. */
+static void trans_nir_intrinsic_shared_atomic_img(rogue_builder *b,
+                                                  nir_intrinsic_instr *intr)
+{
+   unsigned bit_size = intr->def.bit_size;
+   assert(bit_size == 32);
+   nir_atomic_op op = nir_intrinsic_atomic_op(intr);
+   nir_alu_type type = nir_atomic_op_type(op) | bit_size;
+
+   bool is_swap = (op == nir_atomic_op_cmpxchg) ||
+                  (op == nir_atomic_op_fcmpxchg);
+   bool bitwise = (op == nir_atomic_op_iand) || (op == nir_atomic_op_ior) ||
+                  (op == nir_atomic_op_ixor);
+
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, bit_size);
+   rogue_ref coeff = intr_shared_coeff_src(b, intr, 0);
+   rogue_ref data = intr_src(b->shader, intr, 1, &(unsigned){ 1 }, bit_size);
+   rogue_ref data_swap =
+      is_swap ? intr_src(b->shader, intr, 2, &(unsigned){ 1 }, bit_size)
+              : rogue_none();
+
+   rogue_instr *atom =
+      bitwise ? shared_atomic_bitwise(b, op, type, &dst, &coeff, &data)
+              : shared_atomic_alu(b, op, type, &dst, &coeff, &data, &data_swap);
+
+   rogue_set_instr_atom(atom, true);
+}
+
 static void trans_nir_intrinsic_global_atomic(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
@@ -2498,6 +2722,11 @@ static void trans_nir_intrinsic_mutex_img(rogue_builder *b,
       shader->mutex_state |= ROGUE_MUTEX_STATE_LOCKED;
    } else {
       assert(shader->mutex_state & ROGUE_MUTEX_STATE_LOCKED);
+
+      /* Before releasing, check if we need to emit a coeff fence. */
+      if (shader->mutex_state & ROGUE_MUTEX_STATE_WROTE_COEFF)
+         rogue_fence_coeff_write(b);
+
       shader->mutex_state = ROGUE_MUTEX_STATE_RELEASED;
    }
 
@@ -2550,6 +2779,10 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_store_shared_img:
       return trans_nir_intrinsic_load_store_shared_img(b, intr, true);
+
+   case nir_intrinsic_shared_atomic_img:
+   case nir_intrinsic_shared_atomic_swap_img:
+      return trans_nir_intrinsic_shared_atomic_img(b, intr);
 
    case nir_intrinsic_load_sample_id:
       return trans_nir_load_special_reg(b,
