@@ -278,6 +278,41 @@ static bool lower_load_base_instance(nir_builder *b, nir_intrinsic_instr *intr)
    return true;
 }
 
+/* Convert {load,store}_shared intrinsics to their img-specific versions.
+ * These utilise the coefficient registers, and so require DWORD offsets.
+ *
+ * TODO: Coefficient register spilling support.
+ */
+static bool
+lower_load_store_shared(nir_builder *b, nir_intrinsic_instr *intr, bool store)
+{
+   b->cursor = nir_before_instr(&intr->instr);
+
+   assert(nir_intrinsic_base(intr) == 0);
+
+   nir_src offset_src = intr->src[!!store];
+   assert(nir_src_num_components(offset_src) == 1);
+
+   /* To DWORD offset/addressing. */
+   nir_def *offset = nir_ushr_imm(b, offset_src.ssa, 2);
+
+   if (store) {
+      assert(nir_intrinsic_write_mask(intr) == 1);
+      nir_def *value = intr->src[0].ssa;
+
+      nir_store_shared_img(b, value, offset);
+   } else {
+      assert(intr->def.num_components == 1);
+
+      nir_def *load_shared_img = nir_load_shared_img(b, offset);
+      nir_def_rewrite_uses(&intr->def, load_shared_img);
+   }
+
+   nir_instr_remove(&intr->instr);
+
+   return true;
+}
+
 static bool lower_intrinsic(nir_builder *b,
                             nir_intrinsic_instr *instr,
                             rogue_build_ctx *ctx,
@@ -313,6 +348,12 @@ static bool lower_intrinsic(nir_builder *b,
 
       case nir_intrinsic_load_base_instance:
          return lower_load_base_instance(b, instr);
+
+      case nir_intrinsic_load_shared:
+         return lower_load_store_shared(b, instr, false);
+
+      case nir_intrinsic_store_shared:
+         return lower_load_store_shared(b, instr, true);
 
       default:
          break;

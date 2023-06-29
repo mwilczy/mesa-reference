@@ -1052,6 +1052,24 @@ pvr_compute_pipeline_alloc_coeffs(struct rogue_cs_build_data *cs_data)
    else
       cs_data->barrier_reg = ROGUE_REG_UNUSED;
 
+   /* Align shared/local memory allocation.
+    * TODO: Check if this is actually needed.
+    */
+   next_free_reg = ALIGN_POT(next_free_reg, 4);
+
+   /* Allocate shared/local memory. */
+   if (cs_data->has.shmem_bytes) {
+      cs_data->shmem_offset = next_free_reg;
+      next_free_reg += cs_data->has.shmem_bytes;
+   } else {
+      cs_data->shmem_offset = ROGUE_REG_UNUSED;
+   }
+
+   /* Align shared/local memory size.
+    * TODO: Check if this is actually needed.
+    */
+   next_free_reg = ALIGN_POT(next_free_reg, 4);
+
    return next_free_reg;
 }
 
@@ -1133,6 +1151,7 @@ static VkResult pvr_compute_pipeline_compile(
    const VkAllocationCallbacks *const allocator,
    struct pvr_compute_pipeline *const compute_pipeline)
 {
+   const uint64_t max_coeffs = device->pdevice->dev_runtime_info.max_coeffs;
    const uint32_t cache_line_size =
       rogue_get_slc_cache_line_size(&device->pdevice->dev_info);
    struct pvr_pipeline_layout *layout = compute_pipeline->base.layout;
@@ -1174,6 +1193,7 @@ static VkResult pvr_compute_pipeline_compile(
    compute_pipeline->shader_state.const_shared_reg_count = reg_count;
 
    reg_count = pvr_compute_pipeline_alloc_coeffs(cs_data);
+   assert(reg_count < max_coeffs);
    compute_pipeline->shader_state.coefficient_register_count = reg_count;
 
    reg_count = pvr_compute_pipeline_alloc_vtx_ins(cs_data);

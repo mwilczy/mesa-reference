@@ -1974,3 +1974,7 @@ intrinsic("load_instance_num_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDE
 
 # Perform a mutex operation (slot granularity).
 intrinsic("mutex_img", indices=[MUTEX_ID_IMG, MUTEX_OP_IMG])
+
+# Shared memory load/store functions, DWORD offsets/addressing
+intrinsic("load_shared_img", src_comp=[1], dest_comp=1, bit_sizes=[32])
+intrinsic("store_shared_img", src_comp=[1, 1], bit_sizes=[32])

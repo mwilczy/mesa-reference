@@ -626,6 +626,9 @@ static void rogue_collect_early_cs_build_data(rogue_build_ctx *ctx,
       }
    }
 
+   assert(!(info->shared_size % 4));
+   cs_data->has.shmem_bytes = info->shared_size / 4;
+
    cs_data->work_size = info->workgroup_size[0] * info->workgroup_size[1] *
                         info->workgroup_size[2];
 

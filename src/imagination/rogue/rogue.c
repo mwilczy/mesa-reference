@@ -891,12 +891,14 @@ void rogue_link_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &alu->dst_write[i].reg;
             rogue_reg *reg = alu->dst[i].ref.reg;
             rogue_link_instr_write_reg(instr, write, reg, i);
+         } else if (rogue_ref_is_reg_indexed(&alu->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&alu->dst[i].ref)) {
             rogue_regarray_write *write = &alu->dst_write[i].regarray;
             rogue_regarray *regarray = alu->dst[i].ref.regarray;
             rogue_link_instr_write_regarray(instr, write, regarray, i);
-         } else if (rogue_ref_is_io(&alu->dst[i].ref)) { /* TODO: check WHICH IO
-                                                            IT IS */
+         } else if (rogue_ref_is_io(&alu->dst[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else {
             unreachable("Unsupported destination reference type.");
          }
@@ -914,13 +916,14 @@ void rogue_link_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &backend->dst_write[i].reg;
             rogue_reg *reg = backend->dst[i].ref.reg;
             rogue_link_instr_write_reg(instr, write, reg, i);
+         } else if (rogue_ref_is_reg_indexed(&backend->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&backend->dst[i].ref)) {
             rogue_regarray_write *write = &backend->dst_write[i].regarray;
             rogue_regarray *regarray = backend->dst[i].ref.regarray;
             rogue_link_instr_write_regarray(instr, write, regarray, i);
-         } else if (rogue_ref_is_io(&backend->dst[i].ref)) { /* TODO: check
-                                                                WHICH IO IT IS
-                                                              */
+         } else if (rogue_ref_is_io(&backend->dst[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else {
             unreachable("Unsupported destination reference type.");
          }
@@ -938,12 +941,14 @@ void rogue_link_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &ctrl->dst_write[i].reg;
             rogue_reg *reg = ctrl->dst[i].ref.reg;
             rogue_link_instr_write_reg(instr, write, reg, i);
+         } else if (rogue_ref_is_reg_indexed(&ctrl->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&ctrl->dst[i].ref)) {
             rogue_regarray_write *write = &ctrl->dst_write[i].regarray;
             rogue_regarray *regarray = ctrl->dst[i].ref.regarray;
             rogue_link_instr_write_regarray(instr, write, regarray, i);
-         } else if (rogue_ref_is_io(&ctrl->dst[i].ref)) { /* TODO: check WHICH
-                                                             IO IT IS */
+         } else if (rogue_ref_is_io(&ctrl->dst[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else {
             unreachable("Unsupported destination reference type.");
          }
@@ -961,13 +966,14 @@ void rogue_link_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &bitwise->dst_write[i].reg;
             rogue_reg *reg = bitwise->dst[i].ref.reg;
             rogue_link_instr_write_reg(instr, write, reg, i);
+         } else if (rogue_ref_is_reg_indexed(&bitwise->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&bitwise->dst[i].ref)) {
             rogue_regarray_write *write = &bitwise->dst_write[i].regarray;
             rogue_regarray *regarray = bitwise->dst[i].ref.regarray;
             rogue_link_instr_write_regarray(instr, write, regarray, i);
-         } else if (rogue_ref_is_io(&bitwise->dst[i].ref)) { /* TODO: check
-                                                                WHICH IO IT IS
-                                                              */
+         } else if (rogue_ref_is_io(&bitwise->dst[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else {
             unreachable("Unsupported destination reference type.");
          }
@@ -1000,6 +1006,7 @@ void rogue_link_instr_use(rogue_instr *instr)
             rogue_reg *reg = alu->src[i].ref.reg;
             rogue_link_instr_use_reg(instr, use, reg, i);
          } else if (rogue_ref_is_reg_indexed(&alu->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&alu->src[i].ref)) {
             rogue_regarray_use *use = &alu->src_use[i].regarray;
             rogue_regarray *regarray = alu->src[i].ref.regarray;
@@ -1009,9 +1016,10 @@ void rogue_link_instr_use(rogue_instr *instr)
                                instr,
                                i,
                                rogue_ref_get_imm(&alu->src[i].ref));
-         } else if (rogue_ref_is_io(&alu->src[i].ref)) { /* TODO: check WHICH IO
-                                                            IT IS */
+         } else if (rogue_ref_is_io(&alu->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&alu->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }
@@ -1030,6 +1038,7 @@ void rogue_link_instr_use(rogue_instr *instr)
             rogue_reg *reg = backend->src[i].ref.reg;
             rogue_link_instr_use_reg(instr, use, reg, i);
          } else if (rogue_ref_is_reg_indexed(&backend->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&backend->src[i].ref)) {
             rogue_regarray_use *use = &backend->src_use[i].regarray;
             rogue_regarray *regarray = backend->src[i].ref.regarray;
@@ -1043,10 +1052,10 @@ void rogue_link_instr_use(rogue_instr *instr)
                                instr,
                                i,
                                rogue_ref_get_imm(&backend->src[i].ref));
-         } else if (rogue_ref_is_io(&backend->src[i].ref)) { /* TODO: check
-                                                                WHICH IO IT IS
-                                                              */
+         } else if (rogue_ref_is_io(&backend->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&backend->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }
@@ -1073,6 +1082,7 @@ void rogue_link_instr_use(rogue_instr *instr)
             rogue_reg *reg = ctrl->src[i].ref.reg;
             rogue_link_instr_use_reg(instr, use, reg, i);
          } else if (rogue_ref_is_reg_indexed(&ctrl->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&ctrl->src[i].ref)) {
             rogue_regarray_use *use = &ctrl->src_use[i].regarray;
             rogue_regarray *regarray = ctrl->src[i].ref.regarray;
@@ -1088,9 +1098,10 @@ void rogue_link_instr_use(rogue_instr *instr)
                                instr,
                                i,
                                rogue_ref_get_imm(&ctrl->src[i].ref));
-         } else if (rogue_ref_is_io(&ctrl->src[i].ref)) { /* TODO: check WHICH
-                                                             IO IT IS */
+         } else if (rogue_ref_is_io(&ctrl->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&ctrl->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }
@@ -1109,6 +1120,7 @@ void rogue_link_instr_use(rogue_instr *instr)
             rogue_reg *reg = bitwise->src[i].ref.reg;
             rogue_link_instr_use_reg(instr, use, reg, i);
          } else if (rogue_ref_is_reg_indexed(&bitwise->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&bitwise->src[i].ref)) {
             rogue_regarray_use *use = &bitwise->src_use[i].regarray;
             rogue_regarray *regarray = bitwise->src[i].ref.regarray;
@@ -1122,10 +1134,10 @@ void rogue_link_instr_use(rogue_instr *instr)
             rogue_link_drc_trxn(instr->block->shader,
                                 instr,
                                 rogue_ref_get_drc(&bitwise->src[i].ref));
-         } else if (rogue_ref_is_io(&bitwise->src[i].ref)) { /* TODO: check
-                                                                WHICH IO IT IS
-                                                              */
+         } else if (rogue_ref_is_io(&bitwise->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&bitwise->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }
@@ -1158,11 +1170,12 @@ void rogue_unlink_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &alu->dst_write[i].reg;
             rogue_unlink_instr_write_reg(instr, write);
          } else if (rogue_ref_is_reg_indexed(&alu->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&alu->dst[i].ref)) {
             rogue_regarray_write *write = &alu->dst_write[i].regarray;
             rogue_unlink_instr_write_regarray(instr, write);
-         } else if (rogue_ref_is_io(&alu->dst[i].ref)) { /* TODO: check WHICH IO
-                                                            IT IS */
+         } else if (rogue_ref_is_io(&alu->dst[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else {
             unreachable("Unsupported destination reference type.");
          }
@@ -1180,12 +1193,12 @@ void rogue_unlink_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &backend->dst_write[i].reg;
             rogue_unlink_instr_write_reg(instr, write);
          } else if (rogue_ref_is_reg_indexed(&backend->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&backend->dst[i].ref)) {
             rogue_regarray_write *write = &backend->dst_write[i].regarray;
             rogue_unlink_instr_write_regarray(instr, write);
-         } else if (rogue_ref_is_io(&backend->dst[i].ref)) { /* TODO: check
-                                                                WHICH IO IT IS
-                                                              */
+         } else if (rogue_ref_is_io(&backend->dst[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else {
             unreachable("Unsupported destination reference type.");
          }
@@ -1203,11 +1216,12 @@ void rogue_unlink_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &ctrl->dst_write[i].reg;
             rogue_unlink_instr_write_reg(instr, write);
          } else if (rogue_ref_is_reg_indexed(&ctrl->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&ctrl->dst[i].ref)) {
             rogue_regarray_write *write = &ctrl->dst_write[i].regarray;
             rogue_unlink_instr_write_regarray(instr, write);
-         } else if (rogue_ref_is_io(&ctrl->dst[i].ref)) { /* TODO: check WHICH
-                                                             IO IT IS */
+         } else if (rogue_ref_is_io(&ctrl->dst[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else {
             unreachable("Unsupported destination reference type.");
          }
@@ -1225,6 +1239,7 @@ void rogue_unlink_instr_write(rogue_instr *instr)
             rogue_reg_write *write = &bitwise->dst_write[i].reg;
             rogue_unlink_instr_write_reg(instr, write);
          } else if (rogue_ref_is_reg_indexed(&bitwise->dst[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&bitwise->dst[i].ref)) {
             rogue_regarray_write *write = &bitwise->dst_write[i].regarray;
             rogue_unlink_instr_write_regarray(instr, write);
@@ -1259,15 +1274,17 @@ void rogue_unlink_instr_use(rogue_instr *instr)
             rogue_reg_use *use = &alu->src_use[i].reg;
             rogue_unlink_instr_use_reg(instr, use);
          } else if (rogue_ref_is_reg_indexed(&alu->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&alu->src[i].ref)) {
             rogue_regarray_use *use = &alu->src_use[i].regarray;
             rogue_unlink_instr_use_regarray(instr, use);
          } else if (rogue_ref_is_imm(&alu->src[i].ref)) {
             rogue_unlink_imm_use(instr,
                                  &rogue_ref_get_imm(&alu->src[i].ref)->use);
-         } else if (rogue_ref_is_io(&alu->src[i].ref)) { /* TODO: check WHICH IO
-                                                            IT IS */
+         } else if (rogue_ref_is_io(&alu->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&alu->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }
@@ -1285,6 +1302,7 @@ void rogue_unlink_instr_use(rogue_instr *instr)
             rogue_reg_use *use = &backend->src_use[i].reg;
             rogue_unlink_instr_use_reg(instr, use);
          } else if (rogue_ref_is_reg_indexed(&backend->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&backend->src[i].ref)) {
             rogue_regarray_use *use = &backend->src_use[i].regarray;
             rogue_unlink_instr_use_regarray(instr, use);
@@ -1295,10 +1313,10 @@ void rogue_unlink_instr_use(rogue_instr *instr)
          } else if (rogue_ref_is_imm(&backend->src[i].ref)) {
             rogue_unlink_imm_use(instr,
                                  &rogue_ref_get_imm(&backend->src[i].ref)->use);
-         } else if (rogue_ref_is_io(&backend->src[i].ref)) { /* TODO: check
-                                                                WHICH IO IT IS
-                                                              */
+         } else if (rogue_ref_is_io(&backend->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&backend->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }
@@ -1322,6 +1340,7 @@ void rogue_unlink_instr_use(rogue_instr *instr)
             rogue_reg_use *use = &ctrl->src_use[i].reg;
             rogue_unlink_instr_use_reg(instr, use);
          } else if (rogue_ref_is_reg_indexed(&ctrl->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&ctrl->src[i].ref)) {
             rogue_regarray_use *use = &ctrl->src_use[i].regarray;
             rogue_unlink_instr_use_regarray(instr, use);
@@ -1334,9 +1353,10 @@ void rogue_unlink_instr_use(rogue_instr *instr)
          } else if (rogue_ref_is_imm(&ctrl->src[i].ref)) {
             rogue_unlink_imm_use(instr,
                                  &rogue_ref_get_imm(&ctrl->src[i].ref)->use);
-         } else if (rogue_ref_is_io(&ctrl->src[i].ref)) { /* TODO: check WHICH
-                                                             IO IT IS */
+         } else if (rogue_ref_is_io(&ctrl->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&ctrl->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }
@@ -1354,6 +1374,7 @@ void rogue_unlink_instr_use(rogue_instr *instr)
             rogue_reg_use *use = &bitwise->src_use[i].reg;
             rogue_unlink_instr_use_reg(instr, use);
          } else if (rogue_ref_is_reg_indexed(&bitwise->src[i].ref)) {
+            /* TODO: Track index register usage. */
          } else if (rogue_ref_is_regarray(&bitwise->src[i].ref)) {
             rogue_regarray_use *use = &bitwise->src_use[i].regarray;
             rogue_unlink_instr_use_regarray(instr, use);
@@ -1364,10 +1385,10 @@ void rogue_unlink_instr_use(rogue_instr *instr)
             rogue_unlink_drc_trxn(instr->block->shader,
                                   instr,
                                   rogue_ref_get_drc(&bitwise->src[i].ref));
-         } else if (rogue_ref_is_io(&bitwise->src[i].ref)) { /* TODO: check
-                                                                WHICH IO IT IS
-                                                              */
+         } else if (rogue_ref_is_io(&bitwise->src[i].ref)) {
+            /* TODO: Check which IO is referenced and handle accordingly. */
          } else if (rogue_ref_is_val(&bitwise->src[i].ref)) {
+            /* Values are untracked. */
          } else {
             unreachable("Unsupported source reference type.");
          }

@@ -1783,6 +1783,86 @@ static void trans_nir_intrinsic_store_global(rogue_builder *b,
                             store_components);
 }
 
+static rogue_ref indexed_coeff(rogue_builder *b,
+                               unsigned base_offset,
+                               rogue_ref *dynamic_offset,
+                               unsigned idx_reg)
+{
+   assert(idx_reg < 2);
+   rogue_ref idx = rogue_ref_reg(rogue_index_reg(b->shader, idx_reg));
+
+   rogue_MOV(b, idx, *dynamic_offset);
+
+   return rogue_ref_reg_indexed(rogue_coeff_reg(b->shader, base_offset),
+                                idx_reg);
+}
+
+static rogue_ref rogue_shared_coeff(rogue_builder *b,
+                                    rogue_ref *shared_mem_offset,
+                                    unsigned idx_reg)
+{
+   const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
+   assert(cs_data->shmem_offset != ROGUE_REG_UNUSED);
+
+   return indexed_coeff(b, cs_data->shmem_offset, shared_mem_offset, idx_reg);
+}
+
+static rogue_ref intr_shared_coeff_src(rogue_builder *b,
+                                       const nir_intrinsic_instr *intr,
+                                       unsigned src_num)
+{
+   const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
+   assert(cs_data->shmem_offset != ROGUE_REG_UNUSED);
+
+   const nir_src *src = &intr->src[src_num];
+   assert(nir_src_bit_size(*src) == 32);
+
+   unsigned num_components = nir_src_num_components(*src);
+   assert(num_components == 1);
+
+   /* If the offset is constant, we don't need to use indexed access. */
+   if (nir_src_is_const(*src)) {
+      return rogue_ref_reg(
+         rogue_coeff_reg(b->shader,
+                         nir_src_as_uint(*src) + cs_data->shmem_offset));
+   }
+
+   unsigned index = src->ssa->index;
+   rogue_ref coeff_offset = rogue_ref_reg(rogue_ssa_reg(b->shader, index));
+   return indexed_coeff(b,
+                        cs_data->shmem_offset,
+                        &coeff_offset,
+                        0 /* idx_reg */);
+   /* TODO: Don't hardcode idx_reg, track its use. */
+}
+
+static void trans_nir_intrinsic_load_store_shared_img(rogue_builder *b,
+                                                      nir_intrinsic_instr *intr,
+                                                      bool store)
+{
+   const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
+   assert(cs_data->shmem_offset != ROGUE_REG_UNUSED);
+
+   /* TODO: handle addressing/packing for < 32-bits. */
+   unsigned bit_size = store ? nir_src_bit_size(intr->src[0])
+                             : intr->def.bit_size;
+   assert(bit_size == 32);
+
+   rogue_ref dst = store
+                      ? intr_shared_coeff_src(b, intr, 1)
+                      : intr_dst(b->shader, intr, &(unsigned){ 1 }, bit_size);
+   rogue_ref src = store
+                      ? intr_src(b->shader, intr, 0, &(unsigned){ 1 }, bit_size)
+                      : intr_shared_coeff_src(b, intr, 0);
+
+   /* TODO: handle addressing/packing for < 32-bits. */
+   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
+   rogue_add_instr_commentf(&mov->instr,
+                            "%s_shared%u",
+                            store ? "store" : "load",
+                            bit_size);
+}
+
 static void trans_nir_load_helper_invocation(rogue_builder *b,
                                              nir_intrinsic_instr *intr)
 {
@@ -2464,6 +2544,12 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_load_helper_invocation:
       return trans_nir_load_helper_invocation(b, intr);
+
+   case nir_intrinsic_load_shared_img:
+      return trans_nir_intrinsic_load_store_shared_img(b, intr, false);
+
+   case nir_intrinsic_store_shared_img:
+      return trans_nir_intrinsic_load_store_shared_img(b, intr, true);
 
    case nir_intrinsic_load_sample_id:
       return trans_nir_load_special_reg(b,
