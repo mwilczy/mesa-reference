@@ -4110,11 +4110,16 @@ unsigned rogue_count_used_regs(const rogue_shader *shader,
 }
 
 static inline void rogue_feedback_used_regs(rogue_build_ctx *ctx,
-                                            const rogue_shader *shader)
+                                            const rogue_shader *shader,
+                                            bool is_preamble)
 {
    /* TODO NEXT: Use this counting method elsewhere as well. */
-   ctx->common_data[shader->stage].temps =
-      rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
+   unsigned temps = rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
+
+   if (is_preamble)
+      ctx->common_data[shader->stage].preamble.temps = temps;
+   else
+      ctx->common_data[shader->stage].temps = temps;
 }
 
 static bool ssa_is_reg_decl(nir_def *ssa)
@@ -4518,30 +4523,14 @@ static inline void rogue_trim_empty_blocks(rogue_shader *shader)
    }
 }
 
-/**
- * \brief Translates a NIR shader to Rogue.
- *
- * \param[in] ctx Shared multi-stage build context.
- * \param[in] nir NIR shader.
- * \return A rogue_shader* if successful, or NULL if unsuccessful.
- */
-PUBLIC
-rogue_shader *rogue_nir_to_rogue(rogue_build_ctx *ctx, const nir_shader *nir)
+static rogue_shader *nir_to_rogue(rogue_build_ctx *ctx,
+                                  const nir_shader *nir,
+                                  rogue_shader *shader,
+                                  nir_function_impl *entry,
+                                  bool is_preamble)
 {
-   gl_shader_stage stage = nir->info.stage;
-   rogue_shader *shader = rogue_shader_create(ctx, stage, (nir_shader *)nir);
-   if (!shader)
-      return NULL;
-
-   shader->ctx = ctx;
-
-   /* Make sure we only have a single function. */
-   assert(exec_list_length(&nir->functions) == 1);
-
    rogue_builder b;
    rogue_builder_init(&b, shader);
-
-   nir_function_impl *entry = nir_shader_get_entrypoint((nir_shader *)nir);
 
    /* Go through SSA used by NIR and "reserve" them so that sub-arrays won't be
     * declared before the parent arrays. */
@@ -4572,9 +4561,49 @@ rogue_shader *rogue_nir_to_rogue(rogue_build_ctx *ctx, const nir_shader *nir)
    /* Collect late build data. */
    rogue_collect_late_build_data(shader);
 
-   rogue_feedback_used_regs(ctx, shader);
+   rogue_feedback_used_regs(ctx, shader, is_preamble);
 
    return shader;
+}
+
+/**
+ * \brief Translates a NIR shader to Rogue.
+ *
+ * \param[in] ctx Shared multi-stage build context.
+ * \param[in] nir NIR shader.
+ * \return A rogue_shader* if successful, or NULL if unsuccessful.
+ */
+PUBLIC
+rogue_shader *rogue_nir_to_rogue(rogue_build_ctx *ctx, const nir_shader *nir)
+{
+   gl_shader_stage stage = nir->info.stage;
+   rogue_shader *shader = rogue_shader_create(ctx, stage, (nir_shader *)nir);
+   if (!shader)
+      return NULL;
+
+   shader->ctx = ctx;
+
+   ASSERTED unsigned num_funcs = exec_list_length(&nir->functions);
+   nir_function_impl *entry = nir_shader_get_entrypoint((nir_shader *)nir);
+   bool has_preamble = !!entry->preamble;
+
+   /* Make sure we only have a single function. */
+   assert(num_funcs == 1 || (num_funcs == 2 && has_preamble));
+
+   if (has_preamble) {
+      nir_function_impl *preamble = nir_shader_get_preamble((nir_shader *)nir);
+
+      rogue_shader *preamble_shader =
+         rogue_shader_create(ctx, stage, (nir_shader *)nir);
+      assert(preamble_shader);
+
+      preamble_shader->ctx = ctx;
+
+      ctx->preamble.rogue[stage] =
+         nir_to_rogue(ctx, nir, preamble_shader, preamble, true);
+   }
+
+   return nir_to_rogue(ctx, nir, shader, entry, false);
 }
 
 /**

@@ -182,6 +182,28 @@ shared_var_info(const struct glsl_type *type, unsigned *size, unsigned *align)
    *size = comp_size * length, *align = comp_size;
 }
 
+static void def_size(nir_def *def, unsigned *size, unsigned *align)
+{
+   unsigned bit_size = def->bit_size < 32 ? 32 : def->bit_size;
+   *size = DIV_ROUND_UP(bit_size, 32) * def->num_components;
+   *align = 1;
+}
+
+static float instr_cost(UNUSED nir_instr *instr, UNUSED const void *data)
+{
+   return 1.0f;
+}
+
+static float rewrite_cost(UNUSED nir_def *def, UNUSED const void *data)
+{
+   return 0.0f;
+}
+
+static bool avoid_instr(UNUSED const nir_instr *instr, UNUSED const void *data)
+{
+   return false;
+}
+
 /**
  * \brief Applies optimizations and passes required to lower the NIR shader into
  * a form suitable for lowering to Rogue IR.
@@ -190,9 +212,8 @@ shared_var_info(const struct glsl_type *type, unsigned *size, unsigned *align)
  * \param[in] shader Rogue shader.
  * \param[in] stage Shader stage.
  */
-static void rogue_nir_passes(struct rogue_build_ctx *ctx,
-                             nir_shader *nir,
-                             gl_shader_stage stage)
+static void
+rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 {
    bool progress;
 
@@ -262,6 +283,27 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
 
    NIR_PASS_V(nir, nir_opt_constant_folding);
    NIR_PASS_V(nir, nir_lower_system_values);
+
+   /* Generate preamble shader. */
+   if (ROGUE_DEBUG(PREAMBLE) && !nir->info.internal &&
+       (nir->info.stage == MESA_SHADER_FRAGMENT ||
+        nir->info.stage == MESA_SHADER_VERTEX)) {
+      static const nir_opt_preamble_options preamble_options = {
+         .drawid_uniform = true,
+         .subgroup_size_uniform = true,
+         .def_size = def_size,
+         .preamble_storage_size = 128,
+         .instr_cost_cb = instr_cost,
+         .rewrite_cost_cb = rewrite_cost,
+         .avoid_instr_cb = avoid_instr,
+         .cb_data = NULL,
+      };
+
+      unsigned preamble_size = 0;
+      NIR_PASS_V(nir, nir_opt_preamble, &preamble_options, &preamble_size);
+
+      ctx->common_data[stage].preamble.shareds = preamble_size;
+   }
 
    /* Replace references to I/O variables with intrinsics. */
    NIR_PASS_V(nir,

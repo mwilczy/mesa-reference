@@ -2066,10 +2066,9 @@ static void rogue_dump_shader_binary(rogue_shader *shader,
    fclose(fp);
 }
 
-PUBLIC
-void rogue_encode_shader(rogue_build_ctx *ctx,
-                         rogue_shader *shader,
-                         struct util_dynarray *binary)
+static void encode_shader(rogue_build_ctx *ctx,
+                          rogue_shader *shader,
+                          struct util_dynarray *binary)
 {
    if (!shader->is_grouped)
       unreachable("Can't encode shader with ungrouped instructions.");
@@ -2081,4 +2080,20 @@ void rogue_encode_shader(rogue_build_ctx *ctx,
 
    if (ROGUE_DEBUG(DUMP_BINARY))
       rogue_dump_shader_binary(shader, binary);
+}
+
+PUBLIC
+void rogue_encode_shader(rogue_build_ctx *ctx,
+                         rogue_shader *shader,
+                         struct util_dynarray *binary)
+{
+   gl_shader_stage stage = shader->stage;
+
+   if (ctx && ctx->preamble.rogue[stage]) {
+      rogue_shader *preamble_shader = ctx->preamble.rogue[stage];
+      struct util_dynarray *preamble_binary = &ctx->preamble.binary[stage];
+      encode_shader(ctx, preamble_shader, preamble_binary);
+   }
+
+   encode_shader(ctx, shader, binary);
 }

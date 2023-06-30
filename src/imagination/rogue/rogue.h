@@ -4028,6 +4028,11 @@ typedef struct rogue_build_ctx {
    rogue_shader *rogue[MESA_SHADER_COMPUTE + 1];
    struct util_dynarray binary[MESA_SHADER_COMPUTE + 1];
 
+   struct {
+      rogue_shader *rogue[MESA_SHADER_COMPUTE + 1];
+      struct util_dynarray binary[MESA_SHADER_COMPUTE + 1];
+   } preamble;
+
    rogue_common_build_data common_data[MESA_SHADER_COMPUTE + 1];
    rogue_build_data stage_data;
    struct pvr_pipeline_layout *pipeline_layout;

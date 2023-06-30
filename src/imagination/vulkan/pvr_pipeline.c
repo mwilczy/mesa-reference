@@ -41,8 +41,6 @@
 #include "pvr_robustness.h"
 #include "pvr_shader.h"
 #include "pvr_types.h"
-/* TODO: hardcoded to use NOP program for now, remove. */
-#include "pvr_uscgen.h"
 #include "rogue/rogue.h"
 #include "util/log.h"
 #include "util/macros.h"
@@ -524,6 +522,8 @@ static VkResult pvr_pds_descriptor_program_create_and_upload(
    const struct pvr_pipeline_layout *const layout,
    enum pvr_stage_allocation stage,
    const struct pvr_sh_reg_layout *sh_reg_layout,
+   struct util_dynarray *preamble_shader,
+   uint32_t sec_temp_reg_count,
    struct pvr_stage_allocation_descriptor_state *const descriptor_state)
 {
    const size_t const_entries_size_in_bytes =
@@ -622,30 +622,23 @@ static VkResult pvr_pds_descriptor_program_create_and_upload(
 
    program.addr_literal_count = addr_literals;
 
-   /* TODO: hardcoded to use NOP program for now, remove. */
-   if (true) {
+   /* Setup preamble shader/secondary program. */
+   if (preamble_shader && preamble_shader->size) {
       const uint32_t cache_line_size =
          rogue_get_slc_cache_line_size(&device->pdevice->dev_info);
 
-      struct util_dynarray nop_usc_bin;
-      pvr_uscgen_nop(&nop_usc_bin);
-
       result = pvr_gpu_upload_usc(device,
-                                  util_dynarray_begin(&nop_usc_bin),
-                                  nop_usc_bin.size,
+                                  util_dynarray_begin(preamble_shader),
+                                  preamble_shader->size,
                                   cache_line_size,
                                   &descriptor_state->usc_code);
       if (result != VK_SUCCESS)
          goto err_free_secondary_program;
 
-      util_dynarray_fini(&nop_usc_bin);
-
       program.secondary_program_present = true;
    }
 
    if (program.secondary_program_present) {
-      uint32_t sec_temp_reg_count = 0;
-
       pvr_pds_setup_doutu(&program.secondary_task_control,
                           0,
                           sec_temp_reg_count,
@@ -1290,6 +1283,8 @@ static VkResult pvr_compute_pipeline_compile(
       layout,
       PVR_STAGE_ALLOCATION_COMPUTE,
       sh_reg_layout,
+      NULL,
+      0,
       &compute_pipeline->descriptor_state);
    if (result != VK_SUCCESS)
       goto err_free_shader;
@@ -2786,6 +2781,8 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
          layout,
          PVR_STAGE_ALLOCATION_FRAGMENT,
          sh_reg_layout_frag,
+         &ctx->preamble.binary[MESA_SHADER_FRAGMENT],
+         ctx->common_data[MESA_SHADER_FRAGMENT].preamble.temps,
          &fragment_state->descriptor_state);
       if (result != VK_SUCCESS)
          goto err_free_frag_program;
@@ -2815,6 +2812,8 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
       layout,
       PVR_STAGE_ALLOCATION_VERTEX_GEOMETRY,
       sh_reg_layout_vert,
+      &ctx->preamble.binary[MESA_SHADER_VERTEX],
+      ctx->common_data[MESA_SHADER_VERTEX].preamble.temps,
       &gfx_pipeline->shader_state.vertex.descriptor_state);
    if (result != VK_SUCCESS)
       goto err_free_vertex_attrib_program;
