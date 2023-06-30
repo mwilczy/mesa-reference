@@ -1024,6 +1024,7 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
     */
    next_free_sh_reg += layout->per_stage_required_register_usage[stage];
 
+   /* Reserve space for the descriptor set device address table base. */
    reg_layout.descriptor_set_addrs_table.present =
       !!(layout->shader_stage_mask & BITFIELD_BIT(stage));
 
@@ -1032,6 +1033,7 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
       next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
    }
 
+   /* Reserve space for the push constants base device address. */
    reg_layout.push_consts.present =
       !!(layout->push_constants_shader_stages & BITFIELD_BIT(stage));
 
@@ -1695,6 +1697,7 @@ static uint32_t pvr_graphics_pipeline_alloc_shareds(
    const struct pvr_device *device,
    const struct pvr_graphics_pipeline *gfx_pipeline,
    enum pvr_stage_allocation stage,
+   unsigned preamble_shareds,
    struct pvr_sh_reg_layout *const sh_reg_layout_out)
 {
    ASSERTED const uint64_t reserved_shared_size =
@@ -1715,6 +1718,12 @@ static uint32_t pvr_graphics_pipeline_alloc_shareds(
    if (reg_layout.blend_consts.present) {
       reg_layout.blend_consts.offset = next_free_sh_reg;
       next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
+   }
+
+   reg_layout.preamble.present = !!preamble_shareds;
+   if (reg_layout.preamble.present) {
+      reg_layout.preamble.offset = next_free_sh_reg;
+      next_free_sh_reg += preamble_shareds;
    }
 
    *sh_reg_layout_out = reg_layout;
@@ -2614,28 +2623,6 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
       pCreateInfo->pInputAssemblyState->topology ==
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
 
-   pvr_graphics_pipeline_alloc_vertex_inputs(
-      pCreateInfo->pVertexInputState,
-      &ctx->stage_data.vs.inputs,
-      &ctx->stage_data.vs.num_vertex_input_regs,
-      &vtx_dma_descriptions,
-      &vtx_dma_count);
-
-   pvr_graphics_pipeline_alloc_vertex_special_vars(
-      &ctx->stage_data.vs.num_vertex_input_regs,
-      &ctx->stage_data.vs.special_vars);
-
-   for (enum pvr_stage_allocation pvr_stage =
-           PVR_STAGE_ALLOCATION_VERTEX_GEOMETRY;
-        pvr_stage < PVR_STAGE_ALLOCATION_COMPUTE;
-        pvr_stage++) {
-      sh_count[pvr_stage] = pvr_graphics_pipeline_alloc_shareds(
-         device,
-         gfx_pipeline,
-         pvr_stage,
-         &layout->sh_reg_layout_per_stage[pvr_stage]);
-   }
-
    /* NIR middle-end translation. */
    /* clang-format off */
    for (gl_shader_stage stage = MESA_SHADER_FRAGMENT;
@@ -2660,6 +2647,30 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
 
       /* Collect I/O data to pass back to the driver. */
       pvr_collect_io_data(ctx, ctx->nir[stage]);
+   }
+
+   pvr_graphics_pipeline_alloc_vertex_inputs(
+      pCreateInfo->pVertexInputState,
+      &ctx->stage_data.vs.inputs,
+      &ctx->stage_data.vs.num_vertex_input_regs,
+      &vtx_dma_descriptions,
+      &vtx_dma_count);
+
+   pvr_graphics_pipeline_alloc_vertex_special_vars(
+      &ctx->stage_data.vs.num_vertex_input_regs,
+      &ctx->stage_data.vs.special_vars);
+
+   for (enum pvr_stage_allocation pvr_stage =
+           PVR_STAGE_ALLOCATION_VERTEX_GEOMETRY;
+        pvr_stage < PVR_STAGE_ALLOCATION_COMPUTE;
+        pvr_stage++) {
+      gl_shader_stage stage = pvr_stage_to_mesa(pvr_stage);
+      sh_count[pvr_stage] = pvr_graphics_pipeline_alloc_shareds(
+         device,
+         gfx_pipeline,
+         pvr_stage,
+         ctx->common_data[stage].preamble.shareds,
+         &layout->sh_reg_layout_per_stage[pvr_stage]);
    }
 
    /* Pre-back-end analysis and optimization, driver data extraction. */

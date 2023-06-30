@@ -562,6 +562,15 @@ struct pvr_descriptor_state {
  * 'offset' fields indicate at which shared reg the resource starts at.
  */
 struct pvr_sh_reg_layout {
+   /* If this is present, it will contain the preamble data populated by the
+    * preamble shader (const calc/secondary program).
+    */
+   struct {
+      bool present;
+      uint32_t offset;
+      /* uint32_t count; */
+   } preamble;
+
    /* If this is present, it will always take up 2 sh regs in size and contain
     * the device address of the descriptor set addrs table.
     */

@@ -1418,6 +1418,25 @@ static void trans_nir_intrinsic_load_preamble(rogue_builder *b,
    rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
 
    unsigned sh_idx = nir_intrinsic_base(intr);
+
+   /* Skip applying offsets to internal shaders/USC programs for now.
+    * TODO: Fix this up when fixing up the NIR USC program code.
+    */
+   nir_shader *nir = b->shader->nir;
+   if (nir && !nir->info.internal) {
+      const struct pvr_pipeline_layout *pipeline_layout =
+         b->shader->ctx->pipeline_layout;
+      enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(b->shader->stage);
+
+      assert(
+         pipeline_layout->sh_reg_layout_per_stage[pvr_stage].preamble.present);
+      unsigned offset =
+         pipeline_layout->sh_reg_layout_per_stage[pvr_stage].preamble.offset;
+
+      /* Add the offset. */
+      sh_idx += offset;
+   }
+
    rogue_reg *sh_reg = rogue_shared_reg(b->shader, sh_idx);
 
    rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(sh_reg));
@@ -4062,8 +4081,6 @@ static inline void rogue_feedback_used_regs(rogue_build_ctx *ctx,
    /* TODO NEXT: Use this counting method elsewhere as well. */
    ctx->common_data[shader->stage].temps =
       rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
-   ctx->common_data[shader->stage].internals =
-      rogue_count_used_regs(shader, ROGUE_REG_CLASS_INTERNAL);
 }
 
 static bool ssa_is_reg_decl(nir_def *ssa)

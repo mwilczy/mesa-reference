@@ -3847,9 +3847,14 @@ typedef struct rogue_compile_time_consts_data {
  */
 typedef struct rogue_common_build_data {
    unsigned temps;
-   unsigned internals;
    unsigned coeffs;
    unsigned shareds;
+
+   struct {
+      unsigned temps;
+      unsigned shareds;
+      /* TODO: coefficient update program support. */
+   } preamble;
 
    rogue_ubo_data ubo_data;
    rogue_compile_time_consts_data compile_time_consts_data;
