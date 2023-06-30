@@ -1443,6 +1443,37 @@ static void trans_nir_intrinsic_load_preamble(rogue_builder *b,
    rogue_add_instr_comment(&mov->instr, "load_preamble");
 }
 
+static void trans_nir_intrinsic_store_preamble(rogue_builder *b,
+                                               nir_intrinsic_instr *intr)
+{
+   unsigned sh_idx = nir_intrinsic_base(intr);
+
+   /* Skip applying offsets to internal shaders/USC programs for now.
+    * TODO: Fix this up when fixing up the NIR USC program code.
+    */
+   nir_shader *nir = b->shader->nir;
+   if (nir && !nir->info.internal) {
+      const struct pvr_pipeline_layout *pipeline_layout =
+         b->shader->ctx->pipeline_layout;
+      enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(b->shader->stage);
+
+      assert(
+         pipeline_layout->sh_reg_layout_per_stage[pvr_stage].preamble.present);
+      unsigned offset =
+         pipeline_layout->sh_reg_layout_per_stage[pvr_stage].preamble.offset;
+
+      /* Add the offset. */
+      sh_idx += offset;
+   }
+
+   rogue_reg *sh_reg = rogue_shared_reg(b->shader, sh_idx);
+
+   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
+
+   rogue_alu_instr *mov = rogue_MOV(b, rogue_ref_reg(sh_reg), src);
+   rogue_add_instr_comment(&mov->instr, "store_preamble");
+}
+
 static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
@@ -2803,6 +2834,9 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_load_preamble:
       return trans_nir_intrinsic_load_preamble(b, intr);
+
+   case nir_intrinsic_store_preamble:
+      return trans_nir_intrinsic_store_preamble(b, intr);
 
    case nir_intrinsic_load_input:
       return trans_nir_intrinsic_load_input(b, intr);

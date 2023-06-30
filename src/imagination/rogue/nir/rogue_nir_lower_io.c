@@ -358,6 +358,54 @@ lower_shared_atomic(nir_builder *b, nir_intrinsic_instr *intr, bool swap)
    return true;
 }
 
+static bool lower_load_preamble(nir_builder *b, nir_intrinsic_instr *intr)
+{
+   unsigned bit_size = intr->def.bit_size;
+   assert(bit_size <= 32);
+
+   unsigned num_components = intr->def.num_components;
+   if (num_components == 1)
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+
+   nir_def *scalar_comps[NIR_MAX_VEC_COMPONENTS];
+   unsigned base = nir_intrinsic_base(intr);
+
+   /* Load each component. */
+   for (unsigned c = 0; c < num_components; ++c)
+      scalar_comps[c] = nir_load_preamble(b, 1, bit_size, .base = base + c);
+
+   nir_def_rewrite_uses(&intr->def, nir_vec(b, scalar_comps, num_components));
+   nir_instr_remove(&intr->instr);
+
+   return true;
+}
+
+static bool lower_store_preamble(nir_builder *b, nir_intrinsic_instr *intr)
+{
+   unsigned bit_size = nir_src_bit_size(intr->src[0]);
+   assert(bit_size <= 32);
+
+   unsigned num_components = nir_src_num_components(intr->src[0]);
+   if (num_components == 1)
+      return false;
+
+   b->cursor = nir_before_instr(&intr->instr);
+
+   unsigned base = nir_intrinsic_base(intr);
+
+   /* Store each component. */
+   for (unsigned c = 0; c < num_components; ++c)
+      nir_store_preamble(b,
+                         nir_channel(b, intr->src[0].ssa, c),
+                         .base = base + c);
+
+   nir_instr_remove(&intr->instr);
+
+   return true;
+}
+
 static bool lower_intrinsic(nir_builder *b,
                             nir_intrinsic_instr *instr,
                             rogue_build_ctx *ctx,
@@ -367,6 +415,12 @@ static bool lower_intrinsic(nir_builder *b,
       switch (instr->intrinsic) {
       case nir_intrinsic_load_vulkan_descriptor:
          return lower_load_vulkan_descriptor(b, instr);
+
+      case nir_intrinsic_load_preamble:
+         return lower_load_preamble(b, instr);
+
+      case nir_intrinsic_store_preamble:
+         return lower_store_preamble(b, instr);
 
       default:
          break;
