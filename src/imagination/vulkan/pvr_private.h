@@ -831,6 +831,9 @@ struct pvr_cmd_buffer {
 };
 
 struct pvr_stage_allocation_descriptor_state {
+   struct pvr_suballoc_bo *usc_code;
+   uint32_t usc_code_size_in_dwords;
+
    struct pvr_pds_upload pds_code;
    /* Since we upload the code segment separately from the data segment
     * pds_code->data_size might be 0 whilst

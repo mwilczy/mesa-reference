@@ -41,6 +41,8 @@
 #include "pvr_robustness.h"
 #include "pvr_shader.h"
 #include "pvr_types.h"
+/* TODO: hardcoded to use NOP program for now, remove. */
+#include "pvr_uscgen.h"
 #include "rogue/rogue.h"
 #include "util/log.h"
 #include "util/macros.h"
@@ -620,6 +622,37 @@ static VkResult pvr_pds_descriptor_program_create_and_upload(
 
    program.addr_literal_count = addr_literals;
 
+   /* TODO: hardcoded to use NOP program for now, remove. */
+   if (true) {
+      const uint32_t cache_line_size =
+         rogue_get_slc_cache_line_size(&device->pdevice->dev_info);
+
+      struct util_dynarray nop_usc_bin;
+      pvr_uscgen_nop(&nop_usc_bin);
+
+      result = pvr_gpu_upload_usc(device,
+                                  util_dynarray_begin(&nop_usc_bin),
+                                  nop_usc_bin.size,
+                                  cache_line_size,
+                                  &descriptor_state->usc_code);
+      if (result != VK_SUCCESS)
+         goto err_free_secondary_program;
+
+      util_dynarray_fini(&nop_usc_bin);
+
+      program.secondary_program_present = true;
+   }
+
+   if (program.secondary_program_present) {
+      uint32_t sec_temp_reg_count = 0;
+
+      pvr_pds_setup_doutu(&program.secondary_task_control,
+                          0,
+                          sec_temp_reg_count,
+                          PVRX(PDSINST_DOUTU_SAMPLE_RATE_INSTANCE),
+                          false);
+   }
+
    pds_info->entries = vk_alloc2(&device->vk.alloc,
                                  allocator,
                                  const_entries_size_in_bytes,
@@ -701,6 +734,9 @@ err_free_entries:
 err_free_static_consts:
    pvr_bo_suballoc_free(descriptor_state->static_consts);
 
+err_free_secondary_program:
+   pvr_bo_suballoc_free(descriptor_state->usc_code);
+
    return result;
 }
 
@@ -715,6 +751,7 @@ static void pvr_pds_descriptor_program_destroy(
    pvr_bo_suballoc_free(descriptor_state->pds_code.pvr_bo);
    vk_free2(&device->vk.alloc, allocator, descriptor_state->pds_info.entries);
    pvr_bo_suballoc_free(descriptor_state->static_consts);
+   pvr_bo_suballoc_free(descriptor_state->usc_code);
 }
 
 static void pvr_pds_compute_program_setup(

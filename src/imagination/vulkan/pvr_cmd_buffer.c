@@ -3951,6 +3951,24 @@ static VkResult pvr_setup_descriptor_mappings(
          break;
       }
 
+      case PVR_PDS_CONST_MAP_ENTRY_TYPE_DOUTU_ADDRESS: {
+         const struct pvr_const_map_entry_doutu_address *const doutu_addr =
+            (struct pvr_const_map_entry_doutu_address *)entries;
+         const pvr_dev_addr_t *exec_addr =
+            &descriptor_state->usc_code->dev_addr;
+         uint64_t addr = 0ULL;
+
+         pvr_set_usc_execution_address64(&addr, exec_addr->addr);
+
+         PVR_WRITE(qword_buffer,
+                   addr | doutu_addr->doutu_control,
+                   doutu_addr->const_offset,
+                   pds_info->data_size_in_dwords);
+
+         entries += sizeof(*doutu_addr);
+         break;
+      }
+
       case PVR_PDS_CONST_MAP_ENTRY_TYPE_SPECIAL_BUFFER: {
          const struct pvr_const_map_entry_special_buffer *special_buff_entry =
             (struct pvr_const_map_entry_special_buffer *)entries;
