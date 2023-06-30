@@ -78,8 +78,7 @@ static inline bool schedule_st_regs(rogue_builder *b, rogue_backend_instr *st)
    assert(!addr_ref->regarray->parent);
 
    /* Create new contiguous regarray containing the address followed by data. */
-   assert(b->shader->ctx);
-   unsigned addr_data_idx = b->shader->ctx->next_ssa_idx++;
+   unsigned addr_data_idx = rogue_next_ssa(b->shader);
    rogue_ssa_vec_regarray(b->shader, addr_size + data_size, addr_data_idx, 0);
    rogue_regarray *addr =
       rogue_ssa_vec_regarray(b->shader, addr_size, addr_data_idx, 0);

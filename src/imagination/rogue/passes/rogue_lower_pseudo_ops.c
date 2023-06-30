@@ -264,7 +264,7 @@ static inline bool rogue_lower_MOV(rogue_builder *b, rogue_alu_instr *mov)
    if (rogue_ref_is_vtxout_reg(&mov->dst[0].ref)) {
       rogue_ref src = mov->src[0].ref;
       if (rogue_ref_is_imm(&mov->src[0].ref)) {
-         unsigned imm_mov_idx = b->shader->ctx->next_ssa_idx++;
+         unsigned imm_mov_idx = rogue_next_ssa(b->shader);
          rogue_reg *imm_mov = rogue_ssa_reg(b->shader, imm_mov_idx);
          src = rogue_ref_reg(imm_mov);
          rogue_MOVI(b, src, mov->src[0].ref);

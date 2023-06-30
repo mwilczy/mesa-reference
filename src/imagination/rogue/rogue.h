@@ -2455,10 +2455,17 @@ typedef struct rogue_shader {
 
    enum rogue_mutex_state mutex_state;
 
+   unsigned next_ssa_idx;
+
    bool is_grouped; /** Whether the instructions are grouped. */
 
    const char *name; /** Shader name. */
 } rogue_shader;
+
+static inline unsigned rogue_next_ssa(rogue_shader *shader)
+{
+   return shader->next_ssa_idx++;
+}
 
 static inline void rogue_set_shader_name(rogue_shader *shader, const char *name)
 {
@@ -4018,7 +4025,6 @@ typedef struct rogue_build_ctx {
    rogue_common_build_data common_data[MESA_SHADER_COMPUTE + 1];
    rogue_build_data stage_data;
    struct pvr_pipeline_layout *pipeline_layout;
-   unsigned next_ssa_idx;
 } rogue_build_ctx;
 
 /**

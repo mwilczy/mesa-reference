@@ -146,8 +146,8 @@ static rogue_backend_instr *rogue_load_global(rogue_builder *b,
    /* TODO: macro for getting next free ssa reg. */
    rogue_ref ld_dst = *dst;
    if (bit_size < 32)
-      ld_dst = rogue_ref_reg(
-         rogue_ssa_reg(b->shader, b->shader->ctx->next_ssa_idx++));
+      ld_dst =
+         rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
 
    /* TODO: cache flags */
    rogue_backend_instr *ld =
@@ -256,7 +256,7 @@ static void rogue_fence_coeff_write(rogue_builder *b)
 {
    /* Instruction writing to a predicate. */
    rogue_ref p0_val =
-      rogue_ref_reg(rogue_ssa_reg(b->shader, b->shader->ctx->next_ssa_idx++));
+      rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
    rogue_GETPRED(b, p0_val, rogue_ref_io(ROGUE_IO_P0));
    rogue_SETPRED(b, rogue_ref_io(ROGUE_IO_P0), p0_val);
 
@@ -276,7 +276,7 @@ static void rogue_fence_coeff_write(rogue_builder *b)
 static void rogue_fence_local(rogue_builder *b)
 {
    rogue_ref fence_reg =
-      rogue_ref_reg(rogue_ssa_reg(b->shader, b->shader->ctx->next_ssa_idx++));
+      rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
 
    /* mov fence_reg, imm(1) */
    /* mov rogue_none(), fence_reg */

@@ -49,7 +49,7 @@ static inline rogue_reg *rogue_imm_alloc_reg(rogue_shader *shader,
          list_first_entry(&first_block->instrs, rogue_instr, link);
       b.cursor = rogue_cursor_before_instr(first_instr);
 
-      unsigned imm_alloc_idx = shader->ctx->next_ssa_idx++;
+      unsigned imm_alloc_idx = rogue_next_ssa(shader);
       *imm_alloc_reg = rogue_ssa_reg(shader, imm_alloc_idx);
       rogue_MOVI(&b, rogue_ref_reg(*imm_alloc_reg), rogue_ref_imm(imm.u32));
    }
