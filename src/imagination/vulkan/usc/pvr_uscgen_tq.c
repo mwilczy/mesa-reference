@@ -829,7 +829,7 @@ void pvr_uscgen_tq_eot(unsigned rt_count,
                        struct util_dynarray *binary)
 {
    rogue_builder b;
-   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE);
+   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE, NULL);
    rogue_set_shader_name(shader, "TQ (EOT)");
    rogue_builder_init(&b, shader);
    rogue_push_block(&b);

@@ -4485,7 +4485,7 @@ PUBLIC
 rogue_shader *rogue_nir_to_rogue(rogue_build_ctx *ctx, const nir_shader *nir)
 {
    gl_shader_stage stage = nir->info.stage;
-   rogue_shader *shader = rogue_shader_create(ctx, stage);
+   rogue_shader *shader = rogue_shader_create(ctx, stage, (nir_shader *)nir);
    if (!shader)
       return NULL;
 

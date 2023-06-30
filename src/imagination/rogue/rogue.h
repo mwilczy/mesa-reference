@@ -2422,6 +2422,7 @@ enum rogue_mutex_state {
 typedef struct rogue_shader {
    gl_shader_stage stage; /** Shader stage. */
 
+   nir_shader *nir; /** The NIR shader. */
    rogue_build_ctx *ctx; /** Build context. */
 
    unsigned next_instr; /** Next instruction index. */
@@ -2522,7 +2523,8 @@ static inline void rogue_clear_reg_use(rogue_shader *shader,
  * \param[in] stage The shader stage.
  * \return The new shader.
  */
-rogue_shader *rogue_shader_create(void *mem_ctx, gl_shader_stage stage);
+rogue_shader *
+rogue_shader_create(void *mem_ctx, gl_shader_stage stage, nir_shader *nir);
 
 rogue_reg *rogue_ssa_reg(rogue_shader *shader, unsigned index);
 

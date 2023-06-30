@@ -47,7 +47,7 @@ void pvr_uscgen_eot(const char *name,
                     struct util_dynarray *binary)
 {
    rogue_builder b;
-   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE);
+   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE, NULL);
    rogue_reg *state_word_0 = rogue_temp_reg(shader, 0);
    rogue_reg *state_word_1 = rogue_temp_reg(shader, 1);
    rogue_backend_instr *emitpix = NULL;
@@ -88,7 +88,7 @@ void pvr_uscgen_passthrough_vtx(struct util_dynarray *binary, bool rta)
    rogue_builder b;
    rogue_reg *dst;
    rogue_reg *src;
-   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_VERTEX);
+   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_VERTEX, NULL);
    rogue_set_shader_name(shader,
                          rta ? "passthrough vertex (RTA)"
                              : "passthrough vertex");
@@ -646,7 +646,7 @@ void pvr_uscgen_idfwdf(struct util_dynarray *binary,
 {
    rogue_builder b;
    rogue_backend_instr *be;
-   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE);
+   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE, NULL);
    rogue_set_shader_name(shader, "idfwdf");
    rogue_builder_init(&b, shader);
    rogue_push_block(&b);
@@ -735,7 +735,7 @@ void pvr_uscgen_idfwdf(struct util_dynarray *binary,
 void pvr_uscgen_nop(struct util_dynarray *binary)
 {
    rogue_builder b;
-   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE);
+   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_NONE, NULL);
    rogue_set_shader_name(shader, "NOP");
    rogue_builder_init(&b, shader);
    rogue_push_block(&b);

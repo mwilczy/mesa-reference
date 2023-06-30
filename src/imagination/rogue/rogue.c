@@ -202,15 +202,19 @@ static void rogue_shader_destructor(void *ptr)
  *
  * \param[in] mem_ctx The new shader's memory context.
  * \param[in] stage The new shader's stage.
+ * \param[in] nir The NIR shader used to build this, or NULL
+ *                if there isn't one.
  * \return The new shader.
  */
 PUBLIC
-rogue_shader *rogue_shader_create(void *mem_ctx, gl_shader_stage stage)
+rogue_shader *
+rogue_shader_create(void *mem_ctx, gl_shader_stage stage, nir_shader *nir)
 {
    rogue_debug_init();
 
    rogue_shader *shader = rzalloc_size(mem_ctx, sizeof(*shader));
 
+   shader->nir = nir;
    shader->stage = stage;
 
    list_inithead(&shader->blocks);
