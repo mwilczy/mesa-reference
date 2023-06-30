@@ -1747,6 +1747,8 @@ PowerVR driver environment variables
       Emulate all atomic ops.
    ``cache``
       Use cache modifiers.
+   ``preamble``
+      Enable preamble shader support.
 
 .. envvar:: ROGUE_COLOR
 
