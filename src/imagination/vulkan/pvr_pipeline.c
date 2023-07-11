@@ -39,7 +39,6 @@
 #include "pvr_pds.h"
 #include "pvr_private.h"
 #include "pvr_robustness.h"
-#include "pvr_shader.h"
 #include "pvr_types.h"
 #include "rogue/rogue.h"
 #include "util/log.h"
@@ -55,6 +54,7 @@
 #include "vk_object.h"
 #include "vk_pipeline_cache.h"
 #include "vk_render_pass.h"
+#include "vk_shader_module.h"
 #include "vk_util.h"
 
 /*****************************************************************************
@@ -1188,6 +1188,32 @@ static uint32_t pvr_compute_pipeline_alloc_shareds(
    return next_free_sh_reg;
 }
 
+static nir_shader *
+pvr_pipeline_spirv_to_nir(rogue_build_ctx *ctx,
+                          gl_shader_stage stage,
+                          const VkPipelineShaderStageCreateInfo *create_info)
+{
+   VK_FROM_HANDLE(vk_shader_module, module, create_info->module);
+   struct nir_spirv_specialization *spec;
+   unsigned num_spec = 0;
+   nir_shader *nir;
+
+   spec =
+      vk_spec_info_to_nir_spirv(create_info->pSpecializationInfo, &num_spec);
+
+   nir = rogue_spirv_to_nir(ctx,
+                            stage,
+                            create_info->pName,
+                            module->size / sizeof(uint32_t),
+                            (uint32_t *)module->data,
+                            num_spec,
+                            spec);
+
+   free(spec);
+
+   return nir;
+}
+
 /* Compiles and uploads shaders and PDS programs. */
 static VkResult pvr_compute_pipeline_compile(
    struct pvr_device *const device,
@@ -1217,11 +1243,16 @@ static VkResult pvr_compute_pipeline_compile(
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
    /* NIR middle-end translation. */
-   ctx->nir[stage] = pvr_spirv_to_nir(ctx, stage, &pCreateInfo->stage);
+   ctx->nir[stage] = pvr_pipeline_spirv_to_nir(ctx, stage, &pCreateInfo->stage);
    if (!ctx->nir[stage]) {
       result = vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
       goto err_free_build_context;
    }
+
+   rogue_nir_preprocess(ctx, true);
+   rogue_nir_link(ctx, true);
+   rogue_nir_lower(ctx, true);
+   rogue_nir_postprocess(ctx, true);
 
    cs_data = &ctx->stage_data.cs;
    common_data = &ctx->common_data[stage];
@@ -1267,18 +1298,7 @@ static VkResult pvr_compute_pipeline_compile(
    /* Y and Z are packed. */
    local_input_regs[2] = cs_data->local_id_regs[1];
 
-   /* Back-end translation. */
-   ctx->rogue[stage] = pvr_nir_to_rogue(ctx, ctx->nir[stage]);
-   if (!ctx->rogue[stage]) {
-      result = vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
-      goto err_free_build_context;
-   }
-
-   pvr_rogue_to_binary(ctx, ctx->rogue[stage], &ctx->binary[stage]);
-   if (!ctx->binary[stage].size) {
-      result = vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
-      goto err_free_build_context;
-   }
+   rogue_nir_build(ctx, true);
 
    result = pvr_gpu_upload_usc(device,
                                util_dynarray_begin(&ctx->binary[stage]),
@@ -2651,30 +2671,27 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
 
    /* NIR middle-end translation. */
-   /* clang-format off */
-   for (gl_shader_stage stage = MESA_SHADER_FRAGMENT;
-        stage > MESA_SHADER_NONE;
-        stage--) {
+   rogue_foreach_graphics_stage (stage) {
       /* clang-format on */
       size_t stage_index = gfx_pipeline->stage_indices[stage];
-      const VkPipelineShaderStageCreateInfo *create_info;
 
       /* Skip unused/inactive stages. */
       if (stage_index == ~0)
          continue;
 
-      create_info = &pCreateInfo->pStages[stage_index];
-
       /* SPIR-V to NIR. */
-      ctx->nir[stage] = pvr_spirv_to_nir(ctx, stage, create_info);
+      ctx->nir[stage] =
+         pvr_pipeline_spirv_to_nir(ctx,
+                                   stage,
+                                   &pCreateInfo->pStages[stage_index]);
       if (!ctx->nir[stage]) {
          ralloc_free(ctx);
          return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
       }
-
-      /* Collect I/O data to pass back to the driver. */
-      pvr_collect_io_data(ctx, ctx->nir[stage]);
    }
+
+   rogue_nir_preprocess(ctx, false);
+   rogue_nir_link(ctx, false);
 
    pvr_graphics_pipeline_alloc_vertex_inputs(
       pCreateInfo->pVertexInputState,
@@ -2683,9 +2700,20 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
       &vtx_dma_descriptions,
       &vtx_dma_count);
 
+   rogue_nir_lower(ctx, false);
+   rogue_nir_postprocess(ctx, false);
+
    pvr_graphics_pipeline_alloc_vertex_special_vars(
       &ctx->stage_data.vs.num_vertex_input_regs,
       &ctx->stage_data.vs.special_vars);
+
+   /* Collect I/O data to pass back to the driver. */
+   rogue_foreach_graphics_stage (stage) {
+      if (!ctx->nir[stage])
+         continue;
+
+      pvr_collect_io_data(ctx, ctx->nir[stage]);
+   }
 
    for (enum pvr_stage_allocation pvr_stage =
            PVR_STAGE_ALLOCATION_VERTEX_GEOMETRY;
@@ -2700,33 +2728,7 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
          &layout->sh_reg_layout_per_stage[pvr_stage]);
    }
 
-   /* Pre-back-end analysis and optimization, driver data extraction. */
-   /* TODO: Analyze and cull unused I/O between stages. */
-   /* TODO: Allocate UBOs between stages;
-    * pipeline->layout->set_{count,layout}.
-    */
-
-   /* Back-end translation. */
-   /* clang-format off */
-   for (gl_shader_stage stage = MESA_SHADER_FRAGMENT;
-        stage > MESA_SHADER_NONE;
-        stage--) {
-      /* clang-format on */
-      if (!ctx->nir[stage])
-         continue;
-
-      ctx->rogue[stage] = pvr_nir_to_rogue(ctx, ctx->nir[stage]);
-      if (!ctx->rogue[stage]) {
-         ralloc_free(ctx);
-         return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
-      }
-
-      pvr_rogue_to_binary(ctx, ctx->rogue[stage], &ctx->binary[stage]);
-      if (!ctx->binary[stage].size) {
-         ralloc_free(ctx);
-         return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
-      }
-   }
+   rogue_nir_build(ctx, false);
 
    pvr_vertex_state_init(gfx_pipeline,
                          &ctx->common_data[MESA_SHADER_VERTEX],

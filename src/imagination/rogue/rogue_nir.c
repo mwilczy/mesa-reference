@@ -802,12 +802,6 @@ nir_shader *rogue_spirv_to_nir(rogue_build_ctx *ctx,
 
    ralloc_steal(ctx, nir);
 
-   /* Apply passes. */
-   rogue_nir_passes(ctx, nir, stage);
-
-   /* Collect initial build data. */
-   rogue_collect_early_build_data(ctx, nir);
-
    return nir;
 }
 
@@ -830,4 +824,159 @@ rogue_shader *rogue_nir_compile(rogue_build_ctx *ctx, nir_shader *nir)
    rogue_collect_early_build_data(ctx, nir);
 
    return rogue_nir_to_rogue(ctx, nir);
+}
+
+static bool rogue_nir_preprocess_stage(nir_shader *nir)
+{
+   return true;
+}
+
+PUBLIC
+bool rogue_nir_preprocess(rogue_build_ctx *ctx, bool compute)
+{
+   if (compute)
+      return rogue_nir_preprocess_stage(ctx->nir[MESA_SHADER_COMPUTE]);
+
+   bool success = true;
+   rogue_foreach_graphics_stage (stage) {
+      if (!ctx->nir[stage])
+         continue;
+
+      success &= rogue_nir_preprocess_stage(ctx->nir[stage]);
+      if (!success)
+         break;
+   }
+
+   return success;
+}
+
+static bool rogue_nir_link_stages(nir_shader *producer, nir_shader *consumer)
+{
+   return true;
+}
+
+PUBLIC
+bool rogue_nir_link(rogue_build_ctx *ctx, bool compute)
+{
+   if (compute)
+      return true;
+
+   bool success = true;
+   nir_shader *consumer = NULL;
+   rogue_foreach_graphics_stage (stage) {
+      if (!ctx->nir[stage])
+         continue;
+
+      nir_shader *producer = ctx->nir[stage];
+      if (!consumer) {
+         consumer = producer;
+         continue;
+      }
+
+      success &= rogue_nir_link_stages(producer, consumer);
+      if (!success)
+         break;
+
+      consumer = producer;
+   }
+
+   return success;
+}
+
+static bool rogue_nir_lower_stage(nir_shader *nir)
+{
+   return true;
+}
+
+PUBLIC
+bool rogue_nir_lower(rogue_build_ctx *ctx, bool compute)
+{
+   if (compute)
+      return rogue_nir_lower_stage(ctx->nir[MESA_SHADER_COMPUTE]);
+
+   bool success = true;
+   rogue_foreach_graphics_stage (stage) {
+      if (!ctx->nir[stage])
+         continue;
+
+      success &= rogue_nir_lower_stage(ctx->nir[stage]);
+      if (!success)
+         break;
+   }
+
+   return success;
+}
+
+static bool rogue_nir_postprocess_stage(rogue_build_ctx *ctx, nir_shader *nir)
+{
+   /* Apply passes. */
+   rogue_nir_passes(ctx, nir, nir->info.stage);
+
+   /* Collect initial build data. */
+   rogue_collect_early_build_data(ctx, nir);
+
+   return true;
+}
+
+PUBLIC
+bool rogue_nir_postprocess(rogue_build_ctx *ctx, bool compute)
+{
+   if (compute)
+      return rogue_nir_postprocess_stage(ctx, ctx->nir[MESA_SHADER_COMPUTE]);
+
+   bool success = true;
+   rogue_foreach_graphics_stage (stage) {
+      if (!ctx->nir[stage])
+         continue;
+
+      success &= rogue_nir_postprocess_stage(ctx, ctx->nir[stage]);
+      if (!success)
+         break;
+   }
+
+   return success;
+}
+
+static bool rogue_nir_build_stage(rogue_build_ctx *ctx,
+                                  nir_shader *nir,
+                                  rogue_shader **rogue,
+                                  struct util_dynarray *binary)
+{
+   assert(nir);
+
+   *rogue = rogue_nir_to_rogue(ctx, nir);
+   if (!*rogue)
+      return false;
+
+   rogue_encode_shader(ctx, *rogue, binary);
+   if (!binary->size)
+      return false;
+
+   return true;
+}
+
+PUBLIC
+bool rogue_nir_build(rogue_build_ctx *ctx, bool compute)
+{
+   if (compute)
+      return rogue_nir_build_stage(ctx,
+                                   ctx->nir[MESA_SHADER_COMPUTE],
+                                   &ctx->rogue[MESA_SHADER_COMPUTE],
+                                   &ctx->binary[MESA_SHADER_COMPUTE]);
+
+   bool success = true;
+   rogue_foreach_graphics_stage (stage) {
+      if (!ctx->nir[stage])
+         continue;
+
+      success &= rogue_nir_build_stage(ctx,
+                                       ctx->nir[stage],
+                                       &ctx->rogue[stage],
+                                       &ctx->binary[stage]);
+
+      if (!success)
+         break;
+   }
+
+   return success;
 }

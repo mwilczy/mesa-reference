@@ -4145,6 +4145,21 @@ nir_shader *rogue_spirv_to_nir(rogue_build_ctx *ctx,
 
 rogue_shader *rogue_nir_compile(rogue_build_ctx *ctx, nir_shader *nir);
 
+bool rogue_nir_preprocess(rogue_build_ctx *ctx, bool compute);
+
+bool rogue_nir_link(rogue_build_ctx *ctx, bool compute);
+
+bool rogue_nir_lower(rogue_build_ctx *ctx, bool compute);
+
+bool rogue_nir_postprocess(rogue_build_ctx *ctx, bool compute);
+
+bool rogue_nir_build(rogue_build_ctx *ctx, bool compute);
+
+#define rogue_foreach_graphics_stage(stage)           \
+   for (gl_shader_stage stage = MESA_SHADER_FRAGMENT; \
+        stage > MESA_SHADER_NONE;                     \
+        stage--)
+
 /* Custom NIR passes. */
 bool rogue_nir_opt_algebraic_late(nir_shader *shader);
 
