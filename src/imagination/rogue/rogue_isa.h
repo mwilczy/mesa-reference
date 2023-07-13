@@ -955,6 +955,8 @@ typedef struct rogue_burstlen {
 } PACKED rogue_burstlen;
 static_assert(sizeof(rogue_burstlen) == 1, "sizeof(rogue_burstlen) != 1");
 
+#define ROGUE_MAX_IMM_BURSTLEN 16
+
 typedef struct rogue_backend_dma_ld_encoding {
    /* Byte 0 */
    struct {

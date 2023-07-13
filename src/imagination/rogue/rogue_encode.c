@@ -904,7 +904,7 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
       instr_encoding->backend.fitr.sat =
          rogue_backend_op_mod_is_set(backend, OM(SAT));
       instr_encoding->backend.fitr.count =
-         rogue_ref_get_val(&backend->src[2].ref);
+         rogue_ref_get_val(&backend->src[2].ref) % ROGUE_MAX_IMM_BURSTLEN;
       break;
 
    case ROGUE_BACKEND_OP_FITRP_PIXEL:
@@ -916,7 +916,7 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
       instr_encoding->backend.fitr.sat =
          rogue_backend_op_mod_is_set(backend, OM(SAT));
       instr_encoding->backend.fitr.count =
-         rogue_ref_get_val(&backend->src[3].ref);
+         rogue_ref_get_val(&backend->src[3].ref) % ROGUE_MAX_IMM_BURSTLEN;
       break;
 
    case ROGUE_BACKEND_OP_UVSW_WRITE:
@@ -1030,7 +1030,8 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
       bool imm_burstlen = rogue_ref_is_val(&backend->src[1].ref);
 
       rogue_burstlen burstlen = {
-         ._ = (imm_burstlen ? rogue_ref_get_val(&backend->src[1].ref) : 0) % 16,
+         ._ = (imm_burstlen ? rogue_ref_get_val(&backend->src[1].ref) : 0) %
+              ROGUE_MAX_IMM_BURSTLEN,
       };
 
       if (imm_burstlen) {
@@ -1068,7 +1069,8 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
 
       if (imm_burstlen) {
          rogue_burstlen burstlen = {
-            ._ = rogue_ref_get_val(&backend->src[3].ref) % 16,
+            ._ =
+               rogue_ref_get_val(&backend->src[3].ref) % ROGUE_MAX_IMM_BURSTLEN,
          };
          instr_encoding->backend.dma.st.burstlen_2_0 = burstlen._2_0;
          instr_encoding->backend.dma.st.burstlen_3 = burstlen._3;

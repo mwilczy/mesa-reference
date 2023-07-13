@@ -1481,7 +1481,7 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
 
    unsigned load_size = 0;
    rogue_ref dst = intr_dst(b->shader, intr, &load_size, 32);
-   assert(load_size <= 16);
+   assert(load_size <= ROGUE_MAX_IMM_BURSTLEN);
 
    struct nir_io_semantics io_semantics = nir_intrinsic_io_semantics(intr);
    unsigned component = nir_intrinsic_component(intr);
@@ -1600,51 +1600,19 @@ static void trans_nir_intrinsic_load_input_vs(rogue_builder *b,
    struct nir_io_semantics io_semantics = nir_intrinsic_io_semantics(intr);
    unsigned input = io_semantics.location - VERT_ATTRIB_GENERIC0;
    unsigned component = nir_intrinsic_component(intr);
-   unsigned vtxin_index = ~0U;
 
-   if (pipeline_layout) {
-      rogue_vertex_inputs *vs_inputs = &b->shader->ctx->stage_data.vs.inputs;
-      assert(input < vs_inputs->num_input_vars);
+   assert(pipeline_layout);
+   rogue_vertex_inputs *vs_inputs = &b->shader->ctx->stage_data.vs.inputs;
+   assert(input < vs_inputs->num_input_vars);
 
-      /* Replace components not provided by the driver with 1.0f. */
-      if (component >= vs_inputs->components[input]) {
-         rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_imm_f(1.0f));
-         rogue_add_instr_comment(&mov->instr, "load_input_vs (1.0f)");
-         return;
-      }
-
-      vtxin_index = vs_inputs->base[input] + component;
-   } else {
-      /* Dummy defaults for offline compiler. */
-      /* TODO: Load these from an offline description
-       * if using the offline compiler.
-       */
-
-      nir_shader *nir = b->shader->ctx->nir[MESA_SHADER_VERTEX];
-      vtxin_index = 0;
-
-      /* Process inputs. */
-      nir_foreach_shader_in_variable (var, nir) {
-         unsigned input_components = glsl_get_components(var->type);
-         unsigned bit_size =
-            glsl_base_type_bit_size(glsl_get_base_type(var->type));
-         assert(bit_size >= 32); /* TODO: Support smaller bit sizes. */
-         unsigned reg_count = bit_size / 32;
-
-         /* Check input location. */
-         assert(var->data.location >= VERT_ATTRIB_GENERIC0 &&
-                var->data.location <= VERT_ATTRIB_GENERIC15);
-
-         if (var->data.location == io_semantics.location) {
-            assert(component < input_components);
-            vtxin_index += reg_count * component;
-            break;
-         }
-
-         vtxin_index += reg_count * input_components;
-      }
+   /* Replace components not provided by the driver with 1.0f. */
+   if (component >= vs_inputs->components[input]) {
+      rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_imm_f(1.0f));
+      rogue_add_instr_comment(&mov->instr, "load_input_vs (1.0f)");
+      return;
    }
 
+   unsigned vtxin_index = vs_inputs->base[input] + component;
    assert(vtxin_index != ~0U);
 
    rogue_reg *src = rogue_vtxin_reg(b->shader, vtxin_index);
@@ -1728,6 +1696,7 @@ static void trans_nir_intrinsic_store_output_vs(rogue_builder *b,
 
    rogue_reg *dst = rogue_vtxout_reg(b->shader, vtxout_index);
 
+   /* TODO: Support up to repeat=4 stores. */
    rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
 
    rogue_alu_instr *mov = rogue_MOV(b, rogue_ref_reg(dst), src);
@@ -1785,6 +1754,7 @@ static void trans_nir_intrinsic_load_global(rogue_builder *b,
    unsigned bit_size = intr->def.bit_size;
    unsigned load_components = 0;
    rogue_ref dst = intr_dst(b->shader, intr, &load_components, bit_size);
+   assert(load_components <= ROGUE_MAX_IMM_BURSTLEN);
    rogue_ref src_addr = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 64);
 
    rogue_backend_instr *ld =
@@ -1813,6 +1783,7 @@ static void trans_nir_intrinsic_store_global(rogue_builder *b,
 
    unsigned store_components = 0;
    rogue_ref src = intr_src(b->shader, intr, 0, &store_components, bit_size);
+   assert(store_components <= ROGUE_MAX_IMM_BURSTLEN);
 
    rogue_backend_instr *st =
       rogue_store_global(b, &dst_addr, &src, bit_size, store_components);
