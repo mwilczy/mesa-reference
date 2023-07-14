@@ -4111,6 +4111,8 @@ bool rogue_nir_lower_tex(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_lower_io(nir_shader *shader, rogue_build_ctx *ctx, bool late);
 
+bool rogue_nir_opt_preamble(nir_shader *shader, rogue_build_ctx *ctx);
+
 rogue_shader *rogue_nir_to_rogue(rogue_build_ctx *ctx, const nir_shader *nir);
 
 /* Encode/decode */
