@@ -1439,7 +1439,7 @@ nir_link_opt_varyings(nir_shader *producer, nir_shader *consumer)
 /* TODO any better helper somewhere to sort a list? */
 
 static void
-insert_sorted(struct exec_list *var_list, nir_variable *new_var)
+insert_sorted(struct exec_list *var_list, nir_variable *new_var, UNUSED nir_variable_mode mode, UNUSED gl_shader_stage stage)
 {
    nir_foreach_variable_in_list(var, var_list) {
       /* Use the `per_primitive` bool to sort per-primitive variables
@@ -1469,7 +1469,10 @@ sort_varyings(nir_shader *shader, nir_variable_mode mode,
    exec_list_make_empty(sorted_list);
    nir_foreach_variable_with_modes_safe(var, shader, mode) {
       exec_node_remove(&var->node);
-      insert_sorted(sorted_list, var);
+      if (shader->options->sort_varying_cb)
+         shader->options->sort_varying_cb(sorted_list, var, mode, shader->info.stage);
+      else
+         insert_sorted(sorted_list, var, mode, shader->info.stage);
    }
 }
 

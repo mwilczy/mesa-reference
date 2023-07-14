@@ -2056,6 +2056,7 @@ void pvr_collect_io_data_fs(struct rogue_common_build_data *common_data,
             interp = INTERP_MODE_NOPERSPECTIVE;
 
          rogue_loc = rogue_from_gl_varying_loc(var->data.location);
+         assert(rogue_loc != ~0);
 
          pvr_reserve_iterator(&fs_data->iterator_args,
                               rogue_loc,
@@ -2140,7 +2141,7 @@ static void pvr_collect_io_data_vs(struct rogue_common_build_data *common_data,
                                    struct rogue_fs_build_data *fs_data,
                                    nir_shader *nir)
 {
-   ASSERTED bool out_pos_present = false;
+   bool out_pos_present = false;
    ASSERTED unsigned num_outputs =
       nir_count_variables_with_modes(nir, nir_var_shader_out);
    bool psprite_present = false;
@@ -2199,12 +2200,14 @@ static void pvr_collect_io_data_vs(struct rogue_common_build_data *common_data,
       } else if ((var->data.location >= VARYING_SLOT_VAR0) &&
                  (var->data.location <= VARYING_SLOT_VAR31)) {
          for (int c = 0; c < components; c++) {
-            struct pvr_output_reg reg = {
-               .location = rogue_from_gl_varying_loc(var->data.location),
-               .component = var->data.location_frac + c,
-               .f16 = glsl_type_is_16bit(type),
-               .mode = INTERP_MODE_SMOOTH
-            };
+            unsigned rogue_loc = rogue_from_gl_varying_loc(var->data.location);
+            assert(rogue_loc != ~0);
+
+            struct pvr_output_reg reg = { .location = rogue_loc,
+                                          .component =
+                                             var->data.location_frac + c,
+                                          .f16 = glsl_type_is_16bit(type),
+                                          .mode = INTERP_MODE_SMOOTH };
             unsigned fs_reg = fs_data
                                  ? rogue_coeff_index_fs(&fs_data->iterator_args,
                                                         var->data.location,
@@ -2261,15 +2264,14 @@ static void pvr_collect_io_data_vs(struct rogue_common_build_data *common_data,
       }
    }
 
-   /* Always need the output position to be present. */
-   assert(out_pos_present);
-
+#if 0
    /* Sort the varyings based on their type */
    util_qsort_r(varyings,
                 varyings_count,
                 sizeof(*varyings),
                 pvr_compare_output_reg,
                 NULL);
+#endif
 
    for (int i = 0; i < varyings_count; i++) {
       struct pvr_output_reg *reg = &varyings[i];
@@ -2307,26 +2309,6 @@ static void pvr_collect_io_data_vs(struct rogue_common_build_data *common_data,
     * assert(vs_data->num_vertex_outputs <
     *        rogue_reg_infos[ROGUE_REG_CLASS_VTXOUT].num);
     */
-}
-
-/**
- * \brief Reserves space for a vertex shader input.
- *
- * \param[in] inputs The vertex input data.
- * \param[in] i The vertex input index.
- * \param[in] components The number of components in the input.
- */
-static void reserve_vs_input(struct rogue_vertex_inputs *inputs,
-                             unsigned i,
-                             unsigned components)
-{
-   assert(components >= 1 && components <= 4);
-
-   assert(i < ARRAY_SIZE(inputs->base));
-
-   inputs->base[i] = ~0;
-   inputs->components[i] = components;
-   inputs->num_input_vars++;
 }
 
 /**

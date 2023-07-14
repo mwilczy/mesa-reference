@@ -3824,6 +3824,8 @@ typedef struct nir_shader_compiler_options {
     */
    nir_pack_varying_options pack_varying_options;
 
+   void (*sort_varying_cb)(struct exec_list *, nir_variable *, nir_variable_mode, gl_shader_stage);
+
    /**
     * Lower load_deref/store_deref of inputs and outputs into
     * load_input/store_input intrinsics. This is used by nir_lower_io_passes.

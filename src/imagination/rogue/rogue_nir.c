@@ -63,6 +63,89 @@ static const struct spirv_to_nir_options spirv_options = {
    .shared_addr_format = nir_address_format_32bit_offset,
 };
 
+typedef struct rogue_varying_order_info {
+   bool f16;
+   enum glsl_interp_mode mode;
+   unsigned index;
+} rogue_varying_order_info;
+
+inline static rogue_varying_order_info
+rogue_varying_order_info_from_var(const nir_variable *var)
+{
+   return (rogue_varying_order_info){
+      .f16 = glsl_type_is_16bit(var->type),
+      .mode = var->data.interpolation != INTERP_MODE_NONE
+                 ? var->data.interpolation
+                 : INTERP_MODE_SMOOTH,
+      .index = rogue_from_gl_varying_loc(var->data.location) * 4 +
+               var->data.location_frac,
+   };
+}
+
+static bool rogue_varying_order_before(const nir_variable *var,
+                                       const nir_variable *new_var)
+{
+   rogue_varying_order_info var_info = rogue_varying_order_info_from_var(var);
+   rogue_varying_order_info new_var_info =
+      rogue_varying_order_info_from_var(new_var);
+
+   if (new_var_info.f16 < var_info.f16)
+      return true;
+
+   if (new_var_info.mode < var_info.mode)
+      return true;
+
+   if (new_var_info.index < var_info.index)
+      return true;
+
+   return false;
+}
+
+static bool rogue_nonvarying_order_before(const nir_variable *var,
+                                          const nir_variable *new_var)
+{
+   if (new_var->data.per_primitive < var->data.per_primitive)
+      return true;
+
+   if (new_var->data.per_primitive == var->data.per_primitive) {
+      if (var->data.location > new_var->data.location)
+         return true;
+
+      if (var->data.location == new_var->data.location &&
+          var->data.location_frac > new_var->data.location_frac)
+         return true;
+   }
+
+   return false;
+}
+
+static void rogue_sort_varying_cb(struct exec_list *var_list,
+                                  nir_variable *new_var,
+                                  nir_variable_mode mode,
+                                  gl_shader_stage stage)
+{
+   bool is_loc_varying =
+      (stage == MESA_SHADER_VERTEX && mode == nir_var_shader_out) ||
+      (stage == MESA_SHADER_FRAGMENT && mode == nir_var_shader_in);
+   bool is_varying_new_var =
+      rogue_from_gl_varying_loc(new_var->data.location) != ~0;
+
+   nir_foreach_variable_in_list (var, var_list) {
+      bool is_varying_var = rogue_from_gl_varying_loc(var->data.location) != ~0;
+      bool is_varying_vars = is_loc_varying && is_varying_new_var &&
+                             is_varying_var;
+      bool order_before = is_varying_vars
+                             ? rogue_varying_order_before(var, new_var)
+                             : rogue_nonvarying_order_before(var, new_var);
+
+      if (order_before) {
+         exec_node_insert_node_before(&var->node, &new_var->node);
+         return;
+      }
+   }
+   exec_list_push_tail(var_list, &new_var->node);
+}
+
 static const nir_shader_compiler_options nir_options = {
    .lower_fdiv = true,
    .fuse_ffma32 = true,
@@ -89,6 +172,7 @@ static const nir_shader_compiler_options nir_options = {
    .support_8bit_alu = true,
    .support_16bit_alu = true,
    .max_unroll_iterations = 16,
+   .sort_varying_cb = rogue_sort_varying_cb,
    /* TODO: exclude the remaining native int64 ops we actually support. */
    .lower_int64_options = ~0 & ~nir_lower_iadd64 & ~nir_lower_iabs64 &
                           ~nir_lower_ineg64,

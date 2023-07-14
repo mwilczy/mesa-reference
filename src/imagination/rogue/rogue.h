@@ -3781,7 +3781,7 @@ mesa_stage_to_pvr(gl_shader_stage mesa_stage)
 /* TODO: Currently UBOs are the only supported buffers. */
 #define ROGUE_MAX_BUFFERS 24
 
-static inline unsigned rogue_from_gl_varying_loc(gl_varying_slot gl_loc)
+static inline unsigned rogue_from_gl_varying_loc(unsigned gl_loc)
 {
    switch (gl_loc) {
    case VARYING_SLOT_POS:
@@ -3790,12 +3790,14 @@ static inline unsigned rogue_from_gl_varying_loc(gl_varying_slot gl_loc)
    case VARYING_SLOT_PNTC:
       return 1;
 
-   default:
-      assert(gl_loc >= VARYING_SLOT_VAR0 && gl_loc <= VARYING_SLOT_VAR31);
+   case VARYING_SLOT_VAR0 ... VARYING_SLOT_VAR31:
       return (gl_loc - VARYING_SLOT_VAR0) + ROGUE_MAX_SYSVAL_VARYINGS;
+
+   default:
+      break;
    }
 
-   unreachable("Unsupported gl_varying_slot.");
+   return ~0;
 }
 
 static inline gl_varying_slot gl_from_rogue_varying_loc(unsigned rogue_loc)

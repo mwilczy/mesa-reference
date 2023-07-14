@@ -65,6 +65,7 @@ unsigned rogue_coeff_index_fs(struct rogue_iterator_args *args,
    }
 
    rogue_loc = rogue_from_gl_varying_loc(location);
+   assert(rogue_loc != ~0);
 
    assert(component < 4);
    assert(args->coeff_indices[rogue_loc][component] == ~0 ||
@@ -98,6 +99,7 @@ enum glsl_interp_mode rogue_interp_mode_fs(struct rogue_iterator_args *args,
    }
 
    rogue_loc = rogue_from_gl_varying_loc(location);
+   assert(rogue_loc != ~0);
 
    assert(component < 4);
    assert(args->coeff_indices[rogue_loc][component] != ~0);
@@ -143,7 +145,9 @@ unsigned rogue_output_index_vs(struct rogue_vertex_outputs *outputs,
       i = outputs->cull_index[location - VARYING_SLOT_CULL_DIST0][component];
    } else if ((location >= VARYING_SLOT_VAR0) &&
               (location <= VARYING_SLOT_VAR31)) {
-      i = outputs->indices[rogue_from_gl_varying_loc(location)][component];
+      unsigned rogue_loc = rogue_from_gl_varying_loc(location);
+      assert(rogue_loc != ~0);
+      i = outputs->indices[rogue_loc][component];
       assert(i < outputs->num_output_vars);
    } else {
       unreachable("Unsupported vertex output type.");

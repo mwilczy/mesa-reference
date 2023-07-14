@@ -231,6 +231,7 @@ ForEachMacros: [
   'nir_foreach_shader_out_variable',
   'nir_foreach_use',
   'nir_foreach_use_safe',
+  'nir_foreach_variable_in_list',
   'nir_foreach_variable_with_modes',
   'rogue_foreach_block',
   'rogue_foreach_block_safe',
