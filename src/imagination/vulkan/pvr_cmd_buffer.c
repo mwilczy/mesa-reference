@@ -3820,17 +3820,12 @@ pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
    }
 
    case PVR_PDS_ADDR_LITERAL_PUSH_CONSTS: {
-      const struct pvr_pipeline_layout *layout =
-         PVR_SELECT(cmd_buffer->state.gfx_pipeline->base.layout,
-                    cmd_buffer->state.gfx_pipeline->base.layout,
-                    cmd_buffer->state.compute_pipeline->base.layout);
-      const uint32_t push_constants_offset =
-         PVR_SELECT(layout->vert_push_constants_offset,
-                    layout->frag_push_constants_offset,
-                    layout->compute_push_constants_offset);
+      /* TODO: Instead of applying the push constants offset in the shader we
+       * could add the offset here and avoid the adds in the shader.
+       */
 
-      *addr_out = PVR_DEV_ADDR_OFFSET(cmd_buffer->state.push_constants.dev_addr,
-                                      push_constants_offset);
+      *addr_out = cmd_buffer->state.push_constants.dev_addr;
+
       break;
    }
 

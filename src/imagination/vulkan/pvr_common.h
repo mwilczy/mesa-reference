@@ -596,9 +596,6 @@ struct pvr_pipeline_layout {
 
    /* Mask of enum pvr_stage_allocation. */
    uint8_t push_constants_shader_stages;
-   uint32_t vert_push_constants_offset;
-   uint32_t frag_push_constants_offset;
-   uint32_t compute_push_constants_offset;
 
    /* Mask of enum pvr_stage_allocation. */
    uint8_t shader_stage_mask;
