@@ -23,6 +23,7 @@
 
 #include "compiler/spirv/nir_spirv.h"
 #include "nir/nir.h"
+#include "nir/nir_legacy.h"
 #include "rogue.h"
 #include "util/macros.h"
 
@@ -439,6 +440,11 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
 
    /* Out of SSA pass. */
    NIR_PASS_V(nir, nir_convert_from_ssa, true);
+
+   /* We're not fusing any source mods in NIR, so calling this pass
+    * instead of nir_legacy_trivialize.
+    */
+   NIR_PASS_V(nir, nir_trivialize_registers);
 
    NIR_PASS_V(nir, nir_opt_dce);
 

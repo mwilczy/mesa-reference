@@ -1372,6 +1372,49 @@ static void trans_nir_load_const(rogue_builder *b,
    unreachable("Unsupported load_const bit size.");
 }
 
+static void trans_nir_intrinsic_decl_reg(rogue_builder *b,
+                                         nir_intrinsic_instr *intr)
+{
+   assert(nir_intrinsic_num_components(intr) == 1);
+   assert(nir_intrinsic_num_array_elems(intr) == 0);
+   assert(nir_intrinsic_bit_size(intr) <= 32);
+
+   /* Just "reserve" the temp for now. */
+   rogue_temp_reg(b->shader, intr->def.index);
+}
+
+static void trans_nir_intrinsic_store_reg(rogue_builder *b,
+                                          nir_intrinsic_instr *intr)
+{
+   assert(!nir_intrinsic_base(intr));
+   assert(nir_intrinsic_write_mask(intr) == 1);
+   assert(!nir_intrinsic_legacy_fsat(intr));
+
+   nir_intrinsic_instr *reg_decl = nir_src_as_intrinsic(intr->src[1]);
+   rogue_ref dst =
+      rogue_ref_reg(rogue_temp_reg(b->shader, reg_decl->def.index));
+
+   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
+
+   rogue_MOV(b, dst, src);
+}
+
+static void trans_nir_intrinsic_load_reg(rogue_builder *b,
+                                         nir_intrinsic_instr *intr)
+{
+   assert(!nir_intrinsic_base(intr));
+   assert(!nir_intrinsic_legacy_fabs(intr));
+   assert(!nir_intrinsic_legacy_fneg(intr));
+
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+
+   nir_intrinsic_instr *reg_decl = nir_src_as_intrinsic(intr->src[0]);
+   rogue_ref src =
+      rogue_ref_reg(rogue_temp_reg(b->shader, reg_decl->def.index));
+
+   rogue_MOV(b, dst, src);
+}
+
 static void trans_nir_intrinsic_load_preamble(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
@@ -2364,6 +2407,15 @@ static void trans_nir_intrinsic_mutex_img(rogue_builder *b,
 static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 {
    switch (intr->intrinsic) {
+   case nir_intrinsic_decl_reg:
+      return trans_nir_intrinsic_decl_reg(b, intr);
+
+   case nir_intrinsic_store_reg:
+      return trans_nir_intrinsic_store_reg(b, intr);
+
+   case nir_intrinsic_load_reg:
+      return trans_nir_intrinsic_load_reg(b, intr);
+
    case nir_intrinsic_load_preamble:
       return trans_nir_intrinsic_load_preamble(b, intr);
 
@@ -3698,9 +3750,22 @@ static inline void rogue_feedback_used_regs(rogue_build_ctx *ctx,
       rogue_count_used_regs(shader, ROGUE_REG_CLASS_INTERNAL);
 }
 
+static bool ssa_is_reg_decl(nir_def *ssa)
+{
+   if (ssa->parent_instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *decl = nir_instr_as_intrinsic(ssa->parent_instr);
+   return decl->intrinsic == nir_intrinsic_decl_reg;
+}
+
 static bool ssa_def_cb(nir_def *ssa, void *state)
 {
    rogue_shader *shader = (rogue_shader *)state;
+
+   /* Skip register declarations. */
+   if (ssa_is_reg_decl(ssa))
+      return true;
 
    if (ssa->num_components == 1) {
       if (ssa->bit_size == 32) {
@@ -4110,17 +4175,6 @@ rogue_shader *rogue_nir_to_rogue(rogue_build_ctx *ctx, const nir_shader *nir)
    rogue_builder_init(&b, shader);
 
    nir_function_impl *entry = nir_shader_get_entrypoint((nir_shader *)nir);
-
-#if 0
-   /* Reserve temps and check all are 32-bit vec1s. */
-   nir_foreach_register (reg, &entry->registers) {
-      assert(reg->num_components == 1);
-      assert(reg->num_array_elems == 0);
-      assert(reg->bit_size <= 32);
-
-      rogue_temp_reg(shader, reg->index);
-   }
-#endif
 
    /* Go through SSA used by NIR and "reserve" them so that sub-arrays won't be
     * declared before the parent arrays. */
