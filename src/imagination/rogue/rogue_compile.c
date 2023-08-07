@@ -3751,6 +3751,8 @@ static void trans_nir_bitfield_insert(rogue_builder *b, nir_alu_instr *alu)
    unsigned bit_size = alu->def.bit_size;
 
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, bit_size);
+   rogue_ref bfi_dst =
+      rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
 
    rogue_ref base = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, bit_size);
    rogue_ref insert = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, bit_size);
@@ -3772,13 +3774,25 @@ static void trans_nir_bitfield_insert(rogue_builder *b, nir_alu_instr *alu)
    rogue_set_instr_group_next(&lsl0->instr, true);
 
    rogue_bitwise_instr * or = rogue_OR(b,
-                                       dst,
+                                       bfi_dst,
+                                       /* dst, */
                                        rogue_ref_io(ROGUE_IO_FT1),
                                        rogue_ref_io(ROGUE_IO_FT2),
                                        rogue_ref_io(ROGUE_IO_FT1),
                                        base);
 
    rogue_add_instr_comment(& or->instr, "bitfield_insert");
+
+   /* "If bits is zero, the result will simply be the original value of base."
+    */
+   rogue_alu_instr *csel = rogue_csel(b,
+                                      &dst,
+                                      &bits,
+                                      &base,
+                                      &bfi_dst,
+                                      COMPARE_FUNC_EQUAL,
+                                      nir_type_uint32);
+   rogue_add_instr_comment(&csel->instr, "bitfield_insert (bits == 0 check)");
 }
 
 static void
@@ -3787,6 +3801,8 @@ trans_nir_bitfield_extract(rogue_builder *b, nir_alu_instr *alu, bool is_signed)
    unsigned bit_size = alu->def.bit_size;
 
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, bit_size);
+   rogue_ref bfe_dst =
+      rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
 
    rogue_ref base = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, bit_size);
    rogue_ref offset = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, bit_size);
@@ -3815,15 +3831,26 @@ trans_nir_bitfield_extract(rogue_builder *b, nir_alu_instr *alu, bool is_signed)
    rogue_bitwise_instr *shr;
    if (is_signed) {
       /* Arithmetic right shift using mask top bit (FT0 = bits + offset). */
-      shr = rogue_ASR(b, dst, rogue_ref_io(ROGUE_IO_FT4), offset);
+      shr = rogue_ASR(b, bfe_dst, rogue_ref_io(ROGUE_IO_FT4), offset);
       rogue_set_bitwise_op_mod(shr, ROGUE_BITWISE_OP_MOD_MTB);
    } else {
-      shr = rogue_SHR(b, dst, rogue_ref_io(ROGUE_IO_FT4), offset);
+      shr = rogue_SHR(b, bfe_dst, rogue_ref_io(ROGUE_IO_FT4), offset);
    }
 
    rogue_add_instr_commentf(&shr->instr,
                             "%cbitfield_extract",
                             is_signed ? 'i' : 'u');
+
+   /* "If bits is zero, the result will be zero." */
+   rogue_ref imm_0 = rogue_ref_imm(0);
+   rogue_alu_instr *csel = rogue_csel(b,
+                                      &dst,
+                                      &bits,
+                                      &imm_0,
+                                      &bfe_dst,
+                                      COMPARE_FUNC_EQUAL,
+                                      nir_type_uint32);
+   rogue_add_instr_comment(&csel->instr, "bitfield_extract (bits == 0 check)");
 }
 
 static void trans_nir_bitfield_reverse(rogue_builder *b, nir_alu_instr *alu)
