@@ -3887,10 +3887,21 @@ typedef struct rogue_iterator_args {
  * Each special variable gets allocated its own vtxin reg if used.
  */
 typedef struct rogue_vertex_special_vars {
-   /* VertexIndex built-in. */
-   unsigned vertex_id_offset;
-   /* InstanceIndex built-in. */
-   unsigned instance_id_offset;
+   struct {
+      bool vertex_id; /* VertexIndex built-in. */
+      bool instance_id; /* InstanceIndex built-in. */
+      bool base_instance; /* BaseInstance built-in. */
+      bool base_vertex; /* BaseVertex built-in. */
+      bool draw_index; /* DrawIndex built-in. */
+   } has;
+
+   struct {
+      unsigned vertex_id;
+      unsigned instance_id;
+      unsigned base_instance;
+      unsigned base_vertex;
+      unsigned draw_index;
+   } offset;
 } rogue_vertex_special_vars;
 
 /**

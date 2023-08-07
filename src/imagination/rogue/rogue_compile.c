@@ -1999,34 +1999,53 @@ trans_nir_intrinsic_load_num_workgroups_base_addr_img(rogue_builder *b,
                            "load_num_workgroups_base_addr_img.hi32");
 }
 
-static void trans_nir_intrinsic_load_vertex_id(rogue_builder *b,
-                                               nir_intrinsic_instr *intr)
+static unsigned rogue_vtxin_from_sysval(gl_system_value sysval,
+                                        rogue_vertex_special_vars *special_vars)
 {
-   unsigned vtx_id_index =
-      b->shader->ctx->stage_data.vs.special_vars.vertex_id_offset;
+   unsigned vtxin_idx = ROGUE_REG_UNUSED;
+   switch (sysval) {
+   case SYSTEM_VALUE_VERTEX_ID:
+      vtxin_idx = special_vars->offset.vertex_id;
+      break;
 
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+   case SYSTEM_VALUE_INSTANCE_ID:
+      vtxin_idx = special_vars->offset.instance_id;
+      break;
 
-   assert(vtx_id_index != ROGUE_REG_UNUSED);
-   rogue_reg *src = rogue_vtxin_reg(b->shader, vtx_id_index);
+   case SYSTEM_VALUE_BASE_INSTANCE:
+      vtxin_idx = special_vars->offset.base_instance;
+      break;
 
-   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(src));
-   rogue_add_instr_commentf(&mov->instr, "load_vertex_id");
+   case SYSTEM_VALUE_BASE_VERTEX:
+      vtxin_idx = special_vars->offset.base_vertex;
+      break;
+
+   case SYSTEM_VALUE_DRAW_ID:
+      vtxin_idx = special_vars->offset.draw_index;
+      break;
+
+   default:
+      break;
+   }
+
+   assert(vtxin_idx != ROGUE_REG_UNUSED);
+   return vtxin_idx;
 }
 
-static void trans_nir_intrinsic_load_instance_id(rogue_builder *b,
-                                                 nir_intrinsic_instr *intr)
+static void trans_nir_intrinsic_load_vertex_sysval(rogue_builder *b,
+                                                   nir_intrinsic_instr *intr)
 {
-   unsigned instance_id_index =
-      b->shader->ctx->stage_data.vs.special_vars.instance_id_offset;
+   gl_system_value sysval = nir_system_value_from_intrinsic(intr->intrinsic);
+   rogue_vertex_special_vars *special_vars =
+      &b->shader->ctx->stage_data.vs.special_vars;
+   unsigned vtxin_idx = rogue_vtxin_from_sysval(sysval, special_vars);
 
    rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
 
-   assert(instance_id_index != ROGUE_REG_UNUSED);
-   rogue_reg *src = rogue_vtxin_reg(b->shader, instance_id_index);
+   assert(vtxin_idx != ROGUE_REG_UNUSED);
+   rogue_ref src = rogue_ref_reg(rogue_vtxin_reg(b->shader, vtxin_idx));
 
-   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(src));
-   rogue_add_instr_commentf(&mov->instr, "load_instance_id(");
+   rogue_MOV(b, dst, src);
 }
 
 static void trans_nir_intrinsic_discard(rogue_builder *b,
@@ -2881,10 +2900,11 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
       return trans_nir_intrinsic_load_num_workgroups_base_addr_img(b, intr);
 
    case nir_intrinsic_load_vertex_id:
-      return trans_nir_intrinsic_load_vertex_id(b, intr);
-
    case nir_intrinsic_load_instance_id:
-      return trans_nir_intrinsic_load_instance_id(b, intr);
+   case nir_intrinsic_load_base_instance:
+   case nir_intrinsic_load_base_vertex:
+   case nir_intrinsic_load_draw_id:
+      return trans_nir_intrinsic_load_vertex_sysval(b, intr);
 
    case nir_intrinsic_discard:
       return trans_nir_intrinsic_discard(b, intr);

@@ -582,6 +582,7 @@ static void rogue_collect_early_vs_build_data(rogue_build_ctx *ctx,
 {
    const struct shader_info *info = &nir->info;
    struct rogue_vs_build_data *vs_data = &ctx->stage_data.vs;
+   rogue_vertex_special_vars *special_vars = &vs_data->special_vars;
 
    nir_foreach_function (func, nir) {
       nir_foreach_block (block, func->impl) {
@@ -594,6 +595,26 @@ static void rogue_collect_early_vs_build_data(rogue_build_ctx *ctx,
                case nir_intrinsic_global_atomic_swap:
                case nir_intrinsic_shared_atomic_swap_img:
                   vs_data->has.atomic_ops = true;
+                  break;
+
+               case nir_intrinsic_load_vertex_id:
+                  special_vars->has.vertex_id = true;
+                  break;
+
+               case nir_intrinsic_load_instance_id:
+                  special_vars->has.instance_id = true;
+                  break;
+
+               case nir_intrinsic_load_base_instance:
+                  special_vars->has.base_instance = true;
+                  break;
+
+               case nir_intrinsic_load_base_vertex:
+                  special_vars->has.base_vertex = true;
+                  break;
+
+               case nir_intrinsic_load_draw_id:
+                  special_vars->has.draw_index = true;
                   break;
 
                default:

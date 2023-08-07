@@ -406,16 +406,29 @@ static VkResult pvr_pds_vertex_attrib_programs_create_and_upload(
    struct pvr_pds_attrib_program *const programs_out = *programs_out_ptr;
    VkResult result;
 
-   if (special_vars_layout->vertex_id_offset != ROGUE_REG_UNUSED) {
-      /* Gets filled by the HW and copied into the appropriate reg. */
+   if (special_vars_layout->has.vertex_id) {
       input.flags |= PVR_PDS_VERTEX_FLAGS_VERTEX_ID_REQUIRED;
-      input.vertex_id_register = special_vars_layout->vertex_id_offset;
+      input.vertex_id_register = special_vars_layout->offset.vertex_id;
    }
 
-   if (special_vars_layout->instance_id_offset != ROGUE_REG_UNUSED) {
-      /* Gets filled by the HW and copied into the appropriate reg. */
+   if (special_vars_layout->has.instance_id) {
       input.flags |= PVR_PDS_VERTEX_FLAGS_INSTANCE_ID_REQUIRED;
-      input.instance_id_register = special_vars_layout->instance_id_offset;
+      input.instance_id_register = special_vars_layout->offset.instance_id;
+   }
+
+   if (special_vars_layout->has.base_instance) {
+      input.flags |= PVR_PDS_VERTEX_FLAGS_BASE_INSTANCE_REQUIRED;
+      input.base_instance_register = special_vars_layout->offset.base_instance;
+   }
+
+   if (special_vars_layout->has.base_vertex) {
+      input.flags |= PVR_PDS_VERTEX_FLAGS_BASE_VERTEX_REQUIRED;
+      input.base_vertex_register = special_vars_layout->offset.base_vertex;
+   }
+
+   if (special_vars_layout->has.draw_index) {
+      input.flags |= PVR_PDS_VERTEX_FLAGS_DRAW_INDEX_REQUIRED;
+      input.draw_index_register = special_vars_layout->offset.draw_index;
    }
 
    pvr_pds_setup_doutu(&input.usc_task_control,
@@ -1910,29 +1923,36 @@ static void pvr_graphics_pipeline_alloc_vertex_inputs(
 
 static void pvr_graphics_pipeline_alloc_vertex_special_vars(
    unsigned *num_vertex_input_regs,
-   struct rogue_vertex_special_vars *special_vars_layout_out)
+   struct rogue_vertex_special_vars *layout)
 {
    unsigned next_free_reg = *num_vertex_input_regs;
-   struct rogue_vertex_special_vars layout;
 
-   /* We don't support VK_KHR_shader_draw_parameters or Vulkan 1.1 so no
-    * BaseInstance, BaseVertex, DrawIndex.
-    */
+   if (layout->has.vertex_id)
+      layout->offset.vertex_id = next_free_reg++;
+   else
+      layout->offset.vertex_id = ROGUE_REG_UNUSED;
 
-   /* TODO: The shader might not necessarily be using this so we'd just be
-    * wasting regs. Get the info from the compiler about whether or not the
-    * shader uses them and allocate them accordingly. For now we'll set them up
-    * regardless.
-    */
+   if (layout->has.instance_id)
+      layout->offset.instance_id = next_free_reg++;
+   else
+      layout->offset.instance_id = ROGUE_REG_UNUSED;
 
-   layout.vertex_id_offset = (int16_t)next_free_reg;
-   next_free_reg++;
+   if (layout->has.base_instance)
+      layout->offset.base_instance = next_free_reg++;
+   else
+      layout->offset.base_instance = ROGUE_REG_UNUSED;
 
-   layout.instance_id_offset = (int16_t)next_free_reg;
-   next_free_reg++;
+   if (layout->has.base_vertex)
+      layout->offset.base_vertex = next_free_reg++;
+   else
+      layout->offset.base_vertex = ROGUE_REG_UNUSED;
+
+   if (layout->has.draw_index)
+      layout->offset.draw_index = next_free_reg++;
+   else
+      layout->offset.draw_index = ROGUE_REG_UNUSED;
 
    *num_vertex_input_regs = next_free_reg;
-   *special_vars_layout_out = layout;
 }
 
 /**
