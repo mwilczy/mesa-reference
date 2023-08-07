@@ -25,19 +25,14 @@ import math
 
 a = 'a'
 b = 'b'
-c = 'c'
-d = 'd'
-e = 'e'
 
-late = [
-    (('extract_u16', 'a@32', 'b@32'), ('ubitfield_extract', a, ('imul', b, 16), 16)),
-    (('extract_i16', 'a@32', 'b@32'), ('ibitfield_extract', a, ('imul', b, 16), 16)),
+algebraic_late = [
+   # Change extract ops into bitfield ops.
+   (('extract_u16', 'a@32', 'b@32'), ('ubitfield_extract', a, ('imul', b, 16), 16)),
+   (('extract_i16', 'a@32', 'b@32'), ('ibitfield_extract', a, ('imul', b, 16), 16)),
 
-    (('extract_u8', 'a@32', 'b@32'), ('ubitfield_extract', a, ('imul', b, 8), 8)),
-    (('extract_i8', 'a@32', 'b@32'), ('ibitfield_extract', a, ('imul', b, 8), 8)),
-
-    (('f2u32', ('fround_even', a)), ('f2u32', a)),
-    (('f2i32', ('fround_even', a)), ('f2i32', a)),
+   (('extract_u8', 'a@32', 'b@32'), ('ubitfield_extract', a, ('imul', b, 8), 8)),
+   (('extract_i8', 'a@32', 'b@32'), ('ibitfield_extract', a, ('imul', b, 8), 8)),
 ]
 
 def main():
@@ -50,7 +45,7 @@ def main():
 def run():
     import nir_algebraic  # pylint: disable=import-error
     print('#include "rogue.h"')
-    print(nir_algebraic.AlgebraicPass("rogue_nir_algebraic_late", late).render())
+    print(nir_algebraic.AlgebraicPass("rogue_nir_opt_algebraic_late", algebraic_late).render())
 
 if __name__ == '__main__':
     main()

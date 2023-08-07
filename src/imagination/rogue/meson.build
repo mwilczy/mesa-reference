@@ -60,10 +60,10 @@ libpowervr_rogue_files = files(
   'passes/rogue_trim.c',
 )
 
-rogue_nir_algebraic_c = custom_target(
-  'rogue_nir_algebraic.c',
-  input : 'nir/rogue_nir_algebraic.py',
-  output : 'rogue_nir_algebraic.c',
+rogue_nir_opt_algebraic_c = custom_target(
+  'rogue_nir_opt_algebraic.c',
+  input : 'nir/rogue_nir_opt_algebraic.py',
+  output : 'rogue_nir_opt_algebraic.c',
   command : [
     prog_python, '@INPUT@', '-p', dir_compiler_nir,
   ],
@@ -75,7 +75,7 @@ rogue_nir_algebraic_c = custom_target(
 # the compiler/driver interface is finalised.
 libpowervr_rogue = shared_library(
   'powervr_rogue',
-  [libpowervr_rogue_files, rogue_nir_algebraic_c],
+  [libpowervr_rogue_files, rogue_nir_opt_algebraic_c],
   include_directories : [
     inc_imagination,
     inc_include,
