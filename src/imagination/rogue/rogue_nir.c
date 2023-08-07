@@ -467,11 +467,8 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
                                &nir->num_outputs,
                                nir->info.stage);
 
-   /* Renumber SSA defs and regs. */
+   /* Renumber SSA defs. */
    nir_index_ssa_defs(nir_shader_get_entrypoint(nir));
-#if 0
-   nir_index_local_regs(nir_shader_get_entrypoint(nir));
-#endif
 
    /* Gather info into nir shader struct. */
    nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
