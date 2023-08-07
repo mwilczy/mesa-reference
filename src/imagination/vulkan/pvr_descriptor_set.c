@@ -660,9 +660,6 @@ VkResult pvr_CreateDescriptorSetLayout(
            stage++) {
          const VkDescriptorType descriptor_type = binding->descriptorType;
 
-         if (!(shader_stages & BITFIELD_BIT(stage)))
-            continue;
-
          /* We don't allocate any space for dynamic primaries and secondaries.
           * They will be all be collected together in the pipeline layout.
           * Having them all in one place makes updating them easier when the
@@ -718,9 +715,6 @@ VkResult pvr_CreateDescriptorSetLayout(
            stage < ARRAY_SIZE(layout->bindings[0].per_stage_offset_in_dwords);
            stage++) {
          struct pvr_descriptor_size_info size_info;
-
-         if (!(internal_binding->shader_stage_mask & BITFIELD_BIT(stage)))
-            continue;
 
          pvr_descriptor_size_info_init(
             &device->pdevice->dev_info,
