@@ -3955,6 +3955,13 @@ typedef struct rogue_build_data {
        * programs in the subpass.
        */
       int32_t z_replicate;
+      bool depth_write;
+      uint16_t sample_mask;
+      enum swap_front_face {
+         SWAP_FRONT_FACE_FALSE,
+         SWAP_FRONT_FACE_TRUE,
+         SWAP_FRONT_FACE_FORCE,
+      } swap_front_face;
 
       unsigned num_outputs;
       struct {

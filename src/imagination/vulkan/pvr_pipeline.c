@@ -2519,7 +2519,7 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
    const struct pvr_render_pass *pass,
    const struct pvr_render_subpass *subpass,
    const struct pvr_renderpass_hwsetup_subpass *hw_subpass,
-   const struct vk_color_blend_state *cb_state)
+   const struct vk_graphics_pipeline_state *state)
 {
    fs_data->num_outputs = hw_subpass->setup.num_render_targets;
    fs_data->outputs =
@@ -2568,7 +2568,49 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
       }
    }
 
-   fs_data->cb_state = cb_state;
+   /* Blend constants. */
+   if (state->cb)
+      fs_data->cb_state = state->cb;
+
+   /* Sample mask. */
+   if (state->ms)
+      fs_data->sample_mask = state->ms->sample_mask;
+   else
+      fs_data->sample_mask = ~0;
+
+   /* Depth write. */
+   if (state->ds) {
+      ASSERTED bool dynamic_depth_write_enable =
+         BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_DS_DEPTH_WRITE_ENABLE);
+      assert(!dynamic_depth_write_enable);
+      fs_data->depth_write = state->ds->depth.write_enable;
+   }
+
+   /* Swap front face. */
+   if (state->rs) {
+      ASSERTED bool dynamic_swap_front_face =
+         BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_RS_FRONT_FACE);
+      assert(!dynamic_swap_front_face);
+
+      if (state->rs->front_face == VK_FRONT_FACE_COUNTER_CLOCKWISE)
+         fs_data->swap_front_face = SWAP_FRONT_FACE_TRUE;
+      else
+         fs_data->swap_front_face = SWAP_FRONT_FACE_FALSE;
+   }
+
+   /* Swap front face (force). */
+   if (state->ia) {
+      switch (state->ia->primitive_topology) {
+      case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+      case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+      case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+         fs_data->swap_front_face = SWAP_FRONT_FACE_FORCE;
+         break;
+
+      default:
+         break;
+      }
+   }
 }
 
 /* Compiles and uploads shaders and PDS programs. */
@@ -2615,7 +2657,7 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
                                       pass,
                                       subpass,
                                       hw_subpass,
-                                      state->cb);
+                                      state);
 
    /* TODO: Fix this by having multiple variants of iterator PDS programs for
     * VK_EXT_extended_dynamic_state */
