@@ -432,6 +432,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
                     .lower_cs_local_id_to_index = true,
                  });
 
+   NIR_PASS_V(nir, rogue_nir_lower_compute_intrinsics);
+
    NIR_PASS_V(nir, rogue_nir_lower_io, ctx, false);
 
    /* TODO: should really only need to do this once, and also split up lowering

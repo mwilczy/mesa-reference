@@ -31,15 +31,14 @@
 #include <stdint.h>
 
 /**
- * \file rogue_nir_compute_instance_check.c
+ * \file rogue_nir_compute.c
  *
- * \brief Contains the rogue_nir_compute_instance_check pass.
+ * \brief Contains compute-specific NIR passes.
  */
 
 #define ROGUE_INST_CHK_FUNC_NAME "__rogue_inst_chk_func__"
 
 /* Inserts an instance check for compute shaders. */
-/* TODO: can this be skipped if workgroup is a multiple of 32? */
 PUBLIC
 bool rogue_nir_compute_instance_check(nir_shader *shader)
 {
@@ -97,4 +96,96 @@ bool rogue_nir_compute_instance_check(nir_shader *shader)
    nir_jump(&b, nir_jump_return);
 
    return true;
+}
+
+/*
+ * Scalarize/convert load_workgroup_id to our custom intrinsics.
+ * Unused components will get DCEd later.
+ */
+static nir_def *lower_load_workgroup_id(nir_builder *b,
+                                        nir_intrinsic_instr *intr,
+                                        UNUSED void *cb_data)
+{
+   assert(intr->def.num_components == 3);
+   assert(intr->def.bit_size == 32);
+
+   nir_def *wgid_x = nir_load_workgroup_id_x_img(b);
+   nir_def *wgid_y = nir_load_workgroup_id_y_img(b);
+   nir_def *wgid_z = nir_load_workgroup_id_z_img(b);
+
+   return nir_vec3(b, wgid_x, wgid_y, wgid_z);
+}
+
+/*
+ * Scalarize/convert load_num_workgroups to loads.
+ * Unused components will get DCEd later.
+ */
+static nir_def *lower_load_num_workgroups(nir_builder *b,
+                                          nir_intrinsic_instr *intr,
+                                          UNUSED void *cb_data)
+{
+   unsigned num_components = intr->def.num_components;
+   unsigned bit_size = intr->def.bit_size;
+   unsigned load_align = bit_size / 8;
+
+   assert(num_components == 3);
+   assert(bit_size == 32);
+
+   /* This will be handled in rogue_nir_to_rogue;
+    * load the base address from shareds.
+    */
+   nir_def *num_wgs_base_addr = nir_load_num_workgroups_base_addr_img(b);
+
+   nir_def *num_wgs[3];
+   /* Load each component. */
+   for (unsigned c = 0; c < num_components; ++c) {
+      unsigned offset = c * load_align;
+      num_wgs[c] =
+         nir_load_global_constant(b,
+                                  nir_iadd_imm(b, num_wgs_base_addr, offset),
+                                  load_align,
+                                  1,
+                                  bit_size);
+   }
+
+   return nir_vec(b, num_wgs, num_components);
+}
+
+static bool is_compute_intrinsic(const nir_instr *instr,
+                                 UNUSED const void *cb_data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   return (intr->intrinsic == nir_intrinsic_load_workgroup_id) ||
+          (intr->intrinsic == nir_intrinsic_load_num_workgroups);
+}
+
+static nir_def *
+lower_compute_intrinsic(nir_builder *b, nir_instr *instr, void *cb_data)
+{
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_workgroup_id:
+      return lower_load_workgroup_id(b, intr, cb_data);
+
+   case nir_intrinsic_load_num_workgroups:
+      return lower_load_num_workgroups(b, intr, cb_data);
+
+   default:
+      break;
+   }
+
+   unreachable();
+}
+
+PUBLIC
+bool rogue_nir_lower_compute_intrinsics(nir_shader *shader)
+{
+   return nir_shader_lower_instructions(shader,
+                                        is_compute_intrinsic,
+                                        lower_compute_intrinsic,
+                                        NULL);
 }

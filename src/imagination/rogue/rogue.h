@@ -4120,6 +4120,8 @@ bool rogue_nir_lower_input_attachments(nir_shader *shader,
 
 bool rogue_nir_lower_barriers(nir_shader *shader);
 
+bool rogue_nir_lower_compute_intrinsics(nir_shader *shader);
+
 bool rogue_nir_lower_tex(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_lower_io(nir_shader *shader, rogue_build_ctx *ctx, bool late);

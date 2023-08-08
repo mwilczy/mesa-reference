@@ -26,7 +26,7 @@ inc_rogue = include_directories([
 ])
 
 libpowervr_rogue_files = files(
-  'nir/rogue_nir_compute_instance_check.c',
+  'nir/rogue_nir_compute.c',
   'nir/rogue_nir_expand_swizzles_to_vec.c',
   'nir/rogue_nir_lower_alu.c',
   'nir/rogue_nir_lower_syncops.c',
