@@ -1999,6 +1999,29 @@ trans_nir_intrinsic_load_num_workgroups_base_addr_img(rogue_builder *b,
                            "load_num_workgroups_base_addr_img.hi32");
 }
 
+static void
+trans_nir_intrinsic_load_blend_consts_base_addr_img(rogue_builder *b,
+                                                    nir_intrinsic_instr *intr)
+{
+   rogue_ref64 dst = nir_ssa_intr_dst64(b->shader, intr);
+
+   /* Fetch shared registers containing blend constants base address. */
+   enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(b->shader->stage);
+   const struct pvr_pipeline_layout *pipeline_layout =
+      b->shader->ctx->pipeline_layout;
+   assert(
+      pipeline_layout->sh_reg_layout_per_stage[pvr_stage].blend_consts.present);
+   unsigned blend_consts_sh_reg =
+      pipeline_layout->sh_reg_layout_per_stage[pvr_stage].blend_consts.offset;
+
+   rogue_ref64 src = rogue_shared_ref64(b->shader, blend_consts_sh_reg);
+
+   rogue_alu_instr *mov = rogue_MOV(b, dst.lo32, src.lo32);
+   rogue_add_instr_comment(&mov->instr, "load_blend_consts_base_addr_img.lo32");
+   mov = rogue_MOV(b, dst.hi32, src.hi32);
+   rogue_add_instr_comment(&mov->instr, "load_blend_consts_base_addr_img.hi32");
+}
+
 static unsigned rogue_vtxin_from_sysval(gl_system_value sysval,
                                         rogue_vertex_special_vars *special_vars)
 {
@@ -2898,6 +2921,9 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_load_num_workgroups_base_addr_img:
       return trans_nir_intrinsic_load_num_workgroups_base_addr_img(b, intr);
+
+   case nir_intrinsic_load_blend_consts_base_addr_img:
+      return trans_nir_intrinsic_load_blend_consts_base_addr_img(b, intr);
 
    case nir_intrinsic_load_vertex_id:
    case nir_intrinsic_load_instance_id:

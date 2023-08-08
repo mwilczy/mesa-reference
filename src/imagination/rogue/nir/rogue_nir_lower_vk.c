@@ -23,18 +23,21 @@
 
 #include "nir/nir.h"
 #include "nir/nir_builder.h"
+#include "nir/nir_lower_blend.h"
 #include "nir/nir_search_helpers.h"
 #include "rogue.h"
 #include "util/macros.h"
+#include "vk_graphics_state.h"
+#include "vk_blend.h"
 
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 /**
- * \file rogue_nir_lower_vk_io.c
+ * \file rogue_nir_lower_vk.c
  *
- * \brief Contains the rogue_nir_lower_vk_io pass.
+ * \brief Contains Vulkan-specific NIR passes.
  */
 
 static inline bool descriptor_is_dynamic(VkDescriptorType type)
@@ -147,4 +150,133 @@ PUBLIC
 bool rogue_nir_lower_vk_io(nir_shader *shader, rogue_build_ctx *ctx)
 {
    return nir_shader_lower_instructions(shader, is_vk_io, lower_vk_io, ctx);
+}
+
+PUBLIC
+void rogue_nir_lower_blend(nir_shader *shader, rogue_build_ctx *ctx)
+{
+   assert(shader->info.stage == MESA_SHADER_FRAGMENT);
+
+   struct rogue_fs_build_data *fs_data = &ctx->stage_data.fs;
+   const struct vk_color_blend_state *cb_state = fs_data->cb_state;
+
+   /* No blending info given, skip it */
+   if (!cb_state)
+      return;
+
+   nir_lower_blend_options opts = {
+      .scalar_blend_const = false,
+      .logicop_enable = cb_state->logic_op_enable,
+      .logicop_func = vk_logic_op_to_pipe(cb_state->logic_op),
+      .skip_blend_factor_snorm_clamp = true,
+   };
+
+   memset(opts.format, 0, sizeof(*opts.format));
+
+   unsigned count = MIN2(fs_data->num_outputs, cb_state->attachment_count);
+   for (unsigned u = 0; u < count; ++u) {
+      const struct vk_color_blend_attachment_state *rt =
+         &cb_state->attachments[u];
+      opts.format[u] = fs_data->outputs[u].format;
+
+      if (cb_state->logic_op_enable) {
+         /* No blending, but we get the colour mask below */
+      } else if (!rt->blend_enable) {
+         static const nir_lower_blend_channel replace = {
+            .func = PIPE_BLEND_ADD,
+            .src_factor = PIPE_BLENDFACTOR_ONE,
+            .dst_factor = PIPE_BLENDFACTOR_ZERO,
+         };
+
+         opts.rt[u].rgb = replace;
+         opts.rt[u].alpha = replace;
+      } else {
+         opts.rt[u].rgb.func = vk_blend_op_to_pipe(rt->color_blend_op);
+         opts.rt[u].rgb.src_factor =
+            vk_blend_factor_to_pipe(rt->src_color_blend_factor);
+         opts.rt[u].rgb.dst_factor =
+            vk_blend_factor_to_pipe(rt->dst_color_blend_factor);
+
+         opts.rt[u].alpha.func = vk_blend_op_to_pipe(rt->alpha_blend_op);
+         opts.rt[u].alpha.src_factor =
+            vk_blend_factor_to_pipe(rt->src_alpha_blend_factor);
+         opts.rt[u].alpha.dst_factor =
+            vk_blend_factor_to_pipe(rt->dst_alpha_blend_factor);
+      }
+
+      opts.rt[u].colormask =
+         (cb_state->color_write_enables & BITFIELD_BIT(u)) ? rt->write_mask : 0;
+   }
+
+   return nir_lower_blend(shader, &opts);
+}
+
+static bool is_blend_const(const nir_instr *instr, UNUSED const void *cb_data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   return intr->intrinsic == nir_intrinsic_load_blend_const_color_rgba;
+}
+
+static nir_def *lower_static_blend_const(nir_builder *b,
+                                         const rogue_build_ctx *ctx)
+{
+   const struct vk_color_blend_state *cb_state = ctx->stage_data.fs.cb_state;
+   nir_const_value blend_consts[4];
+   const unsigned bit_size = 32;
+
+   for (unsigned c = 0; c < ARRAY_SIZE(blend_consts); ++c)
+      blend_consts[c] =
+         nir_const_value_for_float(cb_state->blend_constants[c], bit_size);
+
+   return nir_build_imm(b, ARRAY_SIZE(blend_consts), bit_size, blend_consts);
+}
+
+static nir_def *lower_dynamic_blend_const(nir_builder *b)
+{
+   nir_def *consts_base = nir_load_blend_consts_base_addr_img(b);
+   const unsigned bit_size = 32;
+   const unsigned align = bit_size / 8;
+
+   nir_def *blend_consts[4];
+   for (unsigned c = 0; c < ARRAY_SIZE(blend_consts); ++c) {
+      blend_consts[c] =
+         nir_load_global_constant(b,
+                                  nir_iadd_imm(b, consts_base, align * c),
+                                  align,
+                                  1,
+                                  bit_size);
+   }
+
+   return nir_vec(b, blend_consts, ARRAY_SIZE(blend_consts));
+}
+
+static nir_def *
+lower_blend_const(nir_builder *b, nir_instr *instr, void *cb_data)
+{
+   const rogue_build_ctx *ctx = cb_data;
+
+   const struct pvr_pipeline_layout *pipeline_layout = ctx->pipeline_layout;
+   const struct pvr_sh_reg_layout *sh_reg_layout =
+      &pipeline_layout->sh_reg_layout_per_stage[PVR_STAGE_ALLOCATION_FRAGMENT];
+
+   b->cursor = nir_before_instr(instr);
+
+   if (!sh_reg_layout->blend_consts.present)
+      return lower_static_blend_const(b, ctx);
+
+   return lower_dynamic_blend_const(b);
+}
+
+PUBLIC
+bool rogue_nir_lower_blend_consts(nir_shader *shader, rogue_build_ctx *ctx)
+{
+   assert(shader->info.stage == MESA_SHADER_FRAGMENT);
+
+   return nir_shader_lower_instructions(shader,
+                                        is_blend_const,
+                                        lower_blend_const,
+                                        ctx);
 }

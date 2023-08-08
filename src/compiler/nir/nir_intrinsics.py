@@ -1969,8 +1969,11 @@ intrinsic("load_vulkan_desc_set_table_addr_img", src_comp=[1], dest_comp=1, indi
 # load_vulkan_desc_set_addr_img(set_addr, binding_num) [desc_type]
 intrinsic("load_vulkan_desc_set_addr_img", src_comp=[1, 1], dest_comp=1, indices=[DESC_SET, BINDING, DESC_TYPE], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
 
-# load_push_consts_base_addr_img()
+# Dynamic push constants base address.
 intrinsic("load_push_consts_base_addr_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
+
+# Dynamic blend constants base address.
+intrinsic("load_blend_consts_base_addr_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
 
 # Load the current instance's number/id within its slot.
 intrinsic("load_instance_num_img", dest_comp=1, flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
