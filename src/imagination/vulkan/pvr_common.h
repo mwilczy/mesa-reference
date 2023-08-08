@@ -54,6 +54,13 @@
 #define PVR_SAMPLER_DESCRIPTOR_SIZE 4U
 #define PVR_IMAGE_DESCRIPTOR_SIZE 4U
 
+/**
+ * Register alignment for sampler and image descriptors.
+ *
+ * USC SMP instructions require the sampler and image to be 4 sh regs aligned.
+ */
+#define PVR_SMP_DESCRIPTOR_ALIGNMENT 4U
+
 #define PVR_STATE_PBE_DWORDS 2U
 
 #define PVR_PIPELINE_LAYOUT_SUPPORTED_DESCRIPTOR_TYPE_COUNT \

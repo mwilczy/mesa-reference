@@ -90,9 +90,9 @@ void pvr_descriptor_size_info_init(
    /* clang-format off */
    static const struct pvr_descriptor_size_info template_size_infos[] = {
       /* VK_DESCRIPTOR_TYPE_SAMPLER */
-      { PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, 4 },
+      { PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, PVR_SMP_DESCRIPTOR_ALIGNMENT },
       /* VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER */
-      { PVR_IMAGE_DESCRIPTOR_SIZE + PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, 4 },
+      { PVR_IMAGE_DESCRIPTOR_SIZE + PVR_SAMPLER_DESCRIPTOR_SIZE * 2, UINT_MAX, PVR_SMP_DESCRIPTOR_ALIGNMENT },
       /* VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE */
       { 4, UINT_MAX, 4 },
       /* VK_DESCRIPTOR_TYPE_STORAGE_IMAGE */

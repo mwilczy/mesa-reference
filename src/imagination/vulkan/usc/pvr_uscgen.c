@@ -23,6 +23,7 @@
 
 #include "nir/nir.h"
 #include "nir/nir_builder.h"
+#include "pvr_common.h"
 #include "pvr_debug.h"
 #include "pvr_job_transfer.h"
 #include "pvr_private.h"
@@ -31,6 +32,7 @@
 #include "rogue/rogue_builder.h"
 #include "util/bitscan.h"
 #include "util/log.h"
+#include "util/macros.h"
 #include "util/u_dynarray.h"
 #include "vulkan/util/vk_format.h"
 #include "vk_format.h"
@@ -619,6 +621,9 @@ pvr_uscgen_load_op_nir(struct pvr_device *device,
 
    if (load_op->clears_loads_state.rt_clear_mask || depth_to_reg)
       pvr_uscgen_load_op_clears_nir(&b, &loadop_ctx, rogue_ctx);
+
+   loadop_ctx.next_sh_reg =
+      ALIGN_POT(loadop_ctx.next_sh_reg, PVR_SMP_DESCRIPTOR_ALIGNMENT);
 
    if (load_op->clears_loads_state.rt_load_mask)
       pvr_uscgen_load_op_loads_nir(&b, &loadop_ctx, rogue_ctx);

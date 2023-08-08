@@ -788,6 +788,9 @@ pvr_load_op_constants_create_and_upload(struct pvr_cmd_buffer *cmd_buffer,
           hw_clear_value,
           next_clear_consts * sizeof(hw_clear_value[0]));
 
+   next_clear_consts =
+      ALIGN_POT(next_clear_consts, PVR_SMP_DESCRIPTOR_ALIGNMENT);
+
    buffer += next_clear_consts;
    memcpy(buffer,
           texture_states,
