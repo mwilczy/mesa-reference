@@ -567,7 +567,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
 
    /* Clean-up after passes. */
-   nir_sweep(nir);
+   if (!nir->info.internal)
+      nir_sweep(nir);
 
    nir_validate_shader(nir, "after passes");
    if (ROGUE_DEBUG(NIR)) {
