@@ -4072,9 +4072,7 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_lower_alu_conversion_to_intrinsic(nir_shader *shader);
 
-bool rogue_nir_lower_atomics(nir_shader *shader,
-                             unsigned atomic_op_mask,
-                             nir_variable_mode modes);
+bool rogue_nir_lower_atomics(nir_shader *shader);
 
 bool rogue_nir_lower_fquantize2f16(nir_shader *shader);
 

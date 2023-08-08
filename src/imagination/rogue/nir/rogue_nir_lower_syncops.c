@@ -36,9 +36,9 @@
  * \brief Contains passes that lower synchronisation ops.
  */
 
-struct options {
+struct lower_atomics_options {
    unsigned atomic_op_mask;
-   nir_variable_mode modes;
+   nir_variable_mode atomic_op_modes;
 };
 
 /**
@@ -328,7 +328,7 @@ lower_atomic(nir_builder *b, nir_instr *instr, UNUSED void *_data)
 
 static bool is_lowerable_atomic(const nir_instr *instr, const void *data)
 {
-   const struct options *options = data;
+   const struct lower_atomics_options *options = data;
 
    if (instr->type != nir_instr_type_intrinsic)
       return false;
@@ -343,14 +343,14 @@ static bool is_lowerable_atomic(const nir_instr *instr, const void *data)
 
    case nir_intrinsic_global_atomic:
    case nir_intrinsic_global_atomic_swap:
-      if (!(options->modes & nir_var_mem_global))
+      if (!(options->atomic_op_modes & nir_var_mem_global))
          return false;
 
       break;
 
    case nir_intrinsic_shared_atomic_img:
    case nir_intrinsic_shared_atomic_swap_img:
-      if (!(options->modes & nir_var_mem_shared))
+      if (!(options->atomic_op_modes & nir_var_mem_shared))
          return false;
 
       break;
@@ -365,15 +365,33 @@ static bool is_lowerable_atomic(const nir_instr *instr, const void *data)
    return false;
 }
 
-PUBLIC
-bool rogue_nir_lower_atomics(nir_shader *shader,
-                             unsigned atomic_op_mask,
-                             nir_variable_mode modes)
+static void
+rogue_setup_lower_atomics_options(struct lower_atomics_options *options)
 {
-   struct options options = {
-      .atomic_op_mask = atomic_op_mask,
-      .modes = modes,
-   };
+   if (ROGUE_DEBUG(ATOMIC_EMU)) {
+      options->atomic_op_mask = ~0;
+      options->atomic_op_modes = ~0;
+      return;
+   }
+
+   /* For global memory, cmpxchg and float ops aren't natively supported.
+    * All shared memory ops can be performed in a single instruction group,
+    * and so don't need to be lowered.
+    */
+   options->atomic_op_modes = nir_var_mem_global;
+   options->atomic_op_mask =
+      BITFIELD_BIT(nir_atomic_op_fadd) | BITFIELD_BIT(nir_atomic_op_fmin) |
+      BITFIELD_BIT(nir_atomic_op_fmax) | BITFIELD_BIT(nir_atomic_op_fcmpxchg);
+
+   /* TODO: Don't lower this on cores where it's natively supported. */
+   options->atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_cmpxchg);
+}
+
+PUBLIC
+bool rogue_nir_lower_atomics(nir_shader *shader)
+{
+   struct lower_atomics_options options;
+   rogue_setup_lower_atomics_options(&options);
 
    return nir_shader_lower_instructions(shader,
                                         is_lowerable_atomic,

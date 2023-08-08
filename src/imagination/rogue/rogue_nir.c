@@ -171,40 +171,6 @@ static void rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
    } while (progress);
 }
 
-static void rogue_setup_lower_atomic_options(unsigned *atomic_op_mask,
-                                             nir_variable_mode *atomic_op_modes)
-{
-   assert(atomic_op_mask && atomic_op_modes);
-
-   *atomic_op_mask =
-      BITFIELD_BIT(nir_atomic_op_fadd) | BITFIELD_BIT(nir_atomic_op_fmin) |
-      BITFIELD_BIT(nir_atomic_op_fmax) | BITFIELD_BIT(nir_atomic_op_cmpxchg) |
-      BITFIELD_BIT(nir_atomic_op_fcmpxchg);
-   *atomic_op_modes = nir_var_mem_global;
-
-   if (ROGUE_DEBUG(ATOMIC_EMU)) {
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_iadd);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_imin);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_umin);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_imax);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_umax);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_iand);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_ior);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_ixor);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_xchg);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_fadd);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_fmin);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_fmax);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_cmpxchg);
-      *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_fcmpxchg);
-      /* *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_inc_wrap); */
-      /* *atomic_op_mask |= BITFIELD_BIT(nir_atomic_op_dec_wrap); */
-
-      *atomic_op_modes |= nir_var_mem_global;
-      *atomic_op_modes |= nir_var_mem_shared;
-   }
-}
-
 static void
 shared_var_info(const struct glsl_type *type, unsigned *size, unsigned *align)
 {
@@ -398,10 +364,8 @@ static void rogue_nir_passes(struct rogue_build_ctx *ctx,
    NIR_PASS_V(nir, rogue_nir_lower_tex, ctx);
 
    /* Lower atomic ops that aren't supported in hardware. */
-   unsigned atomic_op_mask;
-   nir_variable_mode atomic_op_modes;
-   rogue_setup_lower_atomic_options(&atomic_op_mask, &atomic_op_modes);
-   NIR_PASS_V(nir, rogue_nir_lower_atomics, atomic_op_mask, atomic_op_modes);
+   NIR_PASS_V(nir, rogue_nir_lower_atomics);
+
    rogue_nir_opt_loop(ctx, nir);
 
    nir_lower_idiv_options idiv_options = {
