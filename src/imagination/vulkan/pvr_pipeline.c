@@ -2527,6 +2527,9 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
 
    for (unsigned u = 0; u < subpass->color_count; ++u) {
       unsigned idx = subpass->color_attachments[u];
+      if (idx == VK_ATTACHMENT_UNUSED)
+         continue;
+
       VkFormat vk_format = pass->attachments[idx].vk_format;
       const struct usc_mrt_resource *mrt_resource =
          &hw_subpass->setup.mrt_resources[u];
@@ -2872,6 +2875,9 @@ pvr_create_renderpass_state(const VkGraphicsPipelineCreateInfo *const info)
    assert(info->subpass < pass->subpass_count);
 
    for (uint32_t i = 0; i < subpass->color_count; i++) {
+      if (subpass->color_attachments[i] == VK_ATTACHMENT_UNUSED)
+         continue;
+
       attachment_aspects |=
          pass->attachments[subpass->color_attachments[i]].aspects;
    }
