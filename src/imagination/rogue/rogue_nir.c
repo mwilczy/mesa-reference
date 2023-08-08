@@ -423,6 +423,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
               spirv_options.shared_addr_format);
    NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_mem_shared, NULL, NULL);
 
+   NIR_PASS_V(nir, rogue_nir_lower_vk_io, ctx);
+
    if (nir->info.stage == MESA_SHADER_COMPUTE)
       NIR_PASS_V(nir,
                  nir_lower_compute_system_values,

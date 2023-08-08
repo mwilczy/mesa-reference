@@ -37,44 +37,6 @@
  * \brief Contains the rogue_nir_lower_io pass.
  */
 
-static bool lower_load_vulkan_descriptor(nir_builder *b,
-                                         nir_intrinsic_instr *intr)
-{
-   nir_intrinsic_instr *vk_res_idk = nir_src_as_intrinsic(intr->src[0]);
-   assert(vk_res_idk->intrinsic == nir_intrinsic_vulkan_resource_index);
-
-   /* Fetch the desc_set, binding, desc_type. */
-   unsigned desc_set = nir_intrinsic_desc_set(vk_res_idk);
-   unsigned binding = nir_intrinsic_binding(vk_res_idk);
-   VkDescriptorType desc_type = nir_intrinsic_desc_type(vk_res_idk);
-
-   /* TODO: Skip VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER and other types
-    * that will be put into shareds. Rather than hardcoding types,
-    * look at info passed by the driver.
-    * For types that live in memory, we can probably skip the custom intrinsics
-    * -> lowering to load_global and instead just load_global directly.
-    */
-
-   b->cursor = nir_before_instr(&intr->instr);
-
-   nir_def *ld_tbl_addr =
-      nir_load_vulkan_desc_set_table_addr_img(b,
-                                              nir_imm_int(b, desc_set),
-                                              .desc_set = desc_set);
-   nir_def *ld_set_addr =
-      nir_load_vulkan_desc_set_addr_img(b,
-                                        ld_tbl_addr,
-                                        nir_imm_int(b, binding),
-                                        .desc_set = desc_set,
-                                        .binding = binding,
-                                        .desc_type = desc_type);
-
-   nir_def_rewrite_uses(&intr->def, ld_set_addr);
-   nir_instr_remove(&intr->instr);
-
-   return true;
-}
-
 /*
  * Scalarize/convert load_workgroup_id to our custom intrinsics.
  * Unused components will get DCEd later.
@@ -127,96 +89,6 @@ static bool lower_load_num_workgroups(nir_builder *b, nir_intrinsic_instr *intr)
    }
 
    nir_def_rewrite_uses(&intr->def, nir_vec(b, num_wgs, num_components));
-   nir_instr_remove(&intr->instr);
-
-   return true;
-}
-
-static bool lower_load_vulkan_desc_set_table_addr_img(nir_builder *b,
-                                                      nir_intrinsic_instr *intr,
-                                                      rogue_build_ctx *ctx)
-{
-   b->cursor = nir_before_instr(&intr->instr);
-
-   unsigned desc_set = nir_intrinsic_desc_set(intr);
-   unsigned load_align = intr->def.bit_size / 8;
-
-   /* This will be handled in rogue_nir_to_rogue, load the base address from
-    * shareds. */
-   nir_def *tbl_base_addr = nir_load_vulkan_desc_set_table_base_addr_img(b);
-
-   ASSERTED const struct pvr_pipeline_layout *pipeline_layout =
-      ctx->pipeline_layout;
-   assert(desc_set < pipeline_layout->set_count);
-
-   /* Calculate offset for the descriptor set. */
-   unsigned desc_set_offset = desc_set * sizeof(pvr_dev_addr_t);
-
-   /* Load the descriptor set table address for this set from memory. */
-   nir_def *tbl_addr =
-      nir_load_global_constant(b,
-                               nir_iadd_imm(b, tbl_base_addr, desc_set_offset),
-                               load_align,
-                               intr->def.num_components,
-                               intr->def.bit_size);
-
-   nir_def_rewrite_uses(&intr->def, tbl_addr);
-   nir_instr_remove(&intr->instr);
-
-   return true;
-}
-
-static inline bool descriptor_is_dynamic(VkDescriptorType type)
-{
-   return (type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
-           type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
-}
-
-static bool lower_load_vulkan_desc_set_addr_img(nir_builder *b,
-                                                nir_intrinsic_instr *intr,
-                                                rogue_build_ctx *ctx)
-{
-   b->cursor = nir_before_instr(&intr->instr);
-
-   enum pvr_stage_allocation pvr_stage =
-      mesa_stage_to_pvr(b->shader->info.stage);
-   unsigned desc_set = nir_intrinsic_desc_set(intr);
-   unsigned binding = nir_intrinsic_binding(intr);
-   UNUSED VkDescriptorType desc_type = nir_intrinsic_desc_type(intr);
-   unsigned load_align = intr->def.bit_size / 8;
-
-   const struct pvr_pipeline_layout *pipeline_layout = ctx->pipeline_layout;
-   const struct pvr_descriptor_set_layout *set_layout =
-      pipeline_layout->set_layout[desc_set];
-   const struct pvr_descriptor_set_layout_mem_layout *mem_layout =
-      &set_layout->memory_layout_in_dwords_per_stage[pvr_stage];
-   assert(binding < set_layout->binding_count);
-
-   /* Calculate offset for the descriptor/binding in this set. */
-   const struct pvr_descriptor_set_layout_binding *binding_layout =
-      pvr_get_descriptor_binding(set_layout, binding);
-
-   /* TODO: Handle secondaries. */
-   /* TODO: Handle bindings having multiple descriptors
-    * (VkDescriptorSetLayoutBinding->descriptorCount).
-    */
-
-   unsigned desc_offset = descriptor_is_dynamic(binding_layout->type)
-                             ? set_layout->total_size_in_dwords
-                             : mem_layout->primary_offset;
-   desc_offset += binding_layout->per_stage_offset_in_dwords[pvr_stage].primary;
-   desc_offset = PVR_DW_TO_BYTES(desc_offset);
-
-   /* Load the descriptor set table address for this set from memory. */
-   nir_def *tbl_addr = intr->src[0].ssa;
-   nir_def *desc_addr =
-      nir_load_global_constant(b,
-                               nir_iadd_imm(b, tbl_addr, desc_offset),
-                               load_align,
-                               intr->def.num_components,
-                               intr->def.bit_size);
-
-   nir_def_rewrite_uses(&intr->def, desc_addr);
    nir_instr_remove(&intr->instr);
 
    return true;
@@ -413,9 +285,6 @@ static bool lower_intrinsic(nir_builder *b,
 {
    if (!late) {
       switch (instr->intrinsic) {
-      case nir_intrinsic_load_vulkan_descriptor:
-         return lower_load_vulkan_descriptor(b, instr);
-
       case nir_intrinsic_load_preamble:
          return lower_load_preamble(b, instr);
 
@@ -432,12 +301,6 @@ static bool lower_intrinsic(nir_builder *b,
 
       case nir_intrinsic_load_num_workgroups:
          return lower_load_num_workgroups(b, instr);
-
-      case nir_intrinsic_load_vulkan_desc_set_table_addr_img:
-         return lower_load_vulkan_desc_set_table_addr_img(b, instr, ctx);
-
-      case nir_intrinsic_load_vulkan_desc_set_addr_img:
-         return lower_load_vulkan_desc_set_addr_img(b, instr, ctx);
 
       case nir_intrinsic_load_push_constant:
          return lower_load_push_constant(b, instr);
