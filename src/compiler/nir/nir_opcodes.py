@@ -356,6 +356,14 @@ dst.x |= ((uint32_t) pack_fmt_1x8(src0.z)) << 16;
 dst.x |= ((uint32_t) pack_fmt_1x8(src0.w)) << 24;
 """.replace("fmt", fmt))
 
+def pack_r10g10b10a2(fmt):
+   unop_horiz("pack_" + fmt + "_r10g10b10a2", 1, tuint32, 4, tfloat32, """
+dst.x = (uint32_t) pack_fmt_1x10(src0.x);
+dst.x |= ((uint32_t) pack_fmt_1x10(src0.y)) << 10;
+dst.x |= ((uint32_t) pack_fmt_1x10(src0.z)) << 20;
+dst.x |= ((uint32_t) pack_fmt_1x2(src0.w)) << 30;
+""".replace("fmt", fmt))
+
 def unpack_2x16(fmt):
    unop_horiz("unpack_" + fmt + "_2x16", 2, tfloat32, 1, tuint32, """
 dst.x = unpack_fmt_1x16((uint16_t)(src0.x & 0xffff));
@@ -370,16 +378,28 @@ dst.z = unpack_fmt_1x8((uint8_t)((src0.x >> 16) & 0xff));
 dst.w = unpack_fmt_1x8((uint8_t)(src0.x >> 24));
 """.replace("fmt", fmt))
 
+def unpack_r10g10b10a2(fmt):
+   unop_horiz("unpack_" + fmt + "_r10g10b10a2", 4, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x10((uint16_t)(src0.x & 0x3ff));
+dst.y = unpack_fmt_1x10((uint16_t)((src0.x >> 10) & 0x3ff));
+dst.z = unpack_fmt_1x10((uint16_t)((src0.x >> 20) & 0x3ff));
+dst.w = unpack_fmt_1x2((uint16_t)(src0.x >> 30));
+""".replace("fmt", fmt))
+
 
 pack_2x16("snorm", tfloat)
 pack_4x8("snorm")
+pack_r10g10b10a2("snorm")
 pack_2x16("unorm", tfloat)
 pack_4x8("unorm")
+pack_r10g10b10a2("unorm")
 pack_2x16("half", tfloat32)
 unpack_2x16("snorm")
 unpack_4x8("snorm")
+unpack_r10g10b10a2("snorm")
 unpack_2x16("unorm")
 unpack_4x8("unorm")
+unpack_r10g10b10a2("unorm")
 unpack_2x16("half")
 
 
