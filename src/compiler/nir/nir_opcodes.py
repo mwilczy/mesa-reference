@@ -382,6 +382,20 @@ unpack_2x16("unorm")
 unpack_4x8("unorm")
 unpack_2x16("half")
 
+
+unop_horiz("pack_r11g11b10f", 1, tuint32, 3, tfloat32, """
+float rgb[3] = { src0.x, src0.y, src0.z };
+dst.x = float3_to_r11g11b10f(rgb);
+""")
+
+unop_horiz("unpack_r11g11b10f", 3, tfloat32, 1, tuint32, """
+float rgb[3];
+r11g11b10f_to_float3(src0.x, rgb);
+dst.x = rgb[0];
+dst.y = rgb[1];
+dst.z = rgb[2];
+""")
+
 unop_horiz("pack_uint_2x16", 1, tuint32, 2, tuint32, """
 dst.x = _mesa_unsigned_to_unsigned(src0.x, 16);
 dst.x |= _mesa_unsigned_to_unsigned(src0.y, 16) << 16;
