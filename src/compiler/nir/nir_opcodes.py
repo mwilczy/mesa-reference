@@ -369,6 +369,13 @@ def unpack_2x16(fmt):
 dst.x = unpack_fmt_1x16((uint16_t)(src0.x & 0xffff));
 dst.y = unpack_fmt_1x16((uint16_t)(src0.x << 16));
 """.replace("fmt", fmt))
+   if fmt != "half":
+       unop_horiz("unpack_" + fmt + "_2x16_split_x", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x16((uint16_t)(src0.x & 0xffff));
+""".replace("fmt", fmt))
+       unop_horiz("unpack_" + fmt + "_2x16_split_y", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x16((uint16_t)(src0.x << 16));
+""".replace("fmt", fmt))
 
 def unpack_4x8(fmt):
    unop_horiz("unpack_" + fmt + "_4x8", 4, tfloat32, 1, tuint32, """
@@ -377,6 +384,18 @@ dst.y = unpack_fmt_1x8((uint8_t)((src0.x >> 8) & 0xff));
 dst.z = unpack_fmt_1x8((uint8_t)((src0.x >> 16) & 0xff));
 dst.w = unpack_fmt_1x8((uint8_t)(src0.x >> 24));
 """.replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_4x8_split_x", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x8((uint8_t)(src0.x & 0xff));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_4x8_split_y", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x8((uint8_t)((src0.x >> 8) & 0xff));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_4x8_split_z", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x8((uint8_t)((src0.x >> 16) & 0xff));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_4x8_split_w", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x8((uint8_t)(src0.x >> 24));
+""".replace("fmt", fmt))
 
 def unpack_r10g10b10a2(fmt):
    unop_horiz("unpack_" + fmt + "_r10g10b10a2", 4, tfloat32, 1, tuint32, """
@@ -384,6 +403,18 @@ dst.x = unpack_fmt_1x10((uint16_t)(src0.x & 0x3ff));
 dst.y = unpack_fmt_1x10((uint16_t)((src0.x >> 10) & 0x3ff));
 dst.z = unpack_fmt_1x10((uint16_t)((src0.x >> 20) & 0x3ff));
 dst.w = unpack_fmt_1x2((uint16_t)(src0.x >> 30));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_r10g10b10a2_split_x", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x10((uint16_t)(src0.x & 0x3ff));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_r10g10b10a2_split_y", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x10((uint16_t)((src0.x >> 10) & 0x3ff));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_r10g10b10a2_split_z", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x10((uint16_t)((src0.x >> 20) & 0x3ff));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_r10g10b10a2_split_w", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x2((uint16_t)(src0.x >> 30));
 """.replace("fmt", fmt))
 
 
@@ -426,6 +457,24 @@ r11g11b10f_to_float3(src0.x, rgb);
 dst.x = rgb[0];
 dst.y = rgb[1];
 dst.z = rgb[2];
+""")
+
+unop_horiz("unpack_r11g11b10f_split_x", 1, tfloat32, 1, tuint32, """
+float rgb[3];
+r11g11b10f_to_float3(src0.x, rgb);
+dst.x = rgb[0];
+""")
+
+unop_horiz("unpack_r11g11b10f_split_y", 1, tfloat32, 1, tuint32, """
+float rgb[3];
+r11g11b10f_to_float3(src0.x, rgb);
+dst.x = rgb[1];
+""")
+
+unop_horiz("unpack_r11g11b10f_split_z", 1, tfloat32, 1, tuint32, """
+float rgb[3];
+r11g11b10f_to_float3(src0.x, rgb);
+dst.x = rgb[2];
 """)
 
 unop_horiz("pack_uint_2x16", 1, tuint32, 2, tuint32, """
