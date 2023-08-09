@@ -326,42 +326,188 @@ static unsigned rogue_alu_movc_ft(const rogue_ref *ref)
 static inline unsigned rogue_pck_fmt(enum rogue_alu_op op)
 {
    switch (op) {
-   case ROGUE_ALU_OP_PCK_CONST0:
-      return PCK_FMT_ZERO;
-
    case ROGUE_ALU_OP_PCK_U8888:
    case ROGUE_ALU_OP_UPCK_U8888:
       return PCK_FMT_U8888;
+      break;
 
    case ROGUE_ALU_OP_PCK_S8888:
    case ROGUE_ALU_OP_UPCK_S8888:
       return PCK_FMT_S8888;
+      break;
+
+   case ROGUE_ALU_OP_PCK_O8888:
+   case ROGUE_ALU_OP_UPCK_O8888:
+      return PCK_FMT_O8888;
+      break;
 
    case ROGUE_ALU_OP_PCK_U1616:
    case ROGUE_ALU_OP_UPCK_U1616:
       return PCK_FMT_U1616;
+      break;
 
    case ROGUE_ALU_OP_PCK_S1616:
    case ROGUE_ALU_OP_UPCK_S1616:
       return PCK_FMT_S1616;
+      break;
 
-   case ROGUE_ALU_OP_PCK_F16F16:
-   case ROGUE_ALU_OP_UPCK_F16F16:
-      return PCK_FMT_F16F16;
+   case ROGUE_ALU_OP_PCK_O1616:
+   case ROGUE_ALU_OP_UPCK_O1616:
+      return PCK_FMT_O1616;
+      break;
 
    case ROGUE_ALU_OP_PCK_U32:
    case ROGUE_ALU_OP_UPCK_U32:
       return PCK_FMT_U32;
+      break;
 
    case ROGUE_ALU_OP_PCK_S32:
    case ROGUE_ALU_OP_UPCK_S32:
       return PCK_FMT_S32;
+      break;
 
-   case ROGUE_ALU_OP_PCK_F32:
+   case ROGUE_ALU_OP_PCK_U1010102:
+   case ROGUE_ALU_OP_UPCK_U1010102:
+      return PCK_FMT_U1010102;
+      break;
+
+   case ROGUE_ALU_OP_PCK_S1010102:
+   case ROGUE_ALU_OP_UPCK_S1010102:
+      return PCK_FMT_S1010102;
+      break;
+
+   case ROGUE_ALU_OP_PCK_U111110:
+   case ROGUE_ALU_OP_UPCK_U111110:
+      return PCK_FMT_U111110;
+      break;
+
+   case ROGUE_ALU_OP_PCK_S111110:
+   case ROGUE_ALU_OP_UPCK_S111110:
+      return PCK_FMT_S111110;
+      break;
+
+   case ROGUE_ALU_OP_PCK_F111110:
+   case ROGUE_ALU_OP_UPCK_F111110:
+      return PCK_FMT_F111110;
+      break;
+
+   case ROGUE_ALU_OP_PCK_F16F16:
+   case ROGUE_ALU_OP_UPCK_F16F16:
+      return PCK_FMT_F16F16;
+      break;
+
+   case ROGUE_ALU_OP_PCK_COPY32:
+   case ROGUE_ALU_OP_UPCK_COPY32:
       return PCK_FMT_F32;
+      break;
+
+   case ROGUE_ALU_OP_PCK_COVMASK:
+      return PCK_FMT_COV;
+      break;
+
+   case ROGUE_ALU_OP_PCK_U565U565:
+   case ROGUE_ALU_OP_UPCK_U565U565:
+      return PCK_FMT_U565U565;
+      break;
+
+   case ROGUE_ALU_OP_PCK_D24S8:
+   case ROGUE_ALU_OP_UPCK_D24S8:
+      return PCK_FMT_D24S8;
+      break;
+
+   case ROGUE_ALU_OP_PCK_S8D24:
+   case ROGUE_ALU_OP_UPCK_S8D24:
+      return PCK_FMT_S8D24;
+      break;
+
+   case ROGUE_ALU_OP_PCK_COPY31:
+   case ROGUE_ALU_OP_UPCK_COPY31:
+      return PCK_FMT_F32_MASK;
+      break;
 
    case ROGUE_ALU_OP_PCK_2F10F10F10:
+   case ROGUE_ALU_OP_UPCK_2F10F10F10:
       return PCK_FMT_2F10F10F10;
+      break;
+
+   case ROGUE_ALU_OP_PCK_S8888OGL:
+   case ROGUE_ALU_OP_UPCK_S8888OGL:
+      return PCK_FMT_S8888OGL;
+      break;
+
+   case ROGUE_ALU_OP_PCK_S1616OGL:
+   case ROGUE_ALU_OP_UPCK_S1616OGL:
+      return PCK_FMT_S1616OGL;
+      break;
+
+   case ROGUE_ALU_OP_PCK_CONST0:
+      return PCK_FMT_ZERO;
+      break;
+
+   case ROGUE_ALU_OP_PCK_CONST1:
+      return PCK_FMT_ONE;
+      break;
+
+   default:
+      break;
+   }
+
+   unreachable("Unsupported alu op.");
+}
+
+static inline bool rogue_op_is_pck(enum rogue_alu_op op)
+{
+   switch (op) {
+   case ROGUE_ALU_OP_PCK_U8888:
+   case ROGUE_ALU_OP_PCK_S8888:
+   case ROGUE_ALU_OP_PCK_O8888:
+   case ROGUE_ALU_OP_PCK_U1616:
+   case ROGUE_ALU_OP_PCK_S1616:
+   case ROGUE_ALU_OP_PCK_O1616:
+   case ROGUE_ALU_OP_PCK_U32:
+   case ROGUE_ALU_OP_PCK_S32:
+   case ROGUE_ALU_OP_PCK_U1010102:
+   case ROGUE_ALU_OP_PCK_S1010102:
+   case ROGUE_ALU_OP_PCK_U111110:
+   case ROGUE_ALU_OP_PCK_S111110:
+   case ROGUE_ALU_OP_PCK_F111110:
+   case ROGUE_ALU_OP_PCK_F16F16:
+   case ROGUE_ALU_OP_PCK_COPY32:
+   case ROGUE_ALU_OP_PCK_COVMASK:
+   case ROGUE_ALU_OP_PCK_U565U565:
+   case ROGUE_ALU_OP_PCK_D24S8:
+   case ROGUE_ALU_OP_PCK_S8D24:
+   case ROGUE_ALU_OP_PCK_COPY31:
+   case ROGUE_ALU_OP_PCK_2F10F10F10:
+   case ROGUE_ALU_OP_PCK_S8888OGL:
+   case ROGUE_ALU_OP_PCK_S1616OGL:
+   case ROGUE_ALU_OP_PCK_CONST0:
+   case ROGUE_ALU_OP_PCK_CONST1:
+      return true;
+
+   case ROGUE_ALU_OP_UPCK_U8888:
+   case ROGUE_ALU_OP_UPCK_S8888:
+   case ROGUE_ALU_OP_UPCK_O8888:
+   case ROGUE_ALU_OP_UPCK_U1616:
+   case ROGUE_ALU_OP_UPCK_S1616:
+   case ROGUE_ALU_OP_UPCK_O1616:
+   case ROGUE_ALU_OP_UPCK_U32:
+   case ROGUE_ALU_OP_UPCK_S32:
+   case ROGUE_ALU_OP_UPCK_U1010102:
+   case ROGUE_ALU_OP_UPCK_S1010102:
+   case ROGUE_ALU_OP_UPCK_U111110:
+   case ROGUE_ALU_OP_UPCK_S111110:
+   case ROGUE_ALU_OP_UPCK_F111110:
+   case ROGUE_ALU_OP_UPCK_F16F16:
+   case ROGUE_ALU_OP_UPCK_COPY32:
+   case ROGUE_ALU_OP_UPCK_U565U565:
+   case ROGUE_ALU_OP_UPCK_D24S8:
+   case ROGUE_ALU_OP_UPCK_S8D24:
+   case ROGUE_ALU_OP_UPCK_COPY31:
+   case ROGUE_ALU_OP_UPCK_2F10F10F10:
+   case ROGUE_ALU_OP_UPCK_S8888OGL:
+   case ROGUE_ALU_OP_UPCK_S1616OGL:
+      return false;
 
    default:
       break;
@@ -633,48 +779,68 @@ static void rogue_encode_alu_instr(const rogue_alu_instr *alu,
       break;
    }
 
-   case ROGUE_ALU_OP_PCK_CONST0:
    case ROGUE_ALU_OP_PCK_U8888:
-   case ROGUE_ALU_OP_PCK_S8888:
-   case ROGUE_ALU_OP_PCK_U1616:
-   case ROGUE_ALU_OP_PCK_S1616:
-   case ROGUE_ALU_OP_PCK_F16F16:
-   case ROGUE_ALU_OP_PCK_U32:
-   case ROGUE_ALU_OP_PCK_S32:
-   case ROGUE_ALU_OP_PCK_F32:
-   case ROGUE_ALU_OP_PCK_2F10F10F10:
-      instr_encoding->alu.op = ALUOP_SNGL;
-      instr_encoding->alu.sngl.snglop = SNGLOP_PCK;
-      instr_encoding->alu.sngl.ext0 = 1;
-
-      instr_encoding->alu.sngl.pck.pck.prog = 0;
-      instr_encoding->alu.sngl.pck.pck.rtz =
-         rogue_alu_op_mod_is_set(alu, OM(ROUNDZERO));
-      instr_encoding->alu.sngl.pck.pck.scale =
-         rogue_alu_op_mod_is_set(alu, OM(SCALE));
-
-      instr_encoding->alu.sngl.pck.pck.format = rogue_pck_fmt(alu->op);
-      break;
-
    case ROGUE_ALU_OP_UPCK_U8888:
+   case ROGUE_ALU_OP_PCK_S8888:
    case ROGUE_ALU_OP_UPCK_S8888:
+   case ROGUE_ALU_OP_PCK_O8888:
+   case ROGUE_ALU_OP_UPCK_O8888:
+   case ROGUE_ALU_OP_PCK_U1616:
    case ROGUE_ALU_OP_UPCK_U1616:
+   case ROGUE_ALU_OP_PCK_S1616:
    case ROGUE_ALU_OP_UPCK_S1616:
-   case ROGUE_ALU_OP_UPCK_F16F16:
-   case ROGUE_ALU_OP_UPCK_S32:
+   case ROGUE_ALU_OP_PCK_O1616:
+   case ROGUE_ALU_OP_UPCK_O1616:
+   case ROGUE_ALU_OP_PCK_U32:
    case ROGUE_ALU_OP_UPCK_U32:
+   case ROGUE_ALU_OP_PCK_S32:
+   case ROGUE_ALU_OP_UPCK_S32:
+   case ROGUE_ALU_OP_PCK_U1010102:
+   case ROGUE_ALU_OP_UPCK_U1010102:
+   case ROGUE_ALU_OP_PCK_S1010102:
+   case ROGUE_ALU_OP_UPCK_S1010102:
+   case ROGUE_ALU_OP_PCK_U111110:
+   case ROGUE_ALU_OP_UPCK_U111110:
+   case ROGUE_ALU_OP_PCK_S111110:
+   case ROGUE_ALU_OP_UPCK_S111110:
+   case ROGUE_ALU_OP_PCK_F111110:
+   case ROGUE_ALU_OP_UPCK_F111110:
+   case ROGUE_ALU_OP_PCK_F16F16:
+   case ROGUE_ALU_OP_UPCK_F16F16:
+   case ROGUE_ALU_OP_PCK_COPY32:
+   case ROGUE_ALU_OP_UPCK_COPY32:
+   case ROGUE_ALU_OP_PCK_COVMASK:
+   case ROGUE_ALU_OP_PCK_U565U565:
+   case ROGUE_ALU_OP_UPCK_U565U565:
+   case ROGUE_ALU_OP_PCK_D24S8:
+   case ROGUE_ALU_OP_UPCK_D24S8:
+   case ROGUE_ALU_OP_PCK_S8D24:
+   case ROGUE_ALU_OP_UPCK_S8D24:
+   case ROGUE_ALU_OP_PCK_COPY31:
+   case ROGUE_ALU_OP_UPCK_COPY31:
+   case ROGUE_ALU_OP_PCK_2F10F10F10:
+   case ROGUE_ALU_OP_UPCK_2F10F10F10:
+   case ROGUE_ALU_OP_PCK_S8888OGL:
+   case ROGUE_ALU_OP_UPCK_S8888OGL:
+   case ROGUE_ALU_OP_PCK_S1616OGL:
+   case ROGUE_ALU_OP_UPCK_S1616OGL:
+   case ROGUE_ALU_OP_PCK_CONST0:
+   case ROGUE_ALU_OP_PCK_CONST1:
       instr_encoding->alu.op = ALUOP_SNGL;
       instr_encoding->alu.sngl.snglop = SNGLOP_PCK;
       instr_encoding->alu.sngl.ext0 = 1;
 
-      /* TODO NEXT: rogue validation check that elem is NOT set if repeat > 1
-       * and that one *is* set if == 0/1. */
-      switch (alu->op) {
-      case ROGUE_ALU_OP_UPCK_U8888:
-      case ROGUE_ALU_OP_UPCK_S8888:
-      case ROGUE_ALU_OP_UPCK_U1616:
-      case ROGUE_ALU_OP_UPCK_S1616:
-      case ROGUE_ALU_OP_UPCK_F16F16:
+      if (rogue_op_is_pck(alu->op)) {
+         instr_encoding->alu.sngl.pck.pck.prog = 0; /* TODO */
+         instr_encoding->alu.sngl.pck.pck.rtz =
+            rogue_alu_op_mod_is_set(alu, OM(ROUNDZERO));
+         instr_encoding->alu.sngl.pck.pck.scale =
+            rogue_alu_op_mod_is_set(alu, OM(SCALE));
+
+         instr_encoding->alu.sngl.pck.pck.format = rogue_pck_fmt(alu->op);
+      } else {
+         /* TODO NEXT: rogue validation check that elem is NOT set if repeat > 1
+          * and that one *is* set if == 0/1. */
          if (rogue_alu_src_mod_is_set(alu, 0, SM(E0)))
             instr_encoding->alu.sngl.pck.upck.elem = UPCK_E0;
          else if (rogue_alu_src_mod_is_set(alu, 0, SM(E1)))
@@ -685,18 +851,14 @@ static void rogue_encode_alu_instr(const rogue_alu_instr *alu,
             instr_encoding->alu.sngl.pck.upck.elem = UPCK_E3;
          else if (alu->instr.group->header.repeat == 1)
             unreachable("No unpack element selectors set.");
-         break;
 
-      default:
-         break;
+         instr_encoding->alu.sngl.pck.upck.rtz |=
+            rogue_alu_op_mod_is_set(alu, OM(ROUNDZERO));
+         instr_encoding->alu.sngl.pck.upck.scale |=
+            rogue_alu_op_mod_is_set(alu, OM(SCALE));
+
+         instr_encoding->alu.sngl.pck.upck.format = rogue_pck_fmt(alu->op);
       }
-
-      instr_encoding->alu.sngl.pck.upck.rtz |=
-         rogue_alu_op_mod_is_set(alu, OM(ROUNDZERO));
-      instr_encoding->alu.sngl.pck.upck.scale |=
-         rogue_alu_op_mod_is_set(alu, OM(SCALE));
-
-      instr_encoding->alu.sngl.pck.upck.format = rogue_pck_fmt(alu->op);
       break;
 
    case ROGUE_ALU_OP_ADD8:

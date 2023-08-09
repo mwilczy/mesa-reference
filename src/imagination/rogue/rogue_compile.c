@@ -2261,6 +2261,7 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
          case nir_type_uint32:
             upck = rogue_UPCK_U32(b, dst, src);
             /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
+            rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          case nir_type_int8:
@@ -2278,6 +2279,7 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
          case nir_type_int32:
             upck = rogue_UPCK_S32(b, dst, src);
             /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
+            rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          default:
