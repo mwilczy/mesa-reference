@@ -207,6 +207,11 @@ typedef struct rogue_special_reg_info {
 extern const rogue_special_reg_info
    rogue_special_reg_infos[ROGUE_SPECIAL_REG_COUNT];
 
+enum rogue_face_orient {
+   ROGUE_FACE_ORIENT_CLOCKWISE = 0,
+   ROGUE_FACE_ORIENT_COUNTER_CLOCKWISE = 1,
+};
+
 enum rogue_mutex_op {
    ROGUE_MUTEX_OP_LOCK,
    ROGUE_MUTEX_OP_RELEASE,

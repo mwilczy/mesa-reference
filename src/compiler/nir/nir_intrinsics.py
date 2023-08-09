@@ -1995,3 +1995,6 @@ intrinsic("shared_atomic_swap_img",  src_comp=[1, 1, 1], dest_comp=1, indices=[A
 # TODO: commonise these into special case load_shared_img, since it's just a coeff reg.
 intrinsic("load_barrier_counter_img", dest_comp=1, bit_sizes=[32])
 intrinsic("store_barrier_counter_img", src_comp=[1], bit_sizes=[32])
+
+# Hardware that doesn't have load_front_face has this instead.
+intrinsic("load_face_orientation_img", dest_comp=1, bit_sizes=[32])

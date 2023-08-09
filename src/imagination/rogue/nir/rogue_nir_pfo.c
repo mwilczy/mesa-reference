@@ -301,15 +301,98 @@ static bool is_output_io(const nir_instr *instr, UNUSED const void *cb_data)
    return (sem.location >= FRAG_RESULT_DATA0);
 }
 
+static nir_def *lower_load_front_face(nir_builder *b,
+                                      nir_intrinsic_instr *intr,
+                                      const struct rogue_fs_build_data *fs_data)
+{
+   nir_def *front_face;
+
+   /* TODO: Handle cores that have a front face special register.  */
+   const bool sr_is_front = false;
+   if (sr_is_front) {
+      front_face = nir_i2b(b, nir_instr_def(&intr->instr));
+   } else {
+      nir_def *face_orient = nir_load_face_orientation_img(b);
+      nir_def *clockwise = nir_imm_int(b, ROGUE_FACE_ORIENT_CLOCKWISE);
+      front_face = nir_ieq(b, face_orient, clockwise);
+   }
+
+   switch (fs_data->swap_front_face) {
+   /* No change. */
+   case SWAP_FRONT_FACE_FALSE:
+      return front_face;
+
+   /* Invert. */
+   case SWAP_FRONT_FACE_TRUE:
+      return nir_inot(b, front_face);
+
+   /* Force true. */
+   case SWAP_FRONT_FACE_FORCE:
+      return nir_imm_true(b);
+
+   default:
+      break;
+   }
+
+   unreachable("Unsupported swap_front_face enum value.");
+}
+
+static nir_def *
+lower_frag_intrinsic(nir_builder *b, nir_instr *instr, void *cb_data)
+{
+   const struct rogue_fs_build_data *fs_data =
+      (const struct rogue_fs_build_data *)cb_data;
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_front_face:
+      return lower_load_front_face(b, intr, fs_data);
+
+   default:
+      break;
+   }
+
+   unreachable("Unsupported fs intrinsic.");
+}
+
+static bool is_frag_intrinsic(const nir_instr *instr,
+                              UNUSED const void *cb_data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_front_face:
+      return true;
+
+   default:
+      break;
+   }
+
+   return false;
+}
+
 PUBLIC
 bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
 {
    assert(shader->info.stage == MESA_SHADER_FRAGMENT);
 
    bool progress = false;
+
+   /* Fragment result data I/O. */
    progress |= nir_shader_lower_instructions(shader,
                                              is_output_io,
                                              lower_output_io,
                                              &ctx->stage_data.fs);
+
+   /* TODO: Depth/sample mask outputs. */
+
+   /* Frag intrinsics. */
+   progress |= nir_shader_lower_instructions(shader,
+                                             is_frag_intrinsic,
+                                             lower_frag_intrinsic,
+                                             &ctx->stage_data.fs);
+
    return progress;
 }

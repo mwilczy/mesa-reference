@@ -2904,6 +2904,13 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
                                         ROGUE_SPECIAL_REG_INST_NUM,
                                         "load_instance_num_img");
 
+   /* TODO: Handle cores that have a front face special register.  */
+   case nir_intrinsic_load_face_orientation_img:
+      return trans_nir_load_special_reg(b,
+                                        intr,
+                                        ROGUE_SPECIAL_REG_FACE_ORIENT,
+                                        "load_face_orientation_img");
+
    case nir_intrinsic_load_push_consts_base_addr_img:
       return trans_nir_load_push_consts_base_addr_img(b, intr);
 
