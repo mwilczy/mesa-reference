@@ -2976,159 +2976,6 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    unreachable("Unsupported NIR intrinsic instruction.");
 }
 
-/* TODO: commonise. */
-static void trans_nir_alu_pack_unorm_4x8(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 4 }, 32);
-
-   rogue_alu_instr *pck_u8888 = rogue_PCK_U8888(b, dst, src);
-   rogue_set_instr_repeat(&pck_u8888->instr, 4);
-   rogue_set_alu_op_mod(pck_u8888, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_unpack_unorm_4x8(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 4 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
-
-   rogue_alu_instr *upck_u8888 = rogue_UPCK_U8888(b, dst, src);
-   rogue_set_instr_repeat(&upck_u8888->instr, 4);
-   rogue_set_alu_op_mod(upck_u8888, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_pack_snorm_4x8(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 4 }, 32);
-
-   rogue_alu_instr *pck_s8888 = rogue_PCK_S8888(b, dst, src);
-   rogue_set_instr_repeat(&pck_s8888->instr, 4);
-   rogue_set_alu_op_mod(pck_s8888, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_unpack_snorm_4x8(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 4 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
-
-   rogue_alu_instr *upck_s8888 = rogue_UPCK_S8888(b, dst, src);
-   rogue_set_instr_repeat(&upck_s8888->instr, 4);
-   rogue_set_alu_op_mod(upck_s8888, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_pack_unorm_2x16(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 2 }, 32);
-
-   rogue_alu_instr *pck_u1616 = rogue_PCK_U1616(b, dst, src);
-   rogue_set_instr_repeat(&pck_u1616->instr, 2);
-   rogue_set_alu_op_mod(pck_u1616, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_unpack_unorm_2x16(rogue_builder *b,
-                                            nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 2 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
-
-   rogue_alu_instr *upck_u1616 = rogue_UPCK_U1616(b, dst, src);
-   rogue_set_instr_repeat(&upck_u1616->instr, 2);
-   rogue_set_alu_op_mod(upck_u1616, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_pack_snorm_2x16(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 2 }, 32);
-
-   rogue_alu_instr *pck_s1616 = rogue_PCK_S1616(b, dst, src);
-   rogue_set_instr_repeat(&pck_s1616->instr, 2);
-   rogue_set_alu_op_mod(pck_s1616, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_unpack_snorm_2x16(rogue_builder *b,
-                                            nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 2 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
-
-   rogue_alu_instr *upck_s1616 = rogue_UPCK_S1616(b, dst, src);
-   rogue_set_instr_repeat(&upck_s1616->instr, 2);
-   rogue_set_alu_op_mod(upck_s1616, ROGUE_ALU_OP_MOD_SCALE);
-}
-
-static void trans_nir_alu_pack_half_2x16(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 2 }, 32);
-
-   rogue_alu_instr *pck_f16f16 = rogue_PCK_F16F16(b, dst, src);
-   rogue_set_instr_repeat(&pck_f16f16->instr, 2);
-}
-
-static void trans_nir_alu_pack_half_2x16_split(rogue_builder *b,
-                                               nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-
-   rogue_ref dst_intrmdt =
-      rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
-
-   rogue_ref src0 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
-   rogue_ref src1 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, 32);
-
-   /* First/lower source. */
-   rogue_alu_instr *mbyp0 =
-      rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), rogue_ref_imm(0));
-   rogue_set_instr_group_next(&mbyp0->instr, true);
-
-   rogue_alu_instr *pck_f16f16 =
-      rogue_PCK_F16F16(b, rogue_ref_io(ROGUE_IO_FT2), src0);
-   rogue_set_instr_group_next(&pck_f16f16->instr, true);
-
-   rogue_alu_instr *movc = rogue_MOVC(b,
-                                      dst_intrmdt,
-                                      rogue_none(),
-                                      rogue_none(),
-                                      rogue_ref_io(ROGUE_IO_FT2),
-                                      rogue_ref_io(ROGUE_IO_FT0),
-                                      rogue_none(),
-                                      rogue_none());
-
-   rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E0);
-   rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E1);
-
-   /* Second/upper source. */
-   mbyp0 = rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), dst_intrmdt);
-   rogue_set_instr_group_next(&mbyp0->instr, true);
-
-   pck_f16f16 = rogue_PCK_F16F16(b, rogue_ref_io(ROGUE_IO_FT2), src1);
-   rogue_set_instr_group_next(&pck_f16f16->instr, true);
-
-   movc = rogue_MOVC(b,
-                     dst,
-                     rogue_none(),
-                     rogue_none(),
-                     rogue_ref_io(ROGUE_IO_FT2),
-                     rogue_ref_io(ROGUE_IO_FT0),
-                     rogue_none(),
-                     rogue_none());
-
-   rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E2);
-   rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E3);
-}
-
-static void trans_nir_alu_unpack_half_2x16(rogue_builder *b, nir_alu_instr *alu)
-{
-   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 2 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
-
-   rogue_alu_instr *upck_f16f16 = rogue_UPCK_F16F16(b, dst, src);
-   rogue_set_instr_repeat(&upck_f16f16->instr, 2);
-}
-
 static void trans_nir_alu_fadd(rogue_builder *b, nir_alu_instr *alu)
 {
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
@@ -3933,42 +3780,500 @@ trans_nir_unpack_32_2x16_split(rogue_builder *b, nir_alu_instr *alu, bool hi32)
       rogue_IAND(b, dst, src, rogue_ref_imm(0x0000ffff));
 }
 
+enum rogue_storage {
+   ROGUE_STORAGE_4x8,
+   ROGUE_STORAGE_2x16,
+   ROGUE_STORAGE_3x10_1x2,
+   ROGUE_STORAGE_2x11_1x10,
+   ROGUE_STORAGE_1x24_1x8,
+   ROGUE_STORAGE_1x8_1x24,
+   ROGUE_STORAGE_5_6_5,
+};
+
+static inline unsigned rogue_storage_comps(enum rogue_storage storage)
+{
+   switch (storage) {
+   case ROGUE_STORAGE_2x16:
+   case ROGUE_STORAGE_1x24_1x8:
+   case ROGUE_STORAGE_1x8_1x24:
+      return 2;
+
+   case ROGUE_STORAGE_2x11_1x10:
+   case ROGUE_STORAGE_5_6_5:
+      return 3;
+
+   case ROGUE_STORAGE_4x8:
+   case ROGUE_STORAGE_3x10_1x2:
+      return 4;
+
+   default:
+      break;
+   }
+
+   unreachable("Unsupported storage enum value.");
+}
+
+static void trans_nir_pack_format(rogue_builder *b,
+                                  nir_alu_instr *alu,
+                                  enum rogue_storage storage,
+                                  nir_alu_type type,
+                                  bool norm)
+{
+   unsigned num_comps = rogue_storage_comps(storage);
+
+   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
+   rogue_ref src = alu_src(b->shader, alu, 0, &num_comps, 32);
+
+   rogue_alu_instr *pck;
+   switch (storage) {
+   case ROGUE_STORAGE_4x8:
+      switch (type) {
+      case nir_type_int:
+         pck = rogue_PCK_S8888(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         pck = rogue_PCK_U8888(b, dst, src);
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_2x16:
+      switch (type) {
+      case nir_type_int:
+         pck = rogue_PCK_S1616(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         pck = rogue_PCK_U1616(b, dst, src);
+         break;
+
+      case nir_type_float:
+         assert(!norm);
+         pck = rogue_PCK_F16F16(b, dst, src);
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_3x10_1x2:
+      switch (type) {
+      case nir_type_int:
+         pck = rogue_PCK_S1010102(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         pck = rogue_PCK_U1010102(b, dst, src);
+         break;
+
+      case nir_type_float:
+         assert(!norm);
+         pck = rogue_PCK_2F10F10F10(b, dst, src);
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_2x11_1x10:
+      switch (type) {
+      case nir_type_int:
+         pck = rogue_PCK_S111110(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         pck = rogue_PCK_U111110(b, dst, src);
+         break;
+
+      case nir_type_float:
+         assert(!norm);
+         pck = rogue_PCK_F111110(b, dst, src);
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_1x24_1x8:
+      pck = rogue_PCK_D24S8(b, dst, src);
+      break;
+
+   case ROGUE_STORAGE_1x8_1x24:
+      pck = rogue_PCK_S8D24(b, dst, src);
+      break;
+
+   case ROGUE_STORAGE_5_6_5:
+      pck = rogue_PCK_U565U565(b, dst, src);
+      break;
+
+   default:
+      unreachable("Unsupported storage enum value.");
+   }
+
+   if (norm)
+      rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_SCALE);
+
+   rogue_set_instr_repeat(&pck->instr, num_comps);
+}
+
+static void trans_nir_unpack_format(rogue_builder *b,
+                                    nir_alu_instr *alu,
+                                    enum rogue_storage storage,
+                                    nir_alu_type type,
+                                    unsigned elem,
+                                    bool norm)
+{
+   unsigned num_comps = (elem == ~0) ? rogue_storage_comps(storage) : 1;
+
+   rogue_ref dst = alu_dst(b->shader, alu, &num_comps, 32);
+   rogue_ref src = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
+
+   rogue_alu_instr *upck;
+   switch (storage) {
+   case ROGUE_STORAGE_4x8:
+      switch (type) {
+      case nir_type_int:
+         upck = rogue_UPCK_S8888(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         upck = rogue_UPCK_U8888(b, dst, src);
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_2x16:
+      switch (type) {
+      case nir_type_int:
+         upck = rogue_UPCK_S1616(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         upck = rogue_UPCK_U1616(b, dst, src);
+         break;
+
+      case nir_type_float:
+         upck = rogue_UPCK_F16F16(b, dst, src);
+         /* Special case - use norm as RTZ. */
+         if (norm) {
+            rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO);
+            norm = false;
+         }
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_3x10_1x2:
+      switch (type) {
+      case nir_type_int:
+         upck = rogue_UPCK_S1010102(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         upck = rogue_UPCK_U1010102(b, dst, src);
+         break;
+
+      case nir_type_float:
+         assert(!norm);
+         upck = rogue_UPCK_2F10F10F10(b, dst, src);
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_2x11_1x10:
+      switch (type) {
+      case nir_type_int:
+         upck = rogue_UPCK_S111110(b, dst, src);
+         break;
+
+      case nir_type_uint:
+         upck = rogue_UPCK_U111110(b, dst, src);
+         break;
+
+      case nir_type_float:
+         assert(!norm);
+         upck = rogue_UPCK_F111110(b, dst, src);
+         break;
+
+      default:
+         unreachable("Unsupported op type variant.");
+      }
+      break;
+
+   case ROGUE_STORAGE_1x24_1x8:
+      upck = rogue_UPCK_D24S8(b, dst, src);
+      break;
+
+   case ROGUE_STORAGE_1x8_1x24:
+      upck = rogue_UPCK_S8D24(b, dst, src);
+      break;
+
+   case ROGUE_STORAGE_5_6_5:
+      upck = rogue_UPCK_U565U565(b, dst, src);
+      break;
+
+   default:
+      unreachable("Unsupported storage enum value.");
+   }
+
+   if (norm)
+      rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_SCALE);
+
+   if (elem == ~0)
+      rogue_set_instr_repeat(&upck->instr, num_comps);
+   else
+      rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0 + elem);
+}
+
 #define OM(op_mod) ROGUE_ALU_OP_MOD_##op_mod
 static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 {
    switch (alu->op) {
-   case nir_op_pack_unorm_4x8:
-      return trans_nir_alu_pack_unorm_4x8(b, alu);
+   /* Pack ops. */
+   case nir_op_pack_half_2x16:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_2x16,
+                                   nir_type_float,
+                                   false);
 
-   case nir_op_unpack_unorm_4x8:
-      return trans_nir_alu_unpack_unorm_4x8(b, alu);
-
-   case nir_op_pack_snorm_4x8:
-      return trans_nir_alu_pack_snorm_4x8(b, alu);
-
-   case nir_op_unpack_snorm_4x8:
-      return trans_nir_alu_unpack_snorm_4x8(b, alu);
+   case nir_op_pack_r11g11b10f:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_2x11_1x10,
+                                   nir_type_float,
+                                   false);
 
    case nir_op_pack_unorm_2x16:
-      return trans_nir_alu_pack_unorm_2x16(b, alu);
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_2x16,
+                                   nir_type_uint,
+                                   true);
+   case nir_op_pack_snorm_2x16:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_2x16,
+                                   nir_type_int,
+                                   true);
+   case nir_op_pack_uscaled_2x16:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_2x16,
+                                   nir_type_uint,
+                                   false);
+   case nir_op_pack_sscaled_2x16:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_2x16,
+                                   nir_type_int,
+                                   false);
+
+   case nir_op_pack_unorm_4x8:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_4x8,
+                                   nir_type_uint,
+                                   true);
+   case nir_op_pack_snorm_4x8:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_4x8,
+                                   nir_type_int,
+                                   true);
+   case nir_op_pack_uscaled_4x8:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_4x8,
+                                   nir_type_uint,
+                                   false);
+   case nir_op_pack_sscaled_4x8:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_4x8,
+                                   nir_type_int,
+                                   false);
+
+   case nir_op_pack_unorm_r10g10b10a2:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_3x10_1x2,
+                                   nir_type_uint,
+                                   true);
+   case nir_op_pack_snorm_r10g10b10a2:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_3x10_1x2,
+                                   nir_type_int,
+                                   true);
+   case nir_op_pack_uscaled_r10g10b10a2:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_3x10_1x2,
+                                   nir_type_uint,
+                                   false);
+   case nir_op_pack_sscaled_r10g10b10a2:
+      return trans_nir_pack_format(b,
+                                   alu,
+                                   ROGUE_STORAGE_3x10_1x2,
+                                   nir_type_int,
+                                   false);
+
+   /* Unpack ops. */
+   case nir_op_unpack_half_2x16:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_float,
+                                     ~0,
+                                     false);
+   case nir_op_unpack_half_2x16_split_x:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_float,
+                                     0,
+                                     false);
+   case nir_op_unpack_half_2x16_split_y:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_float,
+                                     1,
+                                     false);
+
+   case nir_op_unpack_half_2x16_flush_to_zero:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_float,
+                                     ~0,
+                                     true);
+   case nir_op_unpack_half_2x16_split_x_flush_to_zero:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_float,
+                                     0,
+                                     true);
+   case nir_op_unpack_half_2x16_split_y_flush_to_zero:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_float,
+                                     1,
+                                     true);
+
+   case nir_op_unpack_r11g11b10f:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x11_1x10,
+                                     nir_type_float,
+                                     ~0,
+                                     false);
 
    case nir_op_unpack_unorm_2x16:
-      return trans_nir_alu_unpack_unorm_2x16(b, alu);
-
-   case nir_op_pack_snorm_2x16:
-      return trans_nir_alu_pack_snorm_2x16(b, alu);
-
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_uint,
+                                     ~0,
+                                     true);
    case nir_op_unpack_snorm_2x16:
-      return trans_nir_alu_unpack_snorm_2x16(b, alu);
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_int,
+                                     ~0,
+                                     true);
+   case nir_op_unpack_sscaled_2x16:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_uint,
+                                     ~0,
+                                     false);
+   case nir_op_unpack_uscaled_2x16:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_2x16,
+                                     nir_type_int,
+                                     ~0,
+                                     false);
 
-   case nir_op_pack_half_2x16:
-      return trans_nir_alu_pack_half_2x16(b, alu);
+   case nir_op_unpack_unorm_4x8:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_4x8,
+                                     nir_type_uint,
+                                     ~0,
+                                     true);
+   case nir_op_unpack_snorm_4x8:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_4x8,
+                                     nir_type_int,
+                                     ~0,
+                                     true);
+   case nir_op_unpack_uscaled_4x8:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_4x8,
+                                     nir_type_uint,
+                                     ~0,
+                                     false);
+   case nir_op_unpack_sscaled_4x8:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_4x8,
+                                     nir_type_int,
+                                     ~0,
+                                     false);
 
-   case nir_op_pack_half_2x16_split:
-      return trans_nir_alu_pack_half_2x16_split(b, alu);
-
-   case nir_op_unpack_half_2x16:
-      return trans_nir_alu_unpack_half_2x16(b, alu);
+   case nir_op_unpack_unorm_r10g10b10a2:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_3x10_1x2,
+                                     nir_type_uint,
+                                     ~0,
+                                     true);
+   case nir_op_unpack_snorm_r10g10b10a2:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_3x10_1x2,
+                                     nir_type_int,
+                                     ~0,
+                                     true);
+   case nir_op_unpack_uscaled_r10g10b10a2:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_3x10_1x2,
+                                     nir_type_uint,
+                                     ~0,
+                                     false);
+   case nir_op_unpack_sscaled_r10g10b10a2:
+      return trans_nir_unpack_format(b,
+                                     alu,
+                                     ROGUE_STORAGE_3x10_1x2,
+                                     nir_type_int,
+                                     ~0,
+                                     false);
 
    case nir_op_fadd:
       return trans_nir_alu_fadd(b, alu);
