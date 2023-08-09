@@ -144,6 +144,34 @@ pack_snorm_1x2(float x)
           _mesa_roundevenf(CLAMP(x, -1.0f, +1.0f) * 1.0f);
 }
 
+static uint8_t
+pack_sscaled_1x8(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, -127.0f, +127.0f));
+}
+
+static uint16_t
+pack_sscaled_1x16(float x)
+{
+   return (uint16_t) (int)
+          _mesa_roundevenf(CLAMP(x, -32768.0f, +32767.0f));
+}
+
+static uint16_t
+pack_sscaled_1x10(float x)
+{
+   return (uint16_t) (int)
+          _mesa_roundevenf(CLAMP(x, -512.0f, +511.0f));
+}
+
+static uint16_t
+pack_sscaled_1x2(float x)
+{
+   return (uint16_t) (int)
+          _mesa_roundevenf(CLAMP(x, -2.0f, +1.0f));
+}
+
 /**
  * Evaluate one component of unpackSnorm4x8.
  */
@@ -192,6 +220,32 @@ unpack_snorm_1x2(uint16_t u)
 {
    u &= 0x0003;
    return CLAMP((int16_t) u / 1.0f, -1.0f, +1.0f);
+}
+
+static float
+unpack_sscaled_1x8(uint8_t u)
+{
+   return CLAMP((int8_t) u, -128.0f, +127.0f);
+}
+
+static float
+unpack_sscaled_1x16(uint16_t u)
+{
+   return CLAMP((int16_t) u, -32768.0f, +32767.0f);
+}
+
+static float
+unpack_sscaled_1x10(uint16_t u)
+{
+   u &= 0x03FF;
+   return CLAMP((int16_t) u, -512.0f, +511.0f);
+}
+
+static float
+unpack_sscaled_1x2(uint16_t u)
+{
+   u &= 0x0003;
+   return CLAMP((int16_t) u, -2.0f, +1.0f);
 }
 
 /**
@@ -246,6 +300,34 @@ pack_unorm_1x2(float x)
           _mesa_roundevenf(CLAMP(x, 0.0f, 1.0f) * 3.0f);
 }
 
+static uint8_t
+pack_uscaled_1x8(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 255.0f));
+}
+
+static uint16_t
+pack_uscaled_1x16(float x)
+{
+   return (uint16_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 65535.0f));
+}
+
+static uint16_t
+pack_uscaled_1x10(float x)
+{
+   return (uint16_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 1023.0f));
+}
+
+static uint16_t
+pack_uscaled_1x2(float x)
+{
+   return (uint16_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 3.0f));
+}
+
 /**
  * Evaluate one component of unpackUnorm4x8.
  */
@@ -294,6 +376,32 @@ unpack_unorm_1x2(uint16_t u)
 {
    u &= 0x0003;
    return (float) u / 3.0f;
+}
+
+static float
+unpack_uscaled_1x8(uint8_t u)
+{
+   return (float) u;
+}
+
+static float
+unpack_uscaled_1x16(uint16_t u)
+{
+   return (float) u;
+}
+
+static float
+unpack_uscaled_1x10(uint16_t u)
+{
+   u &= 0x03FF;
+   return (float) u;
+}
+
+static float
+unpack_uscaled_1x2(uint16_t u)
+{
+   u &= 0x0003;
+   return (float) u;
 }
 
 /**
