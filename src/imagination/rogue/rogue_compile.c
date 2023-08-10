@@ -3619,9 +3619,16 @@ static void trans_nir_bitfield_insert(rogue_builder *b, nir_alu_instr *alu)
 {
    unsigned bit_size = alu->def.bit_size;
 
+   /* The bits == 0 case will have been removed in rogue_nir_opt_algebraic_late;
+    * only do the bits check if the source isn't const.
+    */
+   bool bits0_check = !nir_src_is_const(alu->src[3].src);
+
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, bit_size);
    rogue_ref bfi_dst =
-      rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
+      bits0_check
+         ? rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)))
+         : dst;
 
    rogue_ref base = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, bit_size);
    rogue_ref insert = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, bit_size);
@@ -3644,7 +3651,6 @@ static void trans_nir_bitfield_insert(rogue_builder *b, nir_alu_instr *alu)
 
    rogue_bitwise_instr * or = rogue_OR(b,
                                        bfi_dst,
-                                       /* dst, */
                                        rogue_ref_io(ROGUE_IO_FT1),
                                        rogue_ref_io(ROGUE_IO_FT2),
                                        rogue_ref_io(ROGUE_IO_FT1),
@@ -3652,16 +3658,20 @@ static void trans_nir_bitfield_insert(rogue_builder *b, nir_alu_instr *alu)
 
    rogue_add_instr_comment(& or->instr, "bitfield_insert");
 
-   /* "If bits is zero, the result will simply be the original value of base."
-    */
-   rogue_alu_instr *csel = rogue_csel(b,
-                                      &dst,
-                                      &bits,
-                                      &base,
-                                      &bfi_dst,
-                                      COMPARE_FUNC_EQUAL,
-                                      nir_type_uint32);
-   rogue_add_instr_comment(&csel->instr, "bitfield_insert (bits == 0 check)");
+   if (bits0_check) {
+      /* "If bits is zero, the result will simply be the original value of
+       * base."
+       */
+      rogue_alu_instr *csel = rogue_csel(b,
+                                         &dst,
+                                         &bits,
+                                         &base,
+                                         &bfi_dst,
+                                         COMPARE_FUNC_EQUAL,
+                                         nir_type_uint32);
+      rogue_add_instr_comment(&csel->instr,
+                              "bitfield_insert (bits == 0 check)");
+   }
 }
 
 static void
@@ -3669,9 +3679,16 @@ trans_nir_bitfield_extract(rogue_builder *b, nir_alu_instr *alu, bool is_signed)
 {
    unsigned bit_size = alu->def.bit_size;
 
+   /* The bits == 0 case will have been removed in rogue_nir_opt_algebraic_late;
+    * only do the bits check if the source isn't const.
+    */
+   bool bits0_check = !nir_src_is_const(alu->src[2].src);
+
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, bit_size);
    rogue_ref bfe_dst =
-      rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
+      bits0_check
+         ? rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)))
+         : dst;
 
    rogue_ref base = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, bit_size);
    rogue_ref offset = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, bit_size);
@@ -3710,16 +3727,19 @@ trans_nir_bitfield_extract(rogue_builder *b, nir_alu_instr *alu, bool is_signed)
                             "%cbitfield_extract",
                             is_signed ? 'i' : 'u');
 
-   /* "If bits is zero, the result will be zero." */
-   rogue_ref imm_0 = rogue_ref_imm(0);
-   rogue_alu_instr *csel = rogue_csel(b,
-                                      &dst,
-                                      &bits,
-                                      &imm_0,
-                                      &bfe_dst,
-                                      COMPARE_FUNC_EQUAL,
-                                      nir_type_uint32);
-   rogue_add_instr_comment(&csel->instr, "bitfield_extract (bits == 0 check)");
+   if (bits0_check) {
+      /* "If bits is zero, the result will be zero." */
+      rogue_ref imm_0 = rogue_ref_imm(0);
+      rogue_alu_instr *csel = rogue_csel(b,
+                                         &dst,
+                                         &bits,
+                                         &imm_0,
+                                         &bfe_dst,
+                                         COMPARE_FUNC_EQUAL,
+                                         nir_type_uint32);
+      rogue_add_instr_comment(&csel->instr,
+                              "bitfield_extract (bits == 0 check)");
+   }
 }
 
 static void trans_nir_bitfield_reverse(rogue_builder *b, nir_alu_instr *alu)

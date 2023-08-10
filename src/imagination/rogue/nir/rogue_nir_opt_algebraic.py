@@ -34,6 +34,10 @@ algebraic_late = [
    (('extract_u8', 'a@32', 'b@32'), ('ubitfield_extract', a, ('imul', b, 8), 8)),
    (('extract_i8', 'a@32', 'b@32'), ('ibitfield_extract', a, ('imul', b, 8), 8)),
 
+   # Bitfield insert/extract special-case handling.
+   (('bitfield_insert', 'base', 'insert', 'offset', 0), 'base'),
+   (('ubitfield_extract', 'value', 'offset', 0), 0),
+   (('ibitfield_extract', 'value', 'offset', 0), 0),
 ]
 
 # Split unpack ops.
