@@ -125,24 +125,24 @@ struct pvr_uscgen_load_op_context {
    uint32_t next_temp_reg;
 };
 
-static inline VkFormat pvr_uscgen_format_for_accum(VkFormat fmt)
+static inline VkFormat pvr_uscgen_format_for_accum(VkFormat vk_format)
 {
    /* Replicated depth is kept as f32 */
-   return vk_format_has_depth(fmt) ? VK_FORMAT_R32_SFLOAT : fmt;
+   return vk_format_has_depth(vk_format) ? VK_FORMAT_R32_SFLOAT : vk_format;
 }
 
 static rogue_ref pvr_uscgen_rogue_pack(rogue_builder *b,
                                        struct pvr_uscgen_load_op_context *ctx,
                                        rogue_ref src,
-                                       VkFormat fmt)
+                                       VkFormat vk_format)
 {
    enum pvr_pbe_accum_format pbe_accum_format;
    uint32_t nr_components;
    rogue_alu_instr *pck;
    rogue_ref dst;
 
-   pbe_accum_format = pvr_get_pbe_accum_format(fmt);
-   nr_components = vk_format_get_nr_components(fmt);
+   pbe_accum_format = pvr_get_pbe_accum_format(vk_format);
+   nr_components = vk_format_get_nr_components(vk_format);
 
    switch (pbe_accum_format) {
    case PVR_PBE_ACCUM_FORMAT_UINT8:
@@ -171,7 +171,7 @@ static rogue_ref pvr_uscgen_rogue_pack(rogue_builder *b,
    case PVR_PBE_ACCUM_FORMAT_U8:
       dst = rogue_ref_reg(rogue_temp_reg(b->shader, ctx->next_temp_reg++));
       pck = rogue_PCK_U8888(b, dst, src);
-      if (vk_format_is_normalized(fmt))
+      if (vk_format_is_normalized(vk_format))
          rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_SCALE);
       rogue_set_instr_repeat(&pck->instr, nr_components);
       return dst;
@@ -179,7 +179,7 @@ static rogue_ref pvr_uscgen_rogue_pack(rogue_builder *b,
    case PVR_PBE_ACCUM_FORMAT_S8:
       dst = rogue_ref_reg(rogue_temp_reg(b->shader, ctx->next_temp_reg++));
       pck = rogue_PCK_S8888(b, dst, src);
-      if (vk_format_is_normalized(fmt))
+      if (vk_format_is_normalized(vk_format))
          rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_SCALE);
       rogue_set_instr_repeat(&pck->instr, nr_components);
       return dst;
@@ -218,7 +218,7 @@ static rogue_ref pvr_uscgen_rogue_pack(rogue_builder *b,
          }
 
          if (pbe_accum_format != PVR_PBE_ACCUM_FORMAT_F16 &&
-             vk_format_is_normalized(fmt))
+             vk_format_is_normalized(vk_format))
             rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_SCALE);
 
          rogue_set_instr_repeat(&pck->instr, size);
@@ -251,10 +251,10 @@ static void pvr_uscgen_load_op_clears(rogue_builder *b,
 
    u_foreach_bit (attachment_idx,
                   ctx->load_op->clears_loads_state.rt_clear_mask) {
-      VkFormat fmt = pvr_uscgen_format_for_accum(
+      VkFormat vk_format = pvr_uscgen_format_for_accum(
          ctx->load_op->clears_loads_state.dest_vk_format[attachment_idx]);
       uint32_t accum_size_dwords =
-         DIV_ROUND_UP(pvr_get_pbe_accum_format_size_in_bytes(fmt),
+         DIV_ROUND_UP(pvr_get_pbe_accum_format_size_in_bytes(vk_format),
                       sizeof(uint32_t));
 
       struct usc_mrt_resource *mrt_resource =
@@ -358,12 +358,12 @@ static void pvr_uscgen_load_op_loads(rogue_builder *b,
 
    u_foreach_bit (attachment_idx,
                   ctx->load_op->clears_loads_state.rt_load_mask) {
-      VkFormat fmt = pvr_uscgen_format_for_accum(
+      VkFormat vk_format = pvr_uscgen_format_for_accum(
          ctx->load_op->clears_loads_state.dest_vk_format[attachment_idx]);
       struct usc_mrt_resource *mrt_resource =
          &mrt_setup->mrt_resources[attachment_idx];
       uint32_t accum_size_dwords =
-         DIV_ROUND_UP(pvr_get_pbe_accum_format_size_in_bytes(fmt),
+         DIV_ROUND_UP(pvr_get_pbe_accum_format_size_in_bytes(vk_format),
                       sizeof(uint32_t));
 
       rogue_backend_instr *smp_instr;
@@ -377,7 +377,7 @@ static void pvr_uscgen_load_op_loads(rogue_builder *b,
                                PVR_SAMPLER_DESCRIPTOR_SIZE,
                                ctx->next_sh_reg + PVR_IMAGE_DESCRIPTOR_SIZE);
 
-      uint32_t nr_components = vk_format_get_nr_components(fmt);
+      uint32_t nr_components = vk_format_get_nr_components(vk_format);
       rogue_ref accum;
       rogue_regarray *smp_dst =
          rogue_temp_regarray(b->shader, nr_components, ctx->next_temp_reg);
@@ -393,11 +393,12 @@ static void pvr_uscgen_load_op_loads(rogue_builder *b,
                               rogue_ref_val(nr_components));
 
       rogue_set_backend_op_mod(smp_instr, ROGUE_BACKEND_OP_MOD_REPLACE);
-      if (vk_format_is_normalized(fmt))
+      if (vk_format_is_normalized(vk_format))
          rogue_set_backend_op_mod(smp_instr, ROGUE_BACKEND_OP_MOD_FCNORM);
 
       /* Pack the sample results into accumulation format */
-      accum = pvr_uscgen_rogue_pack(b, ctx, rogue_ref_regarray(smp_dst), fmt);
+      accum =
+         pvr_uscgen_rogue_pack(b, ctx, rogue_ref_regarray(smp_dst), vk_format);
       if (accum.type != ROGUE_REF_TYPE_REGARRAY || accum.regarray != smp_dst)
          ctx->next_temp_reg -= nr_components;
 
@@ -463,14 +464,18 @@ static void pvr_uscgen_load_op_loads_nir(nir_builder *b,
    }
 
    u_foreach_bit (rt_idx, ctx->load_op->clears_loads_state.rt_load_mask) {
-      VkFormat fmt = pvr_uscgen_format_for_accum(
+      VkFormat vk_format = pvr_uscgen_format_for_accum(
          ctx->load_op->clears_loads_state.dest_vk_format[rt_idx]);
       struct usc_mrt_resource *mrt_resource = &mrt_setup->mrt_resources[rt_idx];
       nir_tex_instr *tex;
 
-      fs_data->outputs[rt_idx].accum_format = pvr_get_pbe_accum_format(fmt);
+      const struct util_format_description *fmt_desc =
+         vk_format_description(vk_format);
+      memcpy(&fs_data->outputs[rt_idx].fmt_desc, fmt_desc, sizeof(*fmt_desc));
+      fs_data->outputs[rt_idx].accum_format =
+         pvr_get_pbe_accum_format(vk_format);
       fs_data->outputs[rt_idx].mrt_resource = mrt_resource;
-      fs_data->outputs[rt_idx].format = vk_format_to_pipe_format(fmt);
+      fs_data->outputs[rt_idx].format = vk_format_to_pipe_format(vk_format);
 
       tex = nir_tex_instr_create(b->shader, !!msaa + 1);
       tex->src[0].src_type = nir_tex_src_coord;
@@ -481,9 +486,9 @@ static void pvr_uscgen_load_op_loads_nir(nir_builder *b,
          tex->src[1].src = nir_src_for_ssa(sample_id);
       }
 
-      if (vk_format_is_int(fmt))
+      if (vk_format_is_int(vk_format))
          tex->dest_type = nir_type_int32;
-      else if (vk_format_is_uint(fmt))
+      else if (vk_format_is_uint(vk_format))
          tex->dest_type = nir_type_uint32;
       else
          tex->dest_type = nir_type_float32;
@@ -524,10 +529,10 @@ pvr_uscgen_load_op_clears_nir(nir_builder *b,
       ctx->load_op->clears_loads_state.mrt_setup;
 
    u_foreach_bit (rt_idx, ctx->load_op->clears_loads_state.rt_clear_mask) {
-      VkFormat fmt = pvr_uscgen_format_for_accum(
+      VkFormat vk_format = pvr_uscgen_format_for_accum(
          ctx->load_op->clears_loads_state.dest_vk_format[rt_idx]);
       uint32_t accum_size_dwords =
-         DIV_ROUND_UP(pvr_get_pbe_accum_format_size_in_bytes(fmt),
+         DIV_ROUND_UP(pvr_get_pbe_accum_format_size_in_bytes(vk_format),
                       sizeof(uint32_t));
 
       struct usc_mrt_resource *mrt_resource = &mrt_setup->mrt_resources[rt_idx];
@@ -537,6 +542,11 @@ pvr_uscgen_load_op_clears_nir(nir_builder *b,
              DIV_ROUND_UP(mrt_resource->intermediate_size, sizeof(uint32_t)));
 
       /* Use uint32 to disable packing as color values are pre-packed. */
+      /* TODO: remove this extra level of indirection when removing pbe_accum
+       * formats! */
+      const struct util_format_description *fmt_desc =
+         vk_format_description(vk_format_from_num_dwords(accum_size_dwords));
+      memcpy(&fs_data->outputs[rt_idx].fmt_desc, fmt_desc, sizeof(*fmt_desc));
       fs_data->outputs[rt_idx].accum_format = PVR_PBE_ACCUM_FORMAT_UINT32;
       fs_data->outputs[rt_idx].mrt_resource = mrt_resource;
       fs_data->outputs[rt_idx].format =
@@ -564,6 +574,11 @@ pvr_uscgen_load_op_clears_nir(nir_builder *b,
       struct usc_mrt_resource *mrt_resource =
          &mrt_setup->mrt_resources[depth_idx];
 
+      const struct util_format_description *fmt_desc =
+         util_format_description(PIPE_FORMAT_R32_FLOAT);
+      memcpy(&fs_data->outputs[depth_idx].fmt_desc,
+             fmt_desc,
+             sizeof(*fmt_desc));
       fs_data->outputs[depth_idx].accum_format = PVR_PBE_ACCUM_FORMAT_F32;
       fs_data->outputs[depth_idx].mrt_resource = mrt_resource;
       fs_data->outputs[depth_idx].format = PIPE_FORMAT_R32_FLOAT;

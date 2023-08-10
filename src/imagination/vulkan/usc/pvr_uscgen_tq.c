@@ -752,6 +752,9 @@ void pvr_uscgen_tq_frag(const struct pvr_device *device,
    fs_data->outputs =
       rzalloc_array_size(rogue_ctx, sizeof(*fs_data->outputs), loads);
 
+   const struct util_format_description *fmt_desc =
+      vk_format_description(vk_format_from_num_dwords(pixel_size));
+   memcpy(&fs_data->outputs[0].fmt_desc, fmt_desc, sizeof(*fmt_desc));
    fs_data->outputs[0].format =
       vk_format_to_pipe_format(vk_format_from_num_dwords(pixel_size));
    fs_data->outputs[0].accum_format = PVR_PBE_ACCUM_FORMAT_UINT32;

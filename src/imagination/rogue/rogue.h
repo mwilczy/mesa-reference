@@ -4003,6 +4003,7 @@ typedef struct rogue_build_data {
 
       unsigned num_outputs;
       struct {
+         struct util_format_description fmt_desc;
          enum pipe_format format;
          enum pvr_pbe_accum_format accum_format;
          const struct usc_mrt_resource *mrt_resource;

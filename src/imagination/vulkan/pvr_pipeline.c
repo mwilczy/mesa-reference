@@ -2539,6 +2539,9 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
       const struct usc_mrt_resource *mrt_resource =
          &hw_subpass->setup.mrt_resources[u];
 
+      const struct util_format_description *fmt_desc =
+         vk_format_description(vk_format);
+      memcpy(&fs_data->outputs[u].fmt_desc, fmt_desc, sizeof(*fmt_desc));
       fs_data->outputs[u].accum_format = pvr_get_pbe_accum_format(vk_format);
       fs_data->outputs[u].format = vk_format_to_pipe_format(vk_format);
       fs_data->outputs[u].mrt_resource = mrt_resource;
@@ -2566,6 +2569,11 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
              PVR_RENDERPASS_HWSETUP_INPUT_ACCESS_ONCHIP_ZREPLICATE)
             vk_format = VK_FORMAT_R32_SFLOAT;
 
+         const struct util_format_description *fmt_desc =
+            vk_format_description(vk_format);
+         memcpy(&fs_data->outputs[mrt_idx].fmt_desc,
+                fmt_desc,
+                sizeof(*fmt_desc));
          fs_data->outputs[mrt_idx].accum_format =
             pvr_get_pbe_accum_format(vk_format);
          fs_data->outputs[mrt_idx].format = vk_format_to_pipe_format(vk_format);
