@@ -37,7 +37,10 @@
  * This macro makes the conversion more obvious.
  */
 /* clang-format off */
-#define PVR_DW_TO_BYTES(_value) ((_value) * 4)
+#define PVR_DW_TO_BYTES(_value) ((_value) * sizeof(uint32_t))
+#define PVR_BYTES_TO_DW(_value) (DIV_ROUND_UP(_value, sizeof(uint32_t)))
+#define PVR_DW_TO_BITS(_value) ((_value) * 8 * sizeof(uint32_t))
+#define PVR_BITS_TO_DW(_value) (DIV_ROUND_UP(_value, 8 * sizeof(uint32_t)))
 /* clang-format on */
 
 /*****************************************************************************

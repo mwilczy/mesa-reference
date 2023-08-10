@@ -1592,33 +1592,19 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
 static void trans_nir_intrinsic_load_input_vs(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
-   struct pvr_pipeline_layout *pipeline_layout =
-      b->shader->ctx->pipeline_layout;
-
    unsigned load_size = 0;
-   rogue_ref dst = intr_dst(b->shader, intr, &load_size, 32);
+   rogue_ref dst = intr_dst(b->shader, intr, &load_size, ROGUE_REG_SIZE_BITS);
    assert(load_size == 1); /* TODO: support any size loads. */
 
-   struct nir_io_semantics io_semantics = nir_intrinsic_io_semantics(intr);
-   unsigned input = io_semantics.location - VERT_ATTRIB_GENERIC0;
-   unsigned component = nir_intrinsic_component(intr);
+   /* Offsets/components are taken care of in rogue_nir_pvo. */
+   assert(nir_src_as_uint(intr->src[0]) == 0);
+   assert(nir_intrinsic_component(intr) == 0);
+   /* We set the following. */
+   assert(nir_intrinsic_dest_type(intr) == nir_type_invalid);
 
-   assert(pipeline_layout);
-   rogue_vertex_inputs *vs_inputs = &b->shader->ctx->stage_data.vs.inputs;
-   assert(input < vs_inputs->num_input_vars);
-
-   /* Replace components not provided by the driver with 1.0f. */
-   if (component >= vs_inputs->components[input]) {
-      rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_imm_f(1.0f));
-      rogue_add_instr_comment(&mov->instr, "load_input_vs (1.0f)");
-      return;
-   }
-
-   unsigned vtxin_index = vs_inputs->base[input] + component;
-   assert(vtxin_index != ~0U);
-
-   rogue_reg *src = rogue_vtxin_reg(b->shader, vtxin_index);
-   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(src));
+   unsigned vtxin_index = nir_intrinsic_base(intr);
+   rogue_ref src = rogue_ref_reg(rogue_vtxin_reg(b->shader, vtxin_index));
+   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
    rogue_add_instr_comment(&mov->instr, "load_input_vs");
 }
 

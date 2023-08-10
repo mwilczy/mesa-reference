@@ -1765,9 +1765,7 @@ static void pvr_graphics_pipeline_alloc_vertex_inputs(
    const VkVertexInputAttributeDescription
       *sorted_attributes[PVR_MAX_VERTEX_INPUT_BINDINGS] = { 0 };
 
-   rogue_vertex_inputs build_data = {
-      .num_input_vars = vs_data->vertexAttributeDescriptionCount,
-   };
+   rogue_vertex_inputs build_data = { 0 };
    uint32_t next_reg_offset = 0;
 
    struct pvr_pds_vertex_dma *const dma_descriptions =
@@ -1810,34 +1808,20 @@ static void pvr_graphics_pipeline_alloc_vertex_inputs(
       const struct util_format_description *fmt_description =
          vk_format_description(attribute->format);
       struct pvr_pds_vertex_dma *dma_desc = &dma_descriptions[dma_count];
+      const unsigned l = attribute->location;
       unsigned vtxin_reg_offset;
 
       /* Reg allocation. */
 
       vtxin_reg_offset = next_reg_offset;
-      build_data.base[i] = vtxin_reg_offset;
 
-      if (fmt_description->colorspace != UTIL_FORMAT_COLORSPACE_RGB ||
-          fmt_description->layout != UTIL_FORMAT_LAYOUT_PLAIN ||
-          fmt_description->block.bits % 32 != 0 || !fmt_description->is_array) {
-         /* For now we only support formats with 32 bit components since we
-          * don't need to pack/unpack them.
-          */
-         /* TODO: Support any other format with VERTEX_BUFFER_BIT set that
-          * doesn't have 32 bit components if we're advertising any.
-          */
-         assert(false);
-      }
+      assert(fmt_description->colorspace == UTIL_FORMAT_COLORSPACE_RGB);
 
-      /* TODO: Check if this is fine with the compiler. Does it want the amount
-       * of components or does it want a size in dwords to figure out how many
-       * vtxin regs are covered. For formats with 32 bit components the
-       * distinction doesn't change anything.
-       */
-      build_data.components[i] =
-         util_format_get_nr_components(fmt_description->format);
-
-      next_reg_offset += build_data.components[i];
+      build_data.defined[l] = true;
+      build_data.base_vtxin_reg[l] = vtxin_reg_offset;
+      memcpy(&build_data.format_descs[l],
+             fmt_description,
+             sizeof(*fmt_description));
 
       /* DMA setup. */
 
@@ -1884,7 +1868,8 @@ static void pvr_graphics_pipeline_alloc_vertex_inputs(
 
       /* Size to DMA per vertex attribute. Used to setup src3 in the DDMAD. */
       assert(fmt_description->block.bits != 0); /* Likely an unsupported fmt. */
-      dma_desc->size_in_dwords = fmt_description->block.bits / 32;
+      dma_desc->size_in_dwords = PVR_BITS_TO_DW(fmt_description->block.bits);
+      next_reg_offset += dma_desc->size_in_dwords;
 
       /* Vtxin reg offset to start DMAing into. */
       dma_desc->destination = vtxin_reg_offset;

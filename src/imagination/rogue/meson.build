@@ -35,6 +35,7 @@ libpowervr_rogue_files = files(
   'nir/rogue_nir_lower_vk.c',
   'nir/rogue_nir_opt_preamble.c',
   'nir/rogue_nir_pfo.c',
+  'nir/rogue_nir_pvo.c',
 
   'rogue.c',
   'rogue_build_data.c',

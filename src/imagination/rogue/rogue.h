@@ -3946,9 +3946,9 @@ typedef struct rogue_vertex_special_vars {
  * \brief Vertex input register allocations.
  */
 typedef struct rogue_vertex_inputs {
-   unsigned num_input_vars;
-   unsigned base[ROGUE_MAX_IO_ATTRIB_VARS];
-   unsigned components[ROGUE_MAX_IO_ATTRIB_VARS];
+   bool defined[MAX_VERTEX_GENERIC_ATTRIBS];
+   unsigned base_vtxin_reg[MAX_VERTEX_GENERIC_ATTRIBS];
+   struct util_format_description format_descs[MAX_VERTEX_GENERIC_ATTRIBS];
 } rogue_vertex_inputs;
 
 /**
@@ -4153,6 +4153,8 @@ bool rogue_nir_compute_instance_check(nir_shader *shader);
 bool rogue_nir_expand_swizzles_to_vec(nir_shader *shader);
 
 bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx);
+
+bool rogue_nir_pvo(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_lower_alu_conversion_to_intrinsic(nir_shader *shader);
 

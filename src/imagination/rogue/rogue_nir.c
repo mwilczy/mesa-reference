@@ -374,6 +374,12 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    };
    NIR_PASS_V(nir, nir_opt_access, &opt_access_options);
 
+   /* Apply PVO code to the vertex shader input. */
+   if (nir->info.stage == MESA_SHADER_VERTEX) {
+      NIR_PASS_V(nir, rogue_nir_pvo, ctx);
+      NIR_PASS_V(nir, nir_opt_dce);
+   }
+
    /* Apply PFO code to the fragment shader output. */
    if (nir->info.stage == MESA_SHADER_FRAGMENT) {
       NIR_PASS_V(nir, rogue_nir_lower_blend, ctx);
