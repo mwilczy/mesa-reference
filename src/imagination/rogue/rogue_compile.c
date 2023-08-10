@@ -1391,7 +1391,8 @@ static void trans_nir_intrinsic_store_reg(rogue_builder *b,
    rogue_ref dst =
       rogue_ref_reg(rogue_temp_reg(b->shader, reg_decl->def.index));
 
-   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
+   rogue_ref src =
+      intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
    rogue_MOV(b, dst, src);
 }
@@ -1403,9 +1404,9 @@ static void trans_nir_intrinsic_load_reg(rogue_builder *b,
    assert(!nir_intrinsic_legacy_fabs(intr));
    assert(!nir_intrinsic_legacy_fneg(intr));
 
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
-
    nir_intrinsic_instr *reg_decl = nir_src_as_intrinsic(intr->src[0]);
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
    rogue_ref src =
       rogue_ref_reg(rogue_temp_reg(b->shader, reg_decl->def.index));
 
@@ -1415,7 +1416,8 @@ static void trans_nir_intrinsic_load_reg(rogue_builder *b,
 static void trans_nir_intrinsic_load_preamble(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
    unsigned sh_idx = nir_intrinsic_base(intr);
 
@@ -1437,9 +1439,9 @@ static void trans_nir_intrinsic_load_preamble(rogue_builder *b,
       sh_idx += offset;
    }
 
-   rogue_reg *sh_reg = rogue_shared_reg(b->shader, sh_idx);
+   rogue_ref sh_reg = rogue_ref_reg(rogue_shared_reg(b->shader, sh_idx));
 
-   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(sh_reg));
+   rogue_alu_instr *mov = rogue_MOV(b, dst, sh_reg);
    rogue_add_instr_comment(&mov->instr, "load_preamble");
 }
 
@@ -1466,11 +1468,11 @@ static void trans_nir_intrinsic_store_preamble(rogue_builder *b,
       sh_idx += offset;
    }
 
-   rogue_reg *sh_reg = rogue_shared_reg(b->shader, sh_idx);
+   rogue_ref sh_reg = rogue_ref_reg(rogue_shared_reg(b->shader, sh_idx));
+   rogue_ref src =
+      intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
-   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
-
-   rogue_alu_instr *mov = rogue_MOV(b, rogue_ref_reg(sh_reg), src);
+   rogue_alu_instr *mov = rogue_MOV(b, sh_reg, src);
    rogue_add_instr_comment(&mov->instr, "store_preamble");
 }
 
@@ -1480,7 +1482,7 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
    struct rogue_fs_build_data *fs_data = &b->shader->ctx->stage_data.fs;
 
    unsigned load_size = 0;
-   rogue_ref dst = intr_dst(b->shader, intr, &load_size, 32);
+   rogue_ref dst = intr_dst(b->shader, intr, &load_size, ROGUE_REG_SIZE_BITS);
    assert(load_size <= ROGUE_MAX_IMM_BURSTLEN);
 
    struct nir_io_semantics io_semantics = nir_intrinsic_io_semantics(intr);
@@ -1647,7 +1649,8 @@ static void trans_nir_intrinsic_load_output_fs(rogue_builder *b,
    /* Pixel output registers can't be used with repeat >
     * 1, so load_size will always be limited to 1.
     */
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
    rogue_ref src = rogue_ref_reg(rogue_pixout_reg(b->shader, reg_idx));
 
    rogue_alu_instr *mov = rogue_MOV(b, dst, src);
@@ -1672,14 +1675,15 @@ static void trans_nir_intrinsic_store_output_fs(rogue_builder *b,
                                                 nir_intrinsic_instr *intr)
 {
    unsigned reg_idx = nir_intrinsic_base(intr) + nir_src_as_uint(intr->src[1]);
-   rogue_reg *dst = rogue_pixout_reg(b->shader, reg_idx);
+   rogue_ref dst = rogue_ref_reg(rogue_pixout_reg(b->shader, reg_idx));
 
    /* Pixel output registers can't be used with repeat > 1, so store_size
     * will always be limited to 1.
     */
-   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
+   rogue_ref src =
+      intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
-   rogue_alu_instr *mov = rogue_MOV(b, rogue_ref_reg(dst), src);
+   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
    rogue_add_instr_commentf(&mov->instr, "store_output_fs");
 }
 
@@ -1694,12 +1698,13 @@ static void trans_nir_intrinsic_store_output_vs(rogue_builder *b,
                                                  io_semantics.location,
                                                  component);
 
-   rogue_reg *dst = rogue_vtxout_reg(b->shader, vtxout_index);
+   rogue_ref dst = rogue_ref_reg(rogue_vtxout_reg(b->shader, vtxout_index));
 
    /* TODO: Support up to repeat=4 stores. */
-   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
+   rogue_ref src =
+      intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
-   rogue_alu_instr *mov = rogue_MOV(b, rogue_ref_reg(dst), src);
+   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
    rogue_add_instr_comment(&mov->instr, "store_output_vs");
 }
 
@@ -1888,7 +1893,8 @@ static void trans_nir_intrinsic_load_store_shared_img(rogue_builder *b,
 static void trans_nir_load_helper_invocation(rogue_builder *b,
                                              nir_intrinsic_instr *intr)
 {
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
    rogue_ref valid_msk =
       rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
@@ -1911,10 +1917,11 @@ static void trans_nir_load_special_reg(rogue_builder *b,
                                        enum rogue_special_reg reg,
                                        const char *comment)
 {
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
-   rogue_reg *src = rogue_special_reg(b->shader, reg);
-   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(src));
+   rogue_ref src = rogue_ref_reg(rogue_special_reg(b->shader, reg));
+   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
 
    rogue_add_instr_comment(&mov->instr, comment);
 }
@@ -1947,11 +1954,13 @@ trans_nir_intrinsic_load_local_invocation_index(rogue_builder *b,
 {
    const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
 
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
    assert(cs_data->local_id_regs[0] != ROGUE_REG_UNUSED);
-   rogue_reg *src = rogue_vtxin_reg(b->shader, cs_data->local_id_regs[0]);
-   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(src));
+   rogue_ref src =
+      rogue_ref_reg(rogue_vtxin_reg(b->shader, cs_data->local_id_regs[0]));
+   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
 
    rogue_add_instr_comment(&mov->instr, "load_local_invocation_index");
 }
@@ -1962,13 +1971,14 @@ static void trans_nir_intrinsic_load_workgroup_id_img(rogue_builder *b,
 {
    const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
 
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
    assert(cs_data->workgroup_regs[component] != ROGUE_REG_UNUSED);
-   rogue_reg *src =
-      rogue_coeff_reg(b->shader, cs_data->workgroup_regs[component]);
+   rogue_ref src = rogue_ref_reg(
+      rogue_coeff_reg(b->shader, cs_data->workgroup_regs[component]));
 
-   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(src));
+   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
    rogue_add_instr_commentf(&mov->instr,
                             "load_workgroup_id.%c",
                             'x' + component);
@@ -2062,10 +2072,10 @@ static void trans_nir_intrinsic_load_vertex_sysval(rogue_builder *b,
    rogue_vertex_special_vars *special_vars =
       &b->shader->ctx->stage_data.vs.special_vars;
    unsigned vtxin_idx = rogue_vtxin_from_sysval(sysval, special_vars);
-
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
-
    assert(vtxin_idx != ROGUE_REG_UNUSED);
+
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
    rogue_ref src = rogue_ref_reg(rogue_vtxin_reg(b->shader, vtxin_idx));
 
    rogue_MOV(b, dst, src);

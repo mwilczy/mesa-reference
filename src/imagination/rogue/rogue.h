@@ -65,8 +65,9 @@
 
 #define ROGUE_REG_UNUSED ~0
 
-/* All registers are 32-bit in size. */
+/* All registers are 32-bits. */
 #define ROGUE_REG_SIZE_BYTES 4
+#define ROGUE_REG_SIZE_BITS 32
 
 /** Rogue register classes. */
 enum rogue_reg_class {
