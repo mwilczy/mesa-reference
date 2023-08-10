@@ -33,7 +33,70 @@ algebraic_late = [
 
    (('extract_u8', 'a@32', 'b@32'), ('ubitfield_extract', a, ('imul', b, 8), 8)),
    (('extract_i8', 'a@32', 'b@32'), ('ibitfield_extract', a, ('imul', b, 8), 8)),
+
 ]
+
+# Split unpack ops.
+# TODO: Only split if not all components are being used.
+def unpack_2x16(fmt):
+   return (
+      ('unpack_' + fmt + '_2x16', a),
+      ('vec2',
+         ('unpack_' + fmt + '_2x16_split_x', a),
+         ('unpack_' + fmt + '_2x16_split_y', a)
+      )
+   )
+
+def unpack_4x8(fmt):
+   return (
+      ('unpack_' + fmt + '_4x8', a),
+      ('vec4',
+         ('unpack_' + fmt + '_4x8_split_x', a),
+         ('unpack_' + fmt + '_4x8_split_y', a),
+         ('unpack_' + fmt + '_4x8_split_z', a),
+         ('unpack_' + fmt + '_4x8_split_w', a)
+      )
+   )
+
+def unpack_r10g10b10a2(fmt):
+   return (
+      ('unpack_' + fmt + '_r10g10b10a2', a),
+      ('vec4',
+         ('unpack_' + fmt + '_r10g10b10a2_split_x', a),
+         ('unpack_' + fmt + '_r10g10b10a2_split_y', a),
+         ('unpack_' + fmt + '_r10g10b10a2_split_z', a),
+         ('unpack_' + fmt + '_r10g10b10a2_split_w', a)
+      )
+   )
+
+def unpack_r11g11b10f():
+   return (
+      ('unpack_r11g11b10f', a),
+      ('vec3',
+         ('unpack_r11g11b10f_split_x', a),
+         ('unpack_r11g11b10f_split_y', a),
+         ('unpack_r11g11b10f_split_z', a)
+      )
+   )
+
+split_unpacks = [
+   unpack_2x16('snorm'),
+   unpack_4x8('snorm'),
+   unpack_r10g10b10a2('snorm'),
+   unpack_2x16('unorm'),
+   unpack_4x8('unorm'),
+   unpack_r10g10b10a2('unorm'),
+   unpack_2x16('sscaled'),
+   unpack_4x8('sscaled'),
+   unpack_r10g10b10a2('sscaled'),
+   unpack_2x16('uscaled'),
+   unpack_4x8('uscaled'),
+   unpack_r10g10b10a2('uscaled'),
+   unpack_2x16('half'),
+   unpack_r11g11b10f(),
+]
+
+algebraic_late += split_unpacks
 
 def main():
     parser = argparse.ArgumentParser()
