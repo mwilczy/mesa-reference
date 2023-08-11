@@ -342,10 +342,18 @@ for mode, suffix in [("either fine or coarse", ""), ("fine", "_fine"), ("coarse"
 
 # Floating point pack and unpack operations.
 
+# base, insert, component
+def pckop_field(name, output_type, input_type, const_expr, description = ""):
+   opcode(name, 1, output_type, [1, 1, 1], [output_type, input_type, tuint32], False, "", const_expr, description)
+
 def pack_2x16(fmt, in_type):
    unop_horiz("pack_" + fmt + "_2x16", 1, tuint32, 2, in_type, """
 dst.x = (uint32_t) pack_fmt_1x16(src0.x);
 dst.x |= ((uint32_t) pack_fmt_1x16(src0.y)) << 16;
+""".replace("fmt", fmt))
+   pckop_field("pack_" + fmt + "_2x16_field", tuint32, in_type, """
+dst.x  = ((uint32_t) pack_fmt_1x16(src1.x)) << (src2.x * 16);
+dst.x |= src0.x & ~(0x0000ffff << (src2.x * 16)) ;
 """.replace("fmt", fmt))
 
 def pack_4x8(fmt):
@@ -355,6 +363,10 @@ dst.x |= ((uint32_t) pack_fmt_1x8(src0.y)) << 8;
 dst.x |= ((uint32_t) pack_fmt_1x8(src0.z)) << 16;
 dst.x |= ((uint32_t) pack_fmt_1x8(src0.w)) << 24;
 """.replace("fmt", fmt))
+   pckop_field("pack_" + fmt + "_4x8_field", tuint32, tfloat32, """
+dst.x  = ((uint32_t) pack_fmt_1x8(src1.x)) << (src2.x * 8);
+dst.x |= src0.x & ~(0x000000ff << (src2.x * 8)) ;
+""".replace("fmt", fmt))
 
 def pack_r10g10b10a2(fmt):
    unop_horiz("pack_" + fmt + "_r10g10b10a2", 1, tuint32, 4, tfloat32, """
@@ -362,6 +374,13 @@ dst.x = (uint32_t) pack_fmt_1x10(src0.x);
 dst.x |= ((uint32_t) pack_fmt_1x10(src0.y)) << 10;
 dst.x |= ((uint32_t) pack_fmt_1x10(src0.z)) << 20;
 dst.x |= ((uint32_t) pack_fmt_1x2(src0.w)) << 30;
+""".replace("fmt", fmt))
+   pckop_field("pack_" + fmt + "_r10g10b10a2_field", tuint32, tfloat32, """
+uint32_t packed = (src2.x == 3) ? (uint32_t)pack_fmt_1x2(src1.x) : (uint32_t)pack_fmt_1x10(src1.x);
+uint32_t mask = (src2.x == 3) ? 0x3 : 0x3ff;
+
+dst.x  = packed << (src2.x * 10);
+dst.x |= src0.x & ~(mask << (src2.x * 10)) ;
 """.replace("fmt", fmt))
 
 def unpack_2x16(fmt):
@@ -449,6 +468,13 @@ unpack_2x16("half")
 unop_horiz("pack_r11g11b10f", 1, tuint32, 3, tfloat32, """
 float rgb[3] = { src0.x, src0.y, src0.z };
 dst.x = float3_to_r11g11b10f(rgb);
+""")
+pckop_field("pack_r11g11b10f_field", tuint32, tfloat32, """
+uint32_t packed = (src2.x == 2) ? (uint32_t)f32_to_uf10(src1.x) : (uint32_t)f32_to_uf11(src1.x);
+uint32_t mask = (src2.x == 2) ? 0x3ff : 0x7ff;
+
+dst.x  = packed << (src2.x * 11);
+dst.x |= src0.x & ~(mask << (src2.x * 11)) ;
 """)
 
 unop_horiz("unpack_r11g11b10f", 3, tfloat32, 1, tuint32, """
