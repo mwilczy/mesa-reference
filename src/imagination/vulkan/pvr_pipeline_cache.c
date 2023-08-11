@@ -56,7 +56,9 @@ static void pvr_pipeline_cache_load(struct pvr_pipeline_cache *cache,
       return;
    if (header.device_id != pdevice->dev_info.ident.device_id)
       return;
-   if (memcmp(header.uuid, pdevice->pipeline_cache_uuid, VK_UUID_SIZE) != 0)
+   if (memcmp(header.uuid,
+              pdevice->vk.properties.pipelineCacheUUID,
+              VK_UUID_SIZE) != 0)
       return;
 
    /* TODO: There isn't currently any cached data so there's nothing to load
@@ -128,7 +130,7 @@ VkResult pvr_GetPipelineCacheData(VkDevice _device,
       .vendor_id = VK_VENDOR_ID_IMAGINATION,
       .device_id = pdevice->dev_info.ident.device_id,
    };
-   memcpy(header.uuid, pdevice->pipeline_cache_uuid, VK_UUID_SIZE);
+   memcpy(header.uuid, pdevice->vk.properties.pipelineCacheUUID, VK_UUID_SIZE);
    blob_write_bytes(&blob, &header, sizeof(header));
 
    /* TODO: Once there's some data to cache then this should be written to
