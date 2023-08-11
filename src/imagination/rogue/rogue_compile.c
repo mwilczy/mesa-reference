@@ -3833,23 +3833,32 @@ static void trans_nir_pack_format(rogue_builder *b,
                                   nir_alu_instr *alu,
                                   enum rogue_storage storage,
                                   nir_alu_type type,
+                                  bool partial,
                                   bool norm)
 {
-   unsigned num_comps = rogue_storage_comps(storage);
+   unsigned num_comps = partial ? 1 : rogue_storage_comps(storage);
 
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-   rogue_ref src = alu_src(b->shader, alu, 0, &num_comps, 32);
+   rogue_ref pck_dst = partial ? rogue_ref_io(ROGUE_IO_FT2) : dst;
+
+   rogue_ref src = alu_src(b->shader, alu, !!partial, &num_comps, 32);
+
+   if (partial) {
+      rogue_ref base = alu_src(b->shader, alu, 0, &num_comps, 32);
+      rogue_alu_instr *mbyp0 = rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), base);
+      rogue_set_instr_group_next(&mbyp0->instr, true);
+   }
 
    rogue_alu_instr *pck;
    switch (storage) {
    case ROGUE_STORAGE_4x8:
       switch (type) {
       case nir_type_int:
-         pck = rogue_PCK_S8888(b, dst, src);
+         pck = rogue_PCK_S8888(b, pck_dst, src);
          break;
 
       case nir_type_uint:
-         pck = rogue_PCK_U8888(b, dst, src);
+         pck = rogue_PCK_U8888(b, pck_dst, src);
          break;
 
       default:
@@ -3860,16 +3869,16 @@ static void trans_nir_pack_format(rogue_builder *b,
    case ROGUE_STORAGE_2x16:
       switch (type) {
       case nir_type_int:
-         pck = rogue_PCK_S1616(b, dst, src);
+         pck = rogue_PCK_S1616(b, pck_dst, src);
          break;
 
       case nir_type_uint:
-         pck = rogue_PCK_U1616(b, dst, src);
+         pck = rogue_PCK_U1616(b, pck_dst, src);
          break;
 
       case nir_type_float:
          assert(!norm);
-         pck = rogue_PCK_F16F16(b, dst, src);
+         pck = rogue_PCK_F16F16(b, pck_dst, src);
          break;
 
       default:
@@ -3880,16 +3889,16 @@ static void trans_nir_pack_format(rogue_builder *b,
    case ROGUE_STORAGE_3x10_1x2:
       switch (type) {
       case nir_type_int:
-         pck = rogue_PCK_S1010102(b, dst, src);
+         pck = rogue_PCK_S1010102(b, pck_dst, src);
          break;
 
       case nir_type_uint:
-         pck = rogue_PCK_U1010102(b, dst, src);
+         pck = rogue_PCK_U1010102(b, pck_dst, src);
          break;
 
       case nir_type_float:
          assert(!norm);
-         pck = rogue_PCK_2F10F10F10(b, dst, src);
+         pck = rogue_PCK_2F10F10F10(b, pck_dst, src);
          break;
 
       default:
@@ -3900,16 +3909,16 @@ static void trans_nir_pack_format(rogue_builder *b,
    case ROGUE_STORAGE_2x11_1x10:
       switch (type) {
       case nir_type_int:
-         pck = rogue_PCK_S111110(b, dst, src);
+         pck = rogue_PCK_S111110(b, pck_dst, src);
          break;
 
       case nir_type_uint:
-         pck = rogue_PCK_U111110(b, dst, src);
+         pck = rogue_PCK_U111110(b, pck_dst, src);
          break;
 
       case nir_type_float:
          assert(!norm);
-         pck = rogue_PCK_F111110(b, dst, src);
+         pck = rogue_PCK_F111110(b, pck_dst, src);
          break;
 
       default:
@@ -3918,15 +3927,15 @@ static void trans_nir_pack_format(rogue_builder *b,
       break;
 
    case ROGUE_STORAGE_1x24_1x8:
-      pck = rogue_PCK_D24S8(b, dst, src);
+      pck = rogue_PCK_D24S8(b, pck_dst, src);
       break;
 
    case ROGUE_STORAGE_1x8_1x24:
-      pck = rogue_PCK_S8D24(b, dst, src);
+      pck = rogue_PCK_S8D24(b, pck_dst, src);
       break;
 
    case ROGUE_STORAGE_5_6_5:
-      pck = rogue_PCK_U565U565(b, dst, src);
+      pck = rogue_PCK_U565U565(b, pck_dst, src);
       break;
 
    default:
@@ -3936,7 +3945,23 @@ static void trans_nir_pack_format(rogue_builder *b,
    if (norm)
       rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_SCALE);
 
-   rogue_set_instr_repeat(&pck->instr, num_comps);
+   if (partial) {
+      rogue_set_instr_group_next(&pck->instr, true);
+
+      rogue_alu_instr *movc = rogue_MOVC(b,
+                                         dst,
+                                         rogue_none(),
+                                         rogue_none(),
+                                         rogue_ref_io(ROGUE_IO_FT2),
+                                         rogue_ref_io(ROGUE_IO_FT0),
+                                         rogue_none(),
+                                         rogue_none());
+
+      unsigned elem = nir_src_as_uint(alu->src[2].src);
+      rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E0 + elem);
+   } else {
+      rogue_set_instr_repeat(&pck->instr, num_comps);
+   }
 }
 
 static void trans_nir_unpack_format(rogue_builder *b,
@@ -4061,95 +4086,37 @@ static void trans_nir_unpack_format(rogue_builder *b,
 static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 {
    switch (alu->op) {
-   /* Pack ops. */
-   case nir_op_pack_half_2x16:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_2x16,
-                                   nir_type_float,
-                                   false);
+      /* Pack ops. */
+#define SPLIT_PACK(op, storage, type, norm)                             \
+   case nir_op_pack_##op:                                               \
+      return trans_nir_pack_format(b, alu, storage, type, false, norm); \
+   case nir_op_pack_##op##_field:                                       \
+      return trans_nir_pack_format(b, alu, storage, type, true, norm);
 
-   case nir_op_pack_r11g11b10f:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_2x11_1x10,
-                                   nir_type_float,
-                                   false);
+      SPLIT_PACK(half_2x16, ROGUE_STORAGE_2x16, nir_type_float, false)
 
-   case nir_op_pack_unorm_2x16:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_2x16,
-                                   nir_type_uint,
-                                   true);
-   case nir_op_pack_snorm_2x16:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_2x16,
-                                   nir_type_int,
-                                   true);
-   case nir_op_pack_uscaled_2x16:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_2x16,
-                                   nir_type_uint,
-                                   false);
-   case nir_op_pack_sscaled_2x16:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_2x16,
-                                   nir_type_int,
-                                   false);
+      SPLIT_PACK(r11g11b10f, ROGUE_STORAGE_2x11_1x10, nir_type_float, false)
 
-   case nir_op_pack_unorm_4x8:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_4x8,
-                                   nir_type_uint,
-                                   true);
-   case nir_op_pack_snorm_4x8:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_4x8,
-                                   nir_type_int,
-                                   true);
-   case nir_op_pack_uscaled_4x8:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_4x8,
-                                   nir_type_uint,
-                                   false);
-   case nir_op_pack_sscaled_4x8:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_4x8,
-                                   nir_type_int,
-                                   false);
+      SPLIT_PACK(unorm_2x16, ROGUE_STORAGE_2x16, nir_type_uint, true)
+      SPLIT_PACK(snorm_2x16, ROGUE_STORAGE_2x16, nir_type_int, true)
+      SPLIT_PACK(uscaled_2x16, ROGUE_STORAGE_2x16, nir_type_uint, false)
+      SPLIT_PACK(sscaled_2x16, ROGUE_STORAGE_2x16, nir_type_int, false)
 
-   case nir_op_pack_unorm_r10g10b10a2:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_3x10_1x2,
-                                   nir_type_uint,
-                                   true);
-   case nir_op_pack_snorm_r10g10b10a2:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_3x10_1x2,
-                                   nir_type_int,
-                                   true);
-   case nir_op_pack_uscaled_r10g10b10a2:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_3x10_1x2,
-                                   nir_type_uint,
-                                   false);
-   case nir_op_pack_sscaled_r10g10b10a2:
-      return trans_nir_pack_format(b,
-                                   alu,
-                                   ROGUE_STORAGE_3x10_1x2,
-                                   nir_type_int,
-                                   false);
+      SPLIT_PACK(unorm_4x8, ROGUE_STORAGE_4x8, nir_type_uint, true)
+      SPLIT_PACK(snorm_4x8, ROGUE_STORAGE_4x8, nir_type_int, true)
+      SPLIT_PACK(uscaled_4x8, ROGUE_STORAGE_4x8, nir_type_uint, false)
+      SPLIT_PACK(sscaled_4x8, ROGUE_STORAGE_4x8, nir_type_int, false)
+
+      SPLIT_PACK(unorm_r10g10b10a2, ROGUE_STORAGE_3x10_1x2, nir_type_uint, true)
+      SPLIT_PACK(snorm_r10g10b10a2, ROGUE_STORAGE_3x10_1x2, nir_type_int, true)
+      SPLIT_PACK(uscaled_r10g10b10a2,
+                 ROGUE_STORAGE_3x10_1x2,
+                 nir_type_uint,
+                 false)
+      SPLIT_PACK(sscaled_r10g10b10a2,
+                 ROGUE_STORAGE_3x10_1x2,
+                 nir_type_int,
+                 false)
 
 #define SPLIT_UNPACK2(op, storage, type, norm)                         \
    case nir_op_unpack_##op:                                            \
