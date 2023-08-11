@@ -492,6 +492,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    do {
       progress = false;
 
+      NIR_PASS(progress, nir, rogue_nir_opt_fold_packs);
       NIR_PASS(progress, nir, rogue_nir_opt_algebraic_late);
       NIR_PASS(progress, nir, nir_opt_algebraic_late);
       /*

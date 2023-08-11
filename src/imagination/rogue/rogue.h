@@ -4196,6 +4196,8 @@ bool rogue_nir_lower_vk_io(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_opt_preamble(nir_shader *shader, rogue_build_ctx *ctx);
 
+bool rogue_nir_opt_fold_packs(nir_shader *shader);
+
 rogue_shader *rogue_nir_to_rogue(rogue_build_ctx *ctx, const nir_shader *nir);
 
 /* Encode/decode */

@@ -3803,7 +3803,7 @@ enum rogue_storage {
    ROGUE_STORAGE_2x11_1x10,
    ROGUE_STORAGE_1x24_1x8,
    ROGUE_STORAGE_1x8_1x24,
-   ROGUE_STORAGE_5_6_5,
+   ROGUE_STORAGE_1x5_1x6_1x5,
 };
 
 static inline unsigned rogue_storage_comps(enum rogue_storage storage)
@@ -3815,7 +3815,7 @@ static inline unsigned rogue_storage_comps(enum rogue_storage storage)
       return 2;
 
    case ROGUE_STORAGE_2x11_1x10:
-   case ROGUE_STORAGE_5_6_5:
+   case ROGUE_STORAGE_1x5_1x6_1x5:
       return 3;
 
    case ROGUE_STORAGE_4x8:
@@ -3934,7 +3934,7 @@ static void trans_nir_pack_format(rogue_builder *b,
       pck = rogue_PCK_S8D24(b, pck_dst, src);
       break;
 
-   case ROGUE_STORAGE_5_6_5:
+   case ROGUE_STORAGE_1x5_1x6_1x5:
       pck = rogue_PCK_U565U565(b, pck_dst, src);
       break;
 
@@ -3946,6 +3946,9 @@ static void trans_nir_pack_format(rogue_builder *b,
       rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_SCALE);
 
    if (partial) {
+      /* TODO: add support for other types. */
+      assert(storage == ROGUE_STORAGE_4x8 || storage == ROGUE_STORAGE_2x16);
+
       rogue_set_instr_group_next(&pck->instr, true);
 
       rogue_alu_instr *movc = rogue_MOVC(b,
@@ -3958,7 +3961,12 @@ static void trans_nir_pack_format(rogue_builder *b,
                                          rogue_none());
 
       unsigned elem = nir_src_as_uint(alu->src[2].src);
-      rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E0 + elem);
+      if (storage == ROGUE_STORAGE_4x8) {
+         rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E0 + elem);
+      } else {
+         rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E0 + (elem * 2));
+         rogue_set_alu_dst_mod(movc, 0, ROGUE_ALU_DST_MOD_E0 + (elem * 2) + 1);
+      }
    } else {
       rogue_set_instr_repeat(&pck->instr, num_comps);
    }
@@ -4065,7 +4073,7 @@ static void trans_nir_unpack_format(rogue_builder *b,
       upck = rogue_UPCK_S8D24(b, dst, src);
       break;
 
-   case ROGUE_STORAGE_5_6_5:
+   case ROGUE_STORAGE_1x5_1x6_1x5:
       upck = rogue_UPCK_U565U565(b, dst, src);
       break;
 
