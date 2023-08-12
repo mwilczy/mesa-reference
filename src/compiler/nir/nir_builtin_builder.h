@@ -184,6 +184,13 @@ nir_fmad(nir_builder *b, nir_def *x, nir_def *y, nir_def *z)
 }
 
 static inline nir_def *
+nir_fsat_signed(nir_builder *b, nir_def *x)
+{
+   return nir_fclamp(b, x, nir_imm_floatN_t(b, -1.0, x->bit_size),
+                           nir_imm_floatN_t(b, +1.0, x->bit_size));
+}
+
+static inline nir_def *
 nir_maxmag(nir_builder *b, nir_def *x, nir_def *y)
 {
    nir_def *xabs = nir_fabs(b, x);

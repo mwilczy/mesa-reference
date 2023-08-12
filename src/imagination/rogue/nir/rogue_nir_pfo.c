@@ -23,6 +23,7 @@
 
 #include "nir/nir.h"
 #include "nir/nir_builder.h"
+#include "nir/nir_builtin_builder.h"
 #include "nir/nir_search_helpers.h"
 #include "nir/nir_format_convert.h"
 #include "rogue.h"
@@ -35,14 +36,6 @@
  *
  * \brief Contains PFO (per-fragment operation) passes.
  */
-
-static nir_def *nir_fsat_signed(nir_builder *b, nir_def *x)
-{
-   return nir_fclamp(b,
-                     x,
-                     nir_imm_floatN_t(b, -1.0, x->bit_size),
-                     nir_imm_floatN_t(b, +1.0, x->bit_size));
-}
 
 static nir_def *
 nir_fsat_to_format(nir_builder *b, nir_def *x, enum pipe_format format)

@@ -34,6 +34,7 @@
 #include "nir_lower_blend.h"
 #include "compiler/nir/nir.h"
 #include "compiler/nir/nir_builder.h"
+#include "compiler/nir/nir_builtin_builder.h"
 #include "compiler/nir/nir_format_convert.h"
 #include "util/blend.h"
 
@@ -130,13 +131,6 @@ nir_blend_factor_value(
       assert(util_blendfactor_is_inverted(factor_without_invert));
       unreachable("Unexpected inverted factor");
    }
-}
-
-static nir_def *
-nir_fsat_signed(nir_builder *b, nir_def *x)
-{
-   return nir_fclamp(b, x, nir_imm_floatN_t(b, -1.0, x->bit_size),
-                     nir_imm_floatN_t(b, +1.0, x->bit_size));
 }
 
 static nir_def *
