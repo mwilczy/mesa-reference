@@ -79,6 +79,18 @@ static nir_def *fold_pack(nir_builder *b, nir_op op, nir_def *src)
    case nir_op_pack_sscaled_r10g10b10a2_field:
       return nir_pack_sscaled_r10g10b10a2(b, src);
 
+   case nir_op_pack_unorm_r5g6b5_field:
+      return nir_pack_unorm_r5g6b5(b, src);
+
+   case nir_op_pack_snorm_r5g6b5_field:
+      return nir_pack_snorm_r5g6b5(b, src);
+
+   case nir_op_pack_uscaled_r5g6b5_field:
+      return nir_pack_uscaled_r5g6b5(b, src);
+
+   case nir_op_pack_sscaled_r5g6b5_field:
+      return nir_pack_sscaled_r5g6b5(b, src);
+
    default:
       break;
    }
@@ -95,6 +107,10 @@ static unsigned num_pack_comps(nir_op op)
    case nir_op_pack_sscaled_2x16_field:
       return 2;
 
+   case nir_op_pack_unorm_r5g6b5_field:
+   case nir_op_pack_snorm_r5g6b5_field:
+   case nir_op_pack_uscaled_r5g6b5_field:
+   case nir_op_pack_sscaled_r5g6b5_field:
    case nir_op_pack_r11g11b10f_field:
       return 3;
 
@@ -171,15 +187,19 @@ static unsigned instr_is_field_pack(const nir_instr *instr)
    case nir_op_pack_snorm_2x16_field:
    case nir_op_pack_snorm_4x8_field:
    case nir_op_pack_snorm_r10g10b10a2_field:
+   case nir_op_pack_snorm_r5g6b5_field:
    case nir_op_pack_sscaled_2x16_field:
    case nir_op_pack_sscaled_4x8_field:
    case nir_op_pack_sscaled_r10g10b10a2_field:
+   case nir_op_pack_sscaled_r5g6b5_field:
    case nir_op_pack_unorm_2x16_field:
    case nir_op_pack_unorm_4x8_field:
    case nir_op_pack_unorm_r10g10b10a2_field:
+   case nir_op_pack_unorm_r5g6b5_field:
    case nir_op_pack_uscaled_2x16_field:
    case nir_op_pack_uscaled_4x8_field:
    case nir_op_pack_uscaled_r10g10b10a2_field:
+   case nir_op_pack_uscaled_r5g6b5_field:
       return true;
 
    default:

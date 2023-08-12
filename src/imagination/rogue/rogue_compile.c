@@ -4110,6 +4110,11 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
       SPLIT_PACK(uscaled_2x16, ROGUE_STORAGE_2x16, nir_type_uint, false)
       SPLIT_PACK(sscaled_2x16, ROGUE_STORAGE_2x16, nir_type_int, false)
 
+      SPLIT_PACK(unorm_r5g6b5, ROGUE_STORAGE_1x5_1x6_1x5, nir_type_uint, true)
+      SPLIT_PACK(snorm_r5g6b5, ROGUE_STORAGE_1x5_1x6_1x5, nir_type_int, true)
+      SPLIT_PACK(uscaled_r5g6b5, ROGUE_STORAGE_1x5_1x6_1x5, nir_type_uint, false)
+      SPLIT_PACK(sscaled_r5g6b5, ROGUE_STORAGE_1x5_1x6_1x5, nir_type_int, false)
+
       SPLIT_PACK(unorm_4x8, ROGUE_STORAGE_4x8, nir_type_uint, true)
       SPLIT_PACK(snorm_4x8, ROGUE_STORAGE_4x8, nir_type_int, true)
       SPLIT_PACK(uscaled_4x8, ROGUE_STORAGE_4x8, nir_type_uint, false)
@@ -4175,6 +4180,17 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
       SPLIT_UNPACK2(snorm_2x16, ROGUE_STORAGE_2x16, nir_type_int, true)
       SPLIT_UNPACK2(uscaled_2x16, ROGUE_STORAGE_2x16, nir_type_uint, false)
       SPLIT_UNPACK2(sscaled_2x16, ROGUE_STORAGE_2x16, nir_type_int, false)
+
+      SPLIT_UNPACK3(unorm_r5g6b5, ROGUE_STORAGE_1x5_1x6_1x5, nir_type_uint, true)
+      SPLIT_UNPACK3(snorm_r5g6b5, ROGUE_STORAGE_1x5_1x6_1x5, nir_type_int, true)
+      SPLIT_UNPACK3(uscaled_r5g6b5,
+                    ROGUE_STORAGE_1x5_1x6_1x5,
+                    nir_type_uint,
+                    false)
+      SPLIT_UNPACK3(sscaled_r5g6b5,
+                    ROGUE_STORAGE_1x5_1x6_1x5,
+                    nir_type_int,
+                    false)
 
       SPLIT_UNPACK4(unorm_4x8, ROGUE_STORAGE_4x8, nir_type_uint, true)
       SPLIT_UNPACK4(snorm_4x8, ROGUE_STORAGE_4x8, nir_type_int, true)
