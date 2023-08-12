@@ -719,7 +719,7 @@ write_alu(write_ctx *ctx, const nir_alu_instr *alu)
    unsigned num_srcs = nir_op_infos[alu->op].num_inputs;
 
    /* 9 bits for nir_op */
-   STATIC_ASSERT(nir_num_opcodes <= 512);
+   STATIC_ASSERT(nir_num_opcodes <= 1024);
    union packed_instr header;
    header.u32 = 0;
 
