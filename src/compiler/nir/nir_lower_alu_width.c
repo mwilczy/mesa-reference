@@ -240,6 +240,10 @@ lower_alu_instr_width(nir_builder *b, nir_instr *instr, void *_data)
    case nir_op_unpack_snorm_r10g10b10a2:
    case nir_op_unpack_uscaled_r10g10b10a2:
    case nir_op_unpack_sscaled_r10g10b10a2:
+   case nir_op_unpack_unorm_r5g6b5:
+   case nir_op_unpack_snorm_r5g6b5:
+   case nir_op_unpack_uscaled_r5g6b5:
+   case nir_op_unpack_sscaled_r5g6b5:
    case nir_op_unpack_r11g11b10f:
       /* There is no scalar version of these ops, unless we were to break it
        * down to bitshifts and math (which is definitely not intended).

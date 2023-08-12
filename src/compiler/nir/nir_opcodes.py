@@ -383,6 +383,22 @@ dst.x  = packed << (src2.x * 10);
 dst.x |= src0.x & ~(mask << (src2.x * 10)) ;
 """.replace("fmt", fmt))
 
+def pack_r5g6b5(fmt):
+   unop_horiz("pack_" + fmt + "_r5g6b5", 1, tuint32, 3, tfloat32, """
+dst.x = (uint32_t) pack_fmt_1x5(src0.x);
+dst.x |= ((uint32_t) pack_fmt_1x6(src0.y)) << 5;
+dst.x |= ((uint32_t) pack_fmt_1x5(src0.z)) << 11;
+""".replace("fmt", fmt))
+   pckop_field("pack_" + fmt + "_r5g6b5_field", tuint32, tfloat32, """
+uint32_t packed = (src2.x == 1) ? (uint32_t)pack_fmt_1x6(src1.x) : (uint32_t)pack_fmt_1x5(src1.x);
+uint32_t mask = (src2.x == 1) ? 0x3f : 0x1f;
+uint32_t shift = (src2.x == 0) ? 0 : (src2.x == 1) ? 5 : 11;
+
+dst.x  = packed << shift;
+dst.x |= src0.x & ~(mask << shift) ;
+""".replace("fmt", fmt))
+
+
 def unpack_2x16(fmt):
    unop_horiz("unpack_" + fmt + "_2x16", 2, tfloat32, 1, tuint32, """
 dst.x = unpack_fmt_1x16((uint16_t)(src0.x & 0xffff));
@@ -436,32 +452,56 @@ dst.x = unpack_fmt_1x10((uint16_t)((src0.x >> 20) & 0x3ff));
 dst.x = unpack_fmt_1x2((uint16_t)(src0.x >> 30));
 """.replace("fmt", fmt))
 
+def unpack_r5g6b5(fmt):
+   unop_horiz("unpack_" + fmt + "_r5g6b5", 3, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x5((uint8_t)(src0.x & 0x1f));
+dst.y = unpack_fmt_1x6((uint8_t)((src0.x >> 5) & 0x3f));
+dst.z = unpack_fmt_1x5((uint8_t)((src0.x >> 11) & 0x1f));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_r5g6b5_split_x", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x5((uint16_t)(src0.x & 0x1f));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_r5g6b5_split_y", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x6((uint16_t)((src0.x >> 5) & 0x3f));
+""".replace("fmt", fmt))
+   unop_horiz("unpack_" + fmt + "_r5g6b5_split_z", 1, tfloat32, 1, tuint32, """
+dst.x = unpack_fmt_1x5((uint16_t)((src0.x >> 11) & 0x1f));
+""".replace("fmt", fmt))
+
 
 pack_2x16("snorm", tfloat)
 pack_4x8("snorm")
 pack_r10g10b10a2("snorm")
+pack_r5g6b5("snorm")
 pack_2x16("unorm", tfloat)
 pack_4x8("unorm")
 pack_r10g10b10a2("unorm")
+pack_r5g6b5("unorm")
 pack_2x16("sscaled", tfloat)
 pack_4x8("sscaled")
 pack_r10g10b10a2("sscaled")
+pack_r5g6b5("sscaled")
 pack_2x16("uscaled", tfloat)
 pack_4x8("uscaled")
 pack_r10g10b10a2("uscaled")
+pack_r5g6b5("uscaled")
 pack_2x16("half", tfloat32)
 unpack_2x16("snorm")
 unpack_4x8("snorm")
 unpack_r10g10b10a2("snorm")
+unpack_r5g6b5("snorm")
 unpack_2x16("unorm")
 unpack_4x8("unorm")
 unpack_r10g10b10a2("unorm")
+unpack_r5g6b5("unorm")
 unpack_2x16("sscaled")
 unpack_4x8("sscaled")
 unpack_r10g10b10a2("sscaled")
+unpack_r5g6b5("sscaled")
 unpack_2x16("uscaled")
 unpack_4x8("uscaled")
 unpack_r10g10b10a2("uscaled")
+unpack_r5g6b5("uscaled")
 unpack_2x16("half")
 
 

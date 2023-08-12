@@ -145,6 +145,20 @@ pack_snorm_1x2(float x)
 }
 
 static uint8_t
+pack_snorm_1x5(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, -1.0f, +1.0f) * 15.0f);
+}
+
+static uint8_t
+pack_snorm_1x6(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, -1.0f, +1.0f) * 31.0f);
+}
+
+static uint8_t
 pack_sscaled_1x8(float x)
 {
    return (uint8_t) (int)
@@ -170,6 +184,20 @@ pack_sscaled_1x2(float x)
 {
    return (uint16_t) (int)
           _mesa_roundevenf(CLAMP(x, -2.0f, +1.0f));
+}
+
+static uint8_t
+pack_sscaled_1x5(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, -16.0f, +15.0f));
+}
+
+static uint8_t
+pack_sscaled_1x6(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, -32.0f, +31.0f));
 }
 
 /**
@@ -223,6 +251,20 @@ unpack_snorm_1x2(uint16_t u)
 }
 
 static float
+unpack_snorm_1x5(uint8_t u)
+{
+   u &= 0x1f;
+   return CLAMP((int8_t) u / 15.0f, -1.0f, +1.0f);
+}
+
+static float
+unpack_snorm_1x6(uint8_t u)
+{
+   u &= 0x3f;
+   return CLAMP((int8_t) u / 31.0f, -1.0f, +1.0f);
+}
+
+static float
 unpack_sscaled_1x8(uint8_t u)
 {
    return CLAMP((int8_t) u, -128.0f, +127.0f);
@@ -246,6 +288,20 @@ unpack_sscaled_1x2(uint16_t u)
 {
    u &= 0x0003;
    return CLAMP((int16_t) u, -2.0f, +1.0f);
+}
+
+static float
+unpack_sscaled_1x5(uint8_t u)
+{
+   u &= 0x1f;
+   return CLAMP((int8_t) u, -16.0f, +15.0f);
+}
+
+static float
+unpack_sscaled_1x6(uint8_t u)
+{
+   u &= 0x3f;
+   return CLAMP((int8_t) u, -32.0f, +31.0f);
 }
 
 /**
@@ -301,6 +357,20 @@ pack_unorm_1x2(float x)
 }
 
 static uint8_t
+pack_unorm_1x5(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 1.0f) * 31.0f);
+}
+
+static uint8_t
+pack_unorm_1x6(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 1.0f) * 63.0f);
+}
+
+static uint8_t
 pack_uscaled_1x8(float x)
 {
    return (uint8_t) (int)
@@ -326,6 +396,20 @@ pack_uscaled_1x2(float x)
 {
    return (uint16_t) (int)
           _mesa_roundevenf(CLAMP(x, 0.0f, 3.0f));
+}
+
+static uint8_t
+pack_uscaled_1x5(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 31.0f));
+}
+
+static uint8_t
+pack_uscaled_1x6(float x)
+{
+   return (uint8_t) (int)
+          _mesa_roundevenf(CLAMP(x, 0.0f, 63.0f));
 }
 
 /**
@@ -379,6 +463,20 @@ unpack_unorm_1x2(uint16_t u)
 }
 
 static float
+unpack_unorm_1x5(uint8_t u)
+{
+   u &= 0x1f;
+   return (float) u / 31.0f;
+}
+
+static float
+unpack_unorm_1x6(uint8_t u)
+{
+   u &= 0x3f;
+   return (float) u / 63.0f;
+}
+
+static float
 unpack_uscaled_1x8(uint8_t u)
 {
    return (float) u;
@@ -401,6 +499,20 @@ static float
 unpack_uscaled_1x2(uint16_t u)
 {
    u &= 0x0003;
+   return (float) u;
+}
+
+static float
+unpack_uscaled_1x5(uint8_t u)
+{
+   u &= 0x1f;
+   return (float) u;
+}
+
+static float
+unpack_uscaled_1x6(uint8_t u)
+{
+   u &= 0x3f;
    return (float) u;
 }
 
