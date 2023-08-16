@@ -2095,6 +2095,8 @@ static void trans_nir_intrinsic_load_vertex_sysval(rogue_builder *b,
 static void trans_nir_intrinsic_isp_feedback_img(rogue_builder *b,
                                                  nir_intrinsic_instr *intr)
 {
+   struct rogue_fs_build_data *fs_data = &b->shader->ctx->stage_data.fs;
+
    rogue_ref src_discard_cond =
       intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
    rogue_ref src_depth = intr_src(b->shader, intr, 1, &(unsigned){ 1 }, 32);
@@ -2102,7 +2104,8 @@ static void trans_nir_intrinsic_isp_feedback_img(rogue_builder *b,
    /* Either not a constant condition, or the condition is true/always. */
    bool does_discard = !nir_src_is_const(intr->src[0]) ||
                        nir_src_as_bool(intr->src[0]);
-   bool does_depth = !nir_src_is_undef(intr->src[1]);
+   /* bool does_depth = !nir_src_is_undef(intr->src[1]); */
+   bool does_depth = fs_data->depth_feedback;
 
    if (does_discard)
       rogue_SETPRED(b, rogue_ref_io(ROGUE_IO_P0), src_discard_cond);
@@ -4870,6 +4873,7 @@ static bool fs_data_cb(UNUSED const rogue_instr *instr,
       break;
 
    case ROGUE_BACKEND_OP_DEPTHF:
+      assert(data->depth_feedback);
       data->depth_feedback |= true;
       data->side_effects |= true;
       break;

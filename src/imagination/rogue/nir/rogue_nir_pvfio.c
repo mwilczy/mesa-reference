@@ -526,6 +526,12 @@ struct pfo_state {
 
    /* The first store at the end of the shader. */
    nir_instr *first_store;
+
+   /* Condition accumulator for multiple discards. */
+   nir_def *discard_cond_accum;
+
+   /* Src for depth feedback (undef if unused). */
+   nir_def *depth_feedback_src;
 };
 
 static struct util_format_description *
@@ -1046,10 +1052,112 @@ static bool sink_frag_outs(nir_shader *shader, struct pfo_state *state)
             state->first_store = &intr->instr;
 
          after_instr = &intr->instr;
-
-         progress |= true;
       }
    }
+
+   return progress;
+}
+
+static bool is_isp_fb_instr(const nir_instr *instr, UNUSED const void *data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   if (intr->intrinsic == nir_intrinsic_store_output) {
+      nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
+      if (sem.location != FRAG_RESULT_DEPTH)
+         return false;
+
+      assert(nir_src_num_components(intr->src[0]) == 1);
+      assert(nir_src_as_uint(intr->src[1]) == 0);
+   } else if (intr->intrinsic != nir_intrinsic_discard &&
+              intr->intrinsic != nir_intrinsic_discard_if) {
+      return false;
+   }
+
+   /* Instructions shouldn't be in any control flow. */
+   /* assert(instr->block->cf_node.parent->type == nir_cf_node_function); */
+
+   return true;
+}
+
+static bool
+lower_isp_fb_instr(struct nir_builder *b, nir_instr *instr, void *data)
+{
+   if (!is_isp_fb_instr(instr, data))
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   struct pfo_state *state = data;
+
+   b->cursor = nir_after_instr(instr);
+
+   switch (intr->intrinsic) {
+   case nir_intrinsic_store_output: {
+      nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
+      switch (sem.location) {
+      case FRAG_RESULT_DEPTH:
+         assert(state->depth_feedback_src->parent_instr->type ==
+                nir_instr_type_undef);
+         state->depth_feedback_src = intr->src[0].ssa;
+         break;
+
+      default:
+         unreachable();
+      }
+      break;
+   }
+
+   case nir_intrinsic_discard:
+      state->discard_cond_accum =
+         nir_ior(b, state->discard_cond_accum, nir_imm_true(b));
+      break;
+
+   case nir_intrinsic_discard_if:
+      state->discard_cond_accum =
+         nir_ior(b, state->discard_cond_accum, intr->src[0].ssa);
+      break;
+
+   default:
+      unreachable();
+   }
+
+   nir_instr_remove(instr);
+   return true;
+}
+
+static bool lower_isp_fb(nir_builder *b, struct pfo_state *state)
+{
+   bool progress = false;
+
+   progress |= nir_shader_instructions_pass(b->shader,
+                                            lower_isp_fb_instr,
+                                            nir_metadata_block_index |
+                                               nir_metadata_dominance,
+                                            state);
+   if (!progress)
+      return false;
+
+   /* Insert isp feedback instruction before the first store,
+    * or if there are no stores, at the end.
+    */
+   if (state->first_store)
+      b->cursor = nir_before_instr(state->first_store);
+   else
+      b->cursor = nir_after_block(
+         nir_impl_last_block(nir_shader_get_entrypoint(b->shader)));
+
+   nir_isp_feedback_img(b,
+                        state->discard_cond_accum,
+                        state->depth_feedback_src);
+
+   if (state->depth_feedback_src->parent_instr->type != nir_instr_type_undef)
+      state->fs_data->depth_feedback = true;
+
+   /* TODO: try to fold the condition check into isp_feedback_img
+    * so that ACMP can be used
+    */
 
    return progress;
 }
@@ -1061,8 +1169,14 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
 
    bool progress = false;
 
+   nir_builder b = nir_builder_create(nir_shader_get_entrypoint(shader));
+   b.cursor =
+      nir_before_block(nir_start_block(nir_shader_get_entrypoint(shader)));
+
    struct pfo_state state = {
       .fs_data = &ctx->stage_data.fs,
+      .discard_cond_accum = nir_imm_false(&b),
+      .depth_feedback_src = nir_undef(&b, 1, 32),
    };
 
    /* Fragment outputs - lower to pack components. */
@@ -1074,7 +1188,9 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
    /* Fragment outputs - move to the end. */
    progress |= sink_frag_outs(shader, &state);
 
-   /* TODO: Depth/sample mask outputs. */
+   /* TODO: Sample mask outputs. */
+   /* Lower ISP feedback (discards, depth, etc.) */
+   progress |= lower_isp_fb(&b, &state);
 
    /* Frag intrinsics. */
    progress |= nir_shader_lower_instructions(shader,

@@ -389,6 +389,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
       NIR_PASS_V(nir, rogue_nir_lower_blend, ctx);
       NIR_PASS_V(nir, rogue_nir_lower_blend_consts, ctx);
       NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_shader_out, NULL, NULL);
+      NIR_PASS_V(nir, nir_opt_conditional_discard);
       NIR_PASS_V(nir, rogue_nir_pfo, ctx);
       /* NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_shader_out); */
       NIR_PASS_V(nir, nir_opt_dce);
