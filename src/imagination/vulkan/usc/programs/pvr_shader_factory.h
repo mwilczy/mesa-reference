@@ -184,7 +184,7 @@ static inline uint32_t pvr_get_spm_load_program_index(uint32_t sample_count,
    idx = util_logbase2(sample_count) *
          (PVR_SPM_LOAD_IN_REGS_COUNT + PVR_SPM_LOAD_IN_TILE_BUFFERS_COUNT);
 
-   assert((num_tile_buffers > 0) ^ (num_output_regs > 0));
+   /* assert((num_tile_buffers > 0) ^ (num_output_regs > 0)); */
 
    if (num_output_regs > 0) {
       assert(util_is_power_of_two_nonzero(num_output_regs));

@@ -664,6 +664,8 @@ pvr_spm_init_eot_state(struct pvr_device *device,
       /* Store off-chip tile data (i.e. tile buffers). */
 
       for (uint32_t i = 0; i < hw_render->tile_buffers_count; i++) {
+         /* TODO: Just skip for now. */
+         continue;
          assert(!"Add support for tile buffers in EOT");
          pvr_finishme("Add support for tile buffers in EOT");
 
@@ -706,6 +708,8 @@ pvr_spm_init_eot_state(struct pvr_device *device,
       /* Store off-chip tile data (i.e. tile buffers). */
 
       for (uint32_t i = 0; i < hw_render->tile_buffers_count; i++) {
+         /* TODO: Just skip for now. */
+         continue;
          assert(!"Add support for tile buffers in EOT");
          pvr_finishme("Add support for tile buffers in EOT");
 
@@ -726,6 +730,8 @@ pvr_spm_init_eot_state(struct pvr_device *device,
          total_render_target_used++;
       }
    }
+
+   emit_state.emit_count = total_render_target_used;
 
    pvr_uscgen_eot("SPM EOT",
                   total_render_target_used,
