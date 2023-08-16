@@ -97,11 +97,12 @@ static nir_def *lower_vk_io(nir_builder *b, nir_instr *instr, void *cb_data)
       pipeline_layout->set_layout[desc_set];
    const struct pvr_descriptor_set_layout_mem_layout *mem_layout =
       &set_layout->memory_layout_in_dwords_per_stage[pvr_stage];
-   assert(binding < set_layout->binding_count);
 
    /* Calculate offset for the descriptor/binding in this set. */
    const struct pvr_descriptor_set_layout_binding *binding_layout =
       pvr_get_descriptor_binding(set_layout, binding);
+
+   assert(binding_layout);
 
    /* TODO: Handle secondaries. */
 

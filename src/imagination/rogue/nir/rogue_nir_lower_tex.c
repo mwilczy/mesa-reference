@@ -68,11 +68,12 @@ static void get_tex_deref_layout(nir_builder *b,
    const struct pvr_pipeline_layout *pipeline_layout = ctx->pipeline_layout;
    const struct pvr_descriptor_set_layout *set_layout =
       pipeline_layout->set_layout[desc_set];
-   assert(binding < set_layout->binding_count);
 
    /* Calculate offset for the descriptor/binding in this set. */
    const struct pvr_descriptor_set_layout_binding *binding_layout =
       pvr_get_descriptor_binding(set_layout, binding);
+
+   assert(binding_layout);
 
    unsigned desc_size;
    struct pvr_descriptor_size_info desc_size_info;
