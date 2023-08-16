@@ -165,7 +165,7 @@ void rogue_nir_lower_blend(nir_shader *shader, rogue_build_ctx *ctx)
       return;
 
    nir_lower_blend_options opts = {
-      .scalar_blend_const = false,
+      .scalar_blend_const = false, /* TODO!!! */
       .logicop_enable = cb_state->logic_op_enable,
       .logicop_func = vk_logic_op_to_pipe(cb_state->logic_op),
       .skip_blend_factor_snorm_clamp = true,

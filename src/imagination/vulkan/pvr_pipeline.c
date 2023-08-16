@@ -1845,6 +1845,7 @@ static void pvr_graphics_pipeline_alloc_vertex_inputs(
 
       build_data.defined[l] = true;
       build_data.base_vtxin_reg[l] = vtxin_reg_offset;
+      build_data.format[l] = fmt_description->format;
       memcpy(&build_data.format_descs[l],
              fmt_description,
              sizeof(*fmt_description));

@@ -3949,6 +3949,7 @@ typedef struct rogue_vertex_inputs {
    bool defined[MAX_VERTEX_GENERIC_ATTRIBS];
    unsigned base_vtxin_reg[MAX_VERTEX_GENERIC_ATTRIBS];
    struct util_format_description format_descs[MAX_VERTEX_GENERIC_ATTRIBS];
+   enum pipe_format format[MAX_VERTEX_GENERIC_ATTRIBS];
 } rogue_vertex_inputs;
 
 /**

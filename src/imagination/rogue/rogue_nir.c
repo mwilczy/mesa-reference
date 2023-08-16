@@ -168,6 +168,10 @@ static const nir_shader_compiler_options nir_options = {
    .lower_rotate = true, /* TODO: add nir option to convert ror to rol then
                             enable this. */
    .has_fused_comp_and_csel = true,
+   /* TODO: Remove these and instead merge components in the backend instead. */
+   /* .has_fsub = true, */
+   /* .has_isub = true, */
+   .lower_fsat = true,
    .support_8bit_alu = true,
    .support_16bit_alu = true,
    .max_unroll_iterations = 16,
@@ -280,7 +284,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 
 #if !defined(NDEBUG)
    bool nir_debug_print_shader_prev = nir_debug_print_shader[nir->info.stage];
-   nir_debug_print_shader[nir->info.stage] = ROGUE_DEBUG(NIR_PASSES);
+   if (nir->info.stage == MESA_SHADER_FRAGMENT)
+      nir_debug_print_shader[nir->info.stage] = ROGUE_DEBUG(NIR_PASSES);
 #endif /* !defined(NDEBUG) */
 
    nir_validate_shader(nir, "after spirv_to_nir");
@@ -383,7 +388,9 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    if (nir->info.stage == MESA_SHADER_FRAGMENT) {
       NIR_PASS_V(nir, rogue_nir_lower_blend, ctx);
       NIR_PASS_V(nir, rogue_nir_lower_blend_consts, ctx);
+      NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_shader_out, NULL, NULL);
       NIR_PASS_V(nir, rogue_nir_pfo, ctx);
+      /* NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_shader_out); */
       NIR_PASS_V(nir, nir_opt_dce);
    }
 

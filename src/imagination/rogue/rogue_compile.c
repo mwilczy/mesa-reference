@@ -1628,19 +1628,21 @@ static void trans_nir_intrinsic_load_input(rogue_builder *b,
 static void trans_nir_intrinsic_load_output_fs(rogue_builder *b,
                                                nir_intrinsic_instr *intr)
 {
-   assert(b->shader->stage == MESA_SHADER_FRAGMENT);
-
-   unsigned reg_idx = nir_intrinsic_base(intr) + nir_src_as_uint(intr->src[0]);
-
-   /* Pixel output registers can't be used with repeat >
-    * 1, so load_size will always be limited to 1.
+   bool reg_load = nir_src_is_const(intr->src[0]);
+   /* Pixel output registers can't be used with repeat > 1, so load_size
+    * will always be limited to 1.
     */
    rogue_ref dst =
       intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
-   rogue_ref src = rogue_ref_reg(rogue_pixout_reg(b->shader, reg_idx));
+   if (reg_load) {
+      unsigned reg_idx = nir_intrinsic_base(intr);
+      rogue_ref src = rogue_ref_reg(rogue_pixout_reg(b->shader, reg_idx));
 
-   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
-   rogue_add_instr_commentf(&mov->instr, "load_output_fs");
+      rogue_alu_instr *mov = rogue_MOV(b, dst, src);
+      rogue_add_instr_commentf(&mov->instr, "load_reg_output_fs");
+   } else {
+      unreachable("Tile buffer loads are unsupported.");
+   }
 }
 
 static void trans_nir_intrinsic_load_output(rogue_builder *b,
@@ -1660,17 +1662,22 @@ static void trans_nir_intrinsic_load_output(rogue_builder *b,
 static void trans_nir_intrinsic_store_output_fs(rogue_builder *b,
                                                 nir_intrinsic_instr *intr)
 {
-   unsigned reg_idx = nir_intrinsic_base(intr) + nir_src_as_uint(intr->src[1]);
-   rogue_ref dst = rogue_ref_reg(rogue_pixout_reg(b->shader, reg_idx));
+   bool reg_store = nir_src_is_const(intr->src[1]);
+   if (reg_store) {
+      unsigned reg_idx = nir_intrinsic_base(intr);
+      rogue_ref dst = rogue_ref_reg(rogue_pixout_reg(b->shader, reg_idx));
 
-   /* Pixel output registers can't be used with repeat > 1, so store_size
-    * will always be limited to 1.
-    */
-   rogue_ref src =
-      intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+      /* Pixel output registers can't be used with repeat > 1, so store_size
+       * will always be limited to 1.
+       */
+      rogue_ref src =
+         intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
-   rogue_alu_instr *mov = rogue_MOV(b, dst, src);
-   rogue_add_instr_commentf(&mov->instr, "store_output_fs");
+      rogue_alu_instr *mov = rogue_MOV(b, dst, src);
+      rogue_add_instr_commentf(&mov->instr, "store_reg_output_fs");
+   } else {
+      unreachable("Tile buffer stores are unsupported.");
+   }
 }
 
 static void trans_nir_intrinsic_store_output_vs(rogue_builder *b,
@@ -2972,13 +2979,17 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    unreachable("Unsupported NIR intrinsic instruction.");
 }
 
-static void trans_nir_alu_fadd(rogue_builder *b, nir_alu_instr *alu)
+static void trans_nir_alu_fadd(rogue_builder *b, nir_alu_instr *alu, bool sub)
 {
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
-   rogue_ref src0 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
-   rogue_ref src1 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, 32);
+   /* Swapping srcs so sub will work. */
+   rogue_ref src0 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, 32);
+   rogue_ref src1 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
 
-   rogue_FADD(b, dst, src0, src1);
+   rogue_alu_instr *fadd = rogue_FADD(b, dst, src0, src1);
+
+   if (sub)
+      rogue_set_alu_src_mod(fadd, 0, ROGUE_ALU_SRC_MOD_NEG);
 }
 
 static void trans_nir_alu_fmul(rogue_builder *b, nir_alu_instr *alu)
@@ -3282,30 +3293,33 @@ static void trans_nir_alu_vecN(rogue_builder *b, nir_alu_instr *alu, unsigned n)
    }
 }
 
-static void trans_nir_alu_iadd(rogue_builder *b, nir_alu_instr *alu)
+static void trans_nir_alu_iadd(rogue_builder *b, nir_alu_instr *alu, bool sub)
 {
    unsigned bit_size = alu->def.bit_size;
 
    rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, bit_size);
 
-   rogue_ref src0 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, bit_size);
-   rogue_ref src1 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, bit_size);
+   /* Swapping srcs so sub will work. */
+   rogue_ref src0 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, bit_size);
+   rogue_ref src1 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, bit_size);
+
+   rogue_alu_instr *iadd;
 
    switch (bit_size) {
    case 8:
-      rogue_IADD8(b, dst, src0, src1);
+      iadd = rogue_IADD8(b, dst, src0, src1);
       break;
 
    case 16:
-      rogue_IADD16(b, dst, src0, src1);
+      iadd = rogue_IADD16(b, dst, src0, src1);
       break;
 
    case 32:
-      rogue_IADD32(b, dst, src0, src1);
+      iadd = rogue_IADD32(b, dst, src0, src1);
       break;
 
    case 64:
-      rogue_IADD64(b, dst, src0, src1);
+      iadd = rogue_IADD64(b, dst, src0, src1);
       break;
 
    default:
@@ -3317,6 +3331,9 @@ static void trans_nir_alu_iadd(rogue_builder *b, nir_alu_instr *alu)
    if (bit_size < 64)
       rogue_set_alu_op_mod(iadd, ROGUE_ALU_OP_MOD_S);
 #endif
+
+   if (sub)
+      rogue_set_alu_src_mod(iadd, 0, ROGUE_ALU_SRC_MOD_NEG);
 }
 
 static void trans_nir_alu_imul(rogue_builder *b, nir_alu_instr *alu)
@@ -4228,7 +4245,10 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 #undef SPLIT_UNPACK2
 
    case nir_op_fadd:
-      return trans_nir_alu_fadd(b, alu);
+      return trans_nir_alu_fadd(b, alu, false);
+
+   case nir_op_fsub:
+      return trans_nir_alu_fadd(b, alu, true);
 
    case nir_op_fmul:
       return trans_nir_alu_fmul(b, alu);
@@ -4297,7 +4317,10 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
       return trans_nir_alu_vecN(b, alu, 4);
 
    case nir_op_iadd:
-      return trans_nir_alu_iadd(b, alu);
+      return trans_nir_alu_iadd(b, alu, false);
+
+   case nir_op_isub:
+      return trans_nir_alu_iadd(b, alu, true);
 
    case nir_op_imul:
       return trans_nir_alu_imul(b, alu);
