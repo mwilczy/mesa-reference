@@ -623,7 +623,8 @@ void pvr_uscgen_load_op(struct pvr_device *device,
                                                   rogue_nir_options(),
                                                   "pvr_load_op");
 
-   fs_data->num_outputs = util_bitcount(rt_mask) + !!depth_to_reg;
+   /* fs_data->num_outputs = util_bitcount(rt_mask) + !!depth_to_reg; */
+   fs_data->num_outputs = util_last_bit(rt_mask) + !!depth_to_reg; /* In case bottom ones are zero */
    if (fs_data->num_outputs) {
       fs_data->outputs = rzalloc_array_size(rogue_ctx,
                                             sizeof(*fs_data->outputs),
