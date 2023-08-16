@@ -973,7 +973,7 @@ static void rogue_calc_backend_instrs_size(rogue_instr_group *group,
       group->size.instrs[phase] = 1;
       break;
 
-   case ROGUE_BACKEND_OP_MOVMSK:
+   case ROGUE_BACKEND_OP_MOVMSKF:
       group->size.instrs[phase] = 1;
 
       if (rogue_backend_op_mod_is_set(backend, OM(SM)))
@@ -1007,7 +1007,9 @@ static void rogue_calc_backend_instrs_size(rogue_instr_group *group,
       }
       break;
 
-   case ROGUE_BACKEND_OP_ATST:
+   case ROGUE_BACKEND_OP_ALPHATST:
+   case ROGUE_BACKEND_OP_ALPHAF:
+   case ROGUE_BACKEND_OP_DEPTHF:
       group->size.instrs[phase] = 1;
       break;
 

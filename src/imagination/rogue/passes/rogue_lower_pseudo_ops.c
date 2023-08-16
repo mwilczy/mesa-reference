@@ -859,53 +859,6 @@ static inline const char *atst_cond_str(unsigned cond)
    return cond_str[cond];
 }
 
-#define OM(op_mod) ROGUE_BACKEND_OP_MOD_##op_mod
-static inline unsigned atst_cond_imm(rogue_backend_instr *atst)
-{
-   if (rogue_backend_op_mod_is_set(atst, OM(NEVER)))
-      return ACMPMODE_NEVER;
-   else if (rogue_backend_op_mod_is_set(atst, OM(LESS)))
-      return ACMPMODE_LESS;
-   else if (rogue_backend_op_mod_is_set(atst, OM(EQUAL)))
-      return ACMPMODE_EQUAL;
-   else if (rogue_backend_op_mod_is_set(atst, OM(LESSEQUAL)))
-      return ACMPMODE_LESSEQUAL;
-   else if (rogue_backend_op_mod_is_set(atst, OM(GREATER)))
-      return ACMPMODE_GREATER;
-   else if (rogue_backend_op_mod_is_set(atst, OM(NOTEQUAL)))
-      return ACMPMODE_NOTEQUAL;
-   else if (rogue_backend_op_mod_is_set(atst, OM(GREATEREQUAL)))
-      return ACMPMODE_GREATEREQUAL;
-   else if (rogue_backend_op_mod_is_set(atst, OM(ALWAYS)))
-      return ACMPMODE_ALWAYS;
-
-   unreachable("Invalid or no condition set.");
-   return ~0;
-}
-#undef OM
-
-static inline bool rogue_lower_ATST_IF(rogue_builder *b,
-                                       rogue_backend_instr *backend)
-{
-   unsigned cond = atst_cond_imm(backend);
-
-   /* if (S1 COND S0) */
-   rogue_backend_instr *atst = rogue_ATST(b,
-                                          rogue_none(),
-                                          rogue_ref_drc(0),
-                                          backend->src[1].ref,
-                                          backend->src[0].ref,
-                                          rogue_ref_imm(cond));
-
-   rogue_merge_instr_commentf(&atst->instr,
-                              &backend->instr,
-                              "atst_if (%s)",
-                              atst_cond_str(cond));
-   rogue_instr_delete(&backend->instr);
-
-   return true;
-}
-
 static inline bool rogue_lower_backend_instr(rogue_builder *b,
                                              rogue_backend_instr *backend)
 {
@@ -914,9 +867,6 @@ static inline bool rogue_lower_backend_instr(rogue_builder *b,
       return false;
 
    switch (backend->op) {
-   case ROGUE_BACKEND_OP_ATST_IF:
-      return rogue_lower_ATST_IF(b, backend);
-
    default:
       break;
    }

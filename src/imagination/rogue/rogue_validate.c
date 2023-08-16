@@ -50,7 +50,7 @@ typedef struct rogue_validation_state {
       bool src; /** Current reference type (src/dst). */
       unsigned param; /** Current reference src/dst index. */
 
-      unsigned atst_noifbs;
+      unsigned isp_feedback_count; /** Instructions that feedback to the ISP. */
    } ctx;
    struct util_dynarray *error_msgs; /** Error message list. */
 } rogue_validation_state;
@@ -374,14 +374,6 @@ static bool validate_backend_op_mod_combo(uint64_t mods)
    return true;
 }
 
-static void validate_backend_instr_ATST(rogue_validation_state *state,
-                                        const rogue_backend_instr *atst)
-{
-   /* Count ATST.IFBs. */
-   if (!rogue_backend_op_mod_is_set(atst, ROGUE_BACKEND_OP_MOD_IFB))
-      ++state->ctx.atst_noifbs;
-}
-
 static void validate_backend_instr_ST(rogue_validation_state *state,
                                       const rogue_backend_instr *st)
 {
@@ -482,8 +474,10 @@ static void validate_backend_instr(rogue_validation_state *state,
 
       /* Custom validation for certain ops. */
       switch (backend->op) {
-      case ROGUE_BACKEND_OP_ATST:
-         validate_backend_instr_ATST(state, backend);
+      case ROGUE_BACKEND_OP_ALPHAF:
+      case ROGUE_BACKEND_OP_DEPTHF:
+      case ROGUE_BACKEND_OP_MOVMSKF:
+         ++state->ctx.isp_feedback_count;
          break;
 
       case ROGUE_BACKEND_OP_ST:
@@ -953,8 +947,10 @@ bool rogue_validate_shader(rogue_shader *shader, const char *when)
    rogue_foreach_block (block, shader)
       validate_block(state, block);
 
-   if (state->ctx.atst_noifbs > 1)
-      validate_log(state, "Multiple ATST.IFBs are not permitted.");
+   if (state->ctx.isp_feedback_count > 1)
+      validate_log(
+         state,
+         "Multiple instructions providing feedback to the ISP are not permitted.");
 
    errors_present = validate_print_errors(state);
 

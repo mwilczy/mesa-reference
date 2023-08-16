@@ -449,7 +449,7 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       .supported_src_types = { [0] = T(REG), },
    },
 
-   [ROGUE_BACKEND_OP_MOVMSK] = { .str = "movmsk", .num_dsts = 1, .num_srcs = 2,
+   [ROGUE_BACKEND_OP_MOVMSKF] = { .str = "movmskf", .num_dsts = 1, .num_srcs = 2,
       .io = {
          .dst_set[0] = IO(W0),
          .src_set[1] = IO(S0) | IO(S1) | IO(S2) | IO(S4) | IO(S5),
@@ -541,15 +541,32 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       .src_valnum_mask = B(0),
    },
    /* TODO: Can't co-issue with TST. */
-   [ROGUE_BACKEND_OP_ATST] = { .str = "atst", .num_dsts = 1, .num_srcs = 4,
+   [ROGUE_BACKEND_OP_ALPHATST] = { .str = "alphatst", .num_dsts = 1, .num_srcs = 4,
       .io = { .src_set[1] = IO(S0), .src_set[2] = IO(S1), .src_set[3] = IO(S2), },
-      .supported_op_mods = OM(IFB),
       .supported_dst_types = { [0] = T(IO), },
       .supported_src_types = {
          [0] = T(DRC), /* TODO: *must* be DRC0 */
          [1] = T(REG) | T(REGARRAY) | T(IMM),
          [2] = T(REG) | T(REGARRAY) | T(IMM),
          [3] = T(REG) | T(IMM), /* TODO: Must be special constant or non-indexed shared. */
+      },
+   },
+   /* TODO: Can't co-issue with TST. */
+   [ROGUE_BACKEND_OP_ALPHAF] = { .str = "alphaf", .num_srcs = 4,
+      .io = { .src_set[1] = IO(S0), .src_set[2] = IO(S1), .src_set[3] = IO(S2), },
+      .supported_src_types = {
+         [0] = T(DRC), /* TODO: *must* be DRC0 */
+         [1] = T(REG) | T(REGARRAY) | T(IMM),
+         [2] = T(REG) | T(REGARRAY) | T(IMM),
+         [3] = T(REG) | T(IMM), /* TODO: Must be special constant or non-indexed shared. */
+      },
+   },
+   /* TODO: Can't co-issue with TST. */
+   [ROGUE_BACKEND_OP_DEPTHF] = { .str = "depthf", .num_srcs = 2,
+      .io = { .src_set[1] = IO(W0), },
+      .supported_src_types = {
+         [0] = T(DRC), /* TODO: *must* be DRC0 */
+         [1] = T(REG) | T(REGARRAY) | T(IMM),
       },
    },
 	[ROGUE_BACKEND_OP_FITR_PIXEL] = { .str = "fitr.pixel", .num_dsts = 1, .num_srcs = 3,
@@ -679,14 +696,6 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       .valnum_src = 5,
       .dst_valnum_mask = B(0),
    },
-   [ROGUE_BACKEND_OP_ATST_IF] = { .str = "atst.if", .num_srcs = 2,
-      .supported_op_mods = OM(NEVER) | OM(LESS) | OM(EQUAL) | OM(LESSEQUAL) |
-         OM(GREATER) | OM(NOTEQUAL) | OM(GREATEREQUAL) | OM(ALWAYS),
-      .supported_src_types = {
-         [0] = T(REG) | T(REGARRAY) | T(IMM),
-         [1] = T(REG) | T(REGARRAY) | T(IMM),
-      },
-   },
 };
 #undef B
 #undef T
@@ -743,15 +752,6 @@ const rogue_backend_op_mod_info rogue_backend_op_mod_infos[ROGUE_BACKEND_OP_MOD_
    [ROGUE_BACKEND_OP_MOD_SAT]  = { .str = "sat", },
    [ROGUE_BACKEND_OP_MOD_FREEP] = { .str = "freep", },
    [ROGUE_BACKEND_OP_MOD_NOWDF] = { .str = "nowdf", },
-   [ROGUE_BACKEND_OP_MOD_IFB] = { .str = "ifb", },
-   [ROGUE_BACKEND_OP_MOD_NEVER] = { .str = "never", .exclude = OM(LESS) | OM(EQUAL) | OM(LESSEQUAL) | OM(GREATER) | OM(NOTEQUAL) | OM(GREATEREQUAL) | OM(ALWAYS) },
-   [ROGUE_BACKEND_OP_MOD_LESS] = { .str = "less", .exclude = OM(NEVER) | OM(EQUAL) | OM(LESSEQUAL) | OM(GREATER) | OM(NOTEQUAL) | OM(GREATEREQUAL) | OM(ALWAYS) },
-   [ROGUE_BACKEND_OP_MOD_EQUAL] = { .str = "equal", .exclude = OM(NEVER) | OM(LESS) | OM(LESSEQUAL) | OM(GREATER) | OM(NOTEQUAL) | OM(GREATEREQUAL) | OM(ALWAYS) },
-   [ROGUE_BACKEND_OP_MOD_LESSEQUAL] = { .str = "lessequal", .exclude = OM(NEVER) | OM(LESS) | OM(EQUAL) | OM(GREATER) | OM(NOTEQUAL) | OM(GREATEREQUAL) | OM(ALWAYS) },
-   [ROGUE_BACKEND_OP_MOD_GREATER] = { .str = "greater", .exclude = OM(NEVER) | OM(LESS) | OM(EQUAL) | OM(LESSEQUAL) | OM(NOTEQUAL) | OM(GREATEREQUAL) | OM(ALWAYS) },
-   [ROGUE_BACKEND_OP_MOD_NOTEQUAL] = { .str = "notequal", .exclude = OM(NEVER) | OM(LESS) | OM(EQUAL) | OM(LESSEQUAL) | OM(GREATER) | OM(GREATEREQUAL) | OM(ALWAYS) },
-   [ROGUE_BACKEND_OP_MOD_GREATEREQUAL] = { .str = "greaterequal", .exclude = OM(NEVER) | OM(LESS) | OM(EQUAL) | OM(LESSEQUAL) | OM(GREATER) | OM(NOTEQUAL) | OM(ALWAYS) },
-   [ROGUE_BACKEND_OP_MOD_ALWAYS] = { .str = "always", .exclude = OM(NEVER) | OM(LESS) | OM(EQUAL) | OM(LESSEQUAL) | OM(GREATER) | OM(NOTEQUAL) | OM(GREATEREQUAL) },
 };
 #undef OM
 

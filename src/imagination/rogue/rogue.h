@@ -1870,7 +1870,7 @@ enum rogue_backend_op {
    ROGUE_BACKEND_OP_UVSW_EMITTHENENDTASK,
    ROGUE_BACKEND_OP_UVSW_WRITETHENEMITTHENENDTASK,
 
-   ROGUE_BACKEND_OP_MOVMSK,
+   ROGUE_BACKEND_OP_MOVMSKF,
    ROGUE_BACKEND_OP_SAVMSK,
 
    ROGUE_BACKEND_OP_IDF,
@@ -1882,7 +1882,9 @@ enum rogue_backend_op {
    ROGUE_BACKEND_OP_LD,
    ROGUE_BACKEND_OP_ST,
 
-   ROGUE_BACKEND_OP_ATST,
+   ROGUE_BACKEND_OP_ALPHATST,
+   ROGUE_BACKEND_OP_ALPHAF,
+   ROGUE_BACKEND_OP_DEPTHF,
 
    ROGUE_BACKEND_OP_FITR_PIXEL,
    /* ROGUE_BACKEND_OP_SAMPLE, */
@@ -1896,9 +1898,7 @@ enum rogue_backend_op {
    ROGUE_BACKEND_OP_SMP3D,
 
    ROGUE_BACKEND_OP_PSEUDO,
-   ROGUE_BACKEND_OP_ATST_IF = ROGUE_BACKEND_OP_PSEUDO,
-
-   ROGUE_BACKEND_OP_COUNT,
+   ROGUE_BACKEND_OP_COUNT = ROGUE_BACKEND_OP_PSEUDO,
 };
 
 typedef struct rogue_backend_io_info {
@@ -2013,17 +2013,6 @@ enum rogue_backend_op_mod {
    ROGUE_BACKEND_OP_MOD_FREEP, /* Free partition. */
 
    ROGUE_BACKEND_OP_MOD_NOWDF, /* Don't schedule WDF. */
-
-   ROGUE_BACKEND_OP_MOD_IFB, /* Inhibit FeedBack. */
-
-   ROGUE_BACKEND_OP_MOD_NEVER,
-   ROGUE_BACKEND_OP_MOD_LESS,
-   ROGUE_BACKEND_OP_MOD_EQUAL,
-   ROGUE_BACKEND_OP_MOD_LESSEQUAL,
-   ROGUE_BACKEND_OP_MOD_GREATER,
-   ROGUE_BACKEND_OP_MOD_NOTEQUAL,
-   ROGUE_BACKEND_OP_MOD_GREATEREQUAL,
-   ROGUE_BACKEND_OP_MOD_ALWAYS,
 
    ROGUE_BACKEND_OP_MOD_COUNT,
 };
@@ -3996,6 +3985,7 @@ typedef struct rogue_build_data {
       enum rogue_msaa_mode msaa_mode;
       bool phas; /* Indicates the presence of PHAS instruction. */
       bool discard;
+      bool depth_feedback;
       bool side_effects;
       bool translucent;
 

@@ -1226,7 +1226,7 @@ typedef struct rogue_backend_vistest_encoding {
    /* Byte 0 */
    struct {
       unsigned ifb : 1;
-      unsigned atst : 1;
+      unsigned viststop : 1;
       unsigned pwen : 1;
       unsigned : 5;
    } PACKED;
@@ -1243,6 +1243,11 @@ enum acmpmode {
    ACMPMODE_NOTEQUAL = 0b101,
    ACMPMODE_GREATEREQUAL = 0b110,
    ACMPMODE_ALWAYS = 0b111,
+};
+
+enum viststop {
+   VISTSTOP_DEPTHF = 0b0,
+   VISTSTOP_ATST = 0b1,
 };
 
 typedef struct rogue_backend_msk_encoding {

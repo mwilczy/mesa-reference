@@ -147,13 +147,18 @@ static inline bool rogue_group_instr_needs_olchk(rogue_instr_group *group)
 
    rogue_backend_instr *backend =
       rogue_instr_as_backend(group->instrs[ROGUE_INSTR_PHASE_BACKEND]);
-   if (backend->op == ROGUE_BACKEND_OP_ATST) {
-      if (!rogue_backend_op_mod_is_set(backend, ROGUE_BACKEND_OP_MOD_IFB))
-         return true;
-   }
+   switch (backend->op) {
+   case ROGUE_BACKEND_OP_ST:
+      return rogue_backend_op_mod_is_set(backend, ROGUE_BACKEND_OP_MOD_TILED);
 
-   if (backend->op == ROGUE_BACKEND_OP_MOVMSK)
+   case ROGUE_BACKEND_OP_ALPHAF:
+   case ROGUE_BACKEND_OP_DEPTHF:
+   case ROGUE_BACKEND_OP_MOVMSKF:
       return true;
+
+   default:
+      break;
+   }
 
    return false;
 }
@@ -163,6 +168,11 @@ static bool rogue_should_set_olchk(rogue_instr_group *group)
    /* Only fragment shaders need overlap checks. */
    if (group->block->shader->stage != MESA_SHADER_NONE &&
        group->block->shader->stage != MESA_SHADER_FRAGMENT)
+      return false;
+
+   /* TODO NEXT: do this properly */
+   if (group->block->shader->name &&
+       !strcmp(group->block->shader->name, "per-job EOT"))
       return false;
 
    /* Check for specific backend instructions that require olchk to be set. */
@@ -1112,7 +1122,7 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
          rogue_ref_get_vtxout_index(&backend->dst[0].ref);
       break;
 
-   case ROGUE_BACKEND_OP_MOVMSK:
+   case ROGUE_BACKEND_OP_MOVMSKF:
       instr_encoding->backend.op = BACKENDOP_MSK;
 
       instr_encoding->backend.msk.mode = MSK_MODE_ICM;
@@ -1264,14 +1274,18 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
       break;
    }
 
-   case ROGUE_BACKEND_OP_ATST:
+   case ROGUE_BACKEND_OP_ALPHATST:
+   case ROGUE_BACKEND_OP_ALPHAF:
+   case ROGUE_BACKEND_OP_DEPTHF:
       instr_encoding->backend.op = BACKENDOP_VISTEST;
 
-      instr_encoding->backend.vistest.ifb =
-         rogue_backend_op_mod_is_set(backend, OM(IFB));
-      instr_encoding->backend.vistest.atst = 1;
-      instr_encoding->backend.vistest.pwen =
-         rogue_ref_is_io_p0(&backend->dst[0].ref);
+      instr_encoding->backend.vistest.ifb = backend->op ==
+                                            ROGUE_BACKEND_OP_ALPHATST;
+      instr_encoding->backend.vistest.viststop =
+         backend->op == ROGUE_BACKEND_OP_DEPTHF ? VISTSTOP_DEPTHF
+                                                : VISTSTOP_ATST;
+      instr_encoding->backend.vistest.pwen = backend->op ==
+                                             ROGUE_BACKEND_OP_ALPHATST;
       break;
 
    case ROGUE_BACKEND_OP_SMP1D:

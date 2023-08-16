@@ -2007,3 +2007,5 @@ intrinsic("load_tile_buffer_base_addr_img", dest_comp=1, indices=[BASE], flags=[
 intrinsic("load_tile_buffer_offset_img", dest_comp=1, indices=[BASE, TILE_BUFFER_STORE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 
 intrinsic("pass_cov_mask_img", dest_comp=1, src_comp=[1, 1], indices=[BASE], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
+
+intrinsic("isp_feedback_img", src_comp=[1, 1], bit_sizes=[0, 0], indices=[], flags=[])

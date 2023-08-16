@@ -2092,23 +2092,33 @@ static void trans_nir_intrinsic_load_vertex_sysval(rogue_builder *b,
    rogue_MOV(b, dst, src);
 }
 
-static void trans_nir_intrinsic_discard(rogue_builder *b,
-                                        nir_intrinsic_instr *intr)
+static void trans_nir_intrinsic_isp_feedback_img(rogue_builder *b,
+                                                 nir_intrinsic_instr *intr)
 {
-   rogue_backend_instr *atst_never =
-      rogue_ATST_IF(b, rogue_ref_imm(0), rogue_ref_imm(0));
-   rogue_set_backend_op_mod(atst_never, ROGUE_BACKEND_OP_MOD_NEVER);
-   rogue_add_instr_comment(&atst_never->instr, "discard");
-}
+   rogue_ref src_discard_cond =
+      intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
+   rogue_ref src_depth = intr_src(b->shader, intr, 1, &(unsigned){ 1 }, 32);
 
-static void trans_nir_intrinsic_discard_if(rogue_builder *b,
-                                           nir_intrinsic_instr *intr)
-{
-   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, 32);
-   rogue_backend_instr *atst_if = rogue_ATST_IF(b, src, rogue_ref_imm(0));
-   /* For ATST false = discard; pass if == 0, discard if != 0. */
-   rogue_set_backend_op_mod(atst_if, ROGUE_BACKEND_OP_MOD_EQUAL);
-   rogue_add_instr_comment(&atst_if->instr, "discard_if");
+   /* Either not a constant condition, or the condition is true/always. */
+   bool does_discard = !nir_src_is_const(intr->src[0]) ||
+                       nir_src_as_bool(intr->src[0]);
+   bool does_depth = !nir_src_is_undef(intr->src[1]);
+
+   if (does_discard)
+      rogue_SETPRED(b, rogue_ref_io(ROGUE_IO_P0), src_discard_cond);
+
+   rogue_backend_instr *ispf =
+      does_depth ? rogue_DEPTHF(b, rogue_ref_drc(0), src_depth)
+                 : rogue_ALPHAF(b,
+                                rogue_ref_drc(0),
+                                rogue_ref_imm(0),
+                                rogue_ref_imm(0),
+                                rogue_ref_imm(ACMPMODE_ALWAYS));
+
+   if (does_discard)
+      rogue_set_instr_exec_cond(&ispf->instr, ROGUE_EXEC_COND_P0_FALSE);
+
+   rogue_add_instr_commentf(&ispf->instr, "isp_feedback_img");
 }
 
 static inline const char *nir_alu_type_str(nir_alu_type type)
@@ -3003,11 +3013,8 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    case nir_intrinsic_load_draw_id:
       return trans_nir_intrinsic_load_vertex_sysval(b, intr);
 
-   case nir_intrinsic_discard:
-      return trans_nir_intrinsic_discard(b, intr);
-
-   case nir_intrinsic_discard_if:
-      return trans_nir_intrinsic_discard_if(b, intr);
+   case nir_intrinsic_isp_feedback_img:
+      return trans_nir_intrinsic_isp_feedback_img(b, intr);
 
    case nir_intrinsic_convert_alu_types:
       return trans_nir_intrinsic_convert_alu_types(b, intr);
@@ -4848,25 +4855,33 @@ static rogue_block *trans_nir_cf_nodes(rogue_builder *b,
 }
 
 /* TODO: handle other instructions/build data. */
+/* TODO NEXT: this can likely be done in NIR instead. */
 static bool fs_data_cb(UNUSED const rogue_instr *instr,
                        const void *instr_as,
                        unsigned op,
                        void *user_data)
 {
    struct rogue_fs_build_data *data = user_data;
-   bool discard = false;
-   bool side_effects = false;
 
-   if (op == ROGUE_BACKEND_OP_ATST) {
-      const rogue_backend_instr *atst = instr_as;
-      bool ifb = rogue_backend_op_mod_is_set(atst, ROGUE_BACKEND_OP_MOD_IFB);
+   switch (op) {
+   case ROGUE_BACKEND_OP_ALPHAF:
+      data->discard |= true;
+      data->side_effects |= true;
+      break;
 
-      discard |= !ifb;
-      side_effects |= !ifb;
+   case ROGUE_BACKEND_OP_DEPTHF:
+      data->depth_feedback |= true;
+      data->side_effects |= true;
+      break;
+
+   /* TODO: Check */
+   case ROGUE_BACKEND_OP_MOVMSKF:
+      data->side_effects |= true;
+      break;
+
+   default:
+      break;
    }
-
-   data->discard = discard;
-   data->side_effects = side_effects;
 
    return true;
 }
@@ -4875,7 +4890,9 @@ static void rogue_collect_late_fs_build_data(rogue_shader *shader)
 {
    struct rogue_fs_build_data *data = &shader->ctx->stage_data.fs;
    rogue_instr_filter filter = { 0 };
-   BITSET_SET(filter.backend_mask, ROGUE_BACKEND_OP_ATST);
+   BITSET_SET(filter.backend_mask, ROGUE_BACKEND_OP_ALPHAF);
+   BITSET_SET(filter.backend_mask, ROGUE_BACKEND_OP_DEPTHF);
+   BITSET_SET(filter.backend_mask, ROGUE_BACKEND_OP_MOVMSKF);
    rogue_find_instrs(shader, &filter, fs_data_cb, data);
 }
 
