@@ -1301,6 +1301,17 @@ static inline enum idx_bank rogue_idx_bank_encoding(const rogue_ref *ref)
 static inline unsigned rogue_reg_index_encoding(const rogue_ref *ref)
 {
    if (rogue_ref_is_reg_indexed(ref) || rogue_ref_is_idx_reg(ref)) {
+      /* TODO: ideally we don't want to lower pixout to
+       * special until the actual encoding step */
+      if (ref->reg->class == ROGUE_REG_CLASS_SPECIAL) {
+         assert(ref->reg->index >= ROGUE_SPECIAL_REG_PIXOUT_0 &&
+                ref->reg->index <= ROGUE_SPECIAL_REG_PIXOUT_3);
+         return (rogue_idx_offset){
+            .bank = IDX_BANK_PIXOUT,
+            .offset = ref->reg->index - ROGUE_SPECIAL_REG_PIXOUT_0,
+         }
+            ._;
+      }
       return (rogue_idx_offset){
          .bank = rogue_idx_bank_encoding(ref),
          .offset = ref->reg->index,
