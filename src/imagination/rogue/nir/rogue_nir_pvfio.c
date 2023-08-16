@@ -723,7 +723,8 @@ static nir_def *lower_frag_store_out(nir_builder *b,
 
    unsigned store_component = nir_intrinsic_component(intr);
    enum pipe_swizzle chan = fmt_desc->swizzle[store_component];
-   assert(chan <= PIPE_SWIZZLE_W);
+   if (chan > PIPE_SWIZZLE_W)
+      return NIR_LOWER_INSTR_PROGRESS_REPLACE;
 
    unsigned fmt_chans = fmt_desc->nr_channels;
    assert(chan < fmt_chans);
