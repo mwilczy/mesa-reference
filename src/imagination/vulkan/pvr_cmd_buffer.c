@@ -4780,7 +4780,8 @@ pvr_setup_isp_faces_and_control(struct pvr_cmd_buffer *const cmd_buffer,
    const uint32_t depth_stencil_attachment_idx =
       pass_info->pass->subpasses[subpass_idx].depth_stencil_attachment;
    const struct pvr_render_pass_attachment *const attachment =
-      depth_stencil_attachment_idx != VK_ATTACHMENT_UNUSED
+      (pass_info->pass->attachments &&
+      depth_stencil_attachment_idx != VK_ATTACHMENT_UNUSED)
          ? &pass_info->pass->attachments[depth_stencil_attachment_idx]
          : NULL;
 
