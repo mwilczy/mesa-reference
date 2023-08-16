@@ -299,6 +299,8 @@ index("unsigned", "mutex_op_img")
 
 index("unsigned", "fence_op_img")
 
+index("bool", "tile_buffer_store_img")
+
 # Register metadata
 # number of vector components
 index("unsigned", "num_components")
@@ -1998,3 +2000,10 @@ intrinsic("store_barrier_counter_img", src_comp=[1], bit_sizes=[32])
 
 # Hardware that doesn't have load_front_face has this instead.
 intrinsic("load_face_orientation_img", dest_comp=1, bit_sizes=[32])
+
+intrinsic("load_tile_buffer_base_addr_img", dest_comp=1, indices=[BASE], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
+
+# SR54-57/58-61
+intrinsic("load_tile_buffer_offset_img", dest_comp=1, indices=[BASE, TILE_BUFFER_STORE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+
+intrinsic("pass_cov_mask_img", dest_comp=1, src_comp=[1, 1], indices=[BASE], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])

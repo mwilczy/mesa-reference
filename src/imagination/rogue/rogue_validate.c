@@ -177,7 +177,7 @@ static void validate_dst(rogue_validation_state *state,
       if (repeat_mask & BITFIELD64_BIT(i))
          dst_size *= repeat;
 
-      if (dst_valnum_mask & BITFIELD64_BIT(i))
+      if (rogue_ref_is_val(valnum) && dst_valnum_mask & BITFIELD64_BIT(i))
          dst_size *= rogue_ref_get_val(valnum);
 
       if (rogue_ref_is_regarray(&dst->ref)) {

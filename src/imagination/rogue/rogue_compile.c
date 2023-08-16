@@ -1662,21 +1662,39 @@ static void trans_nir_intrinsic_load_output(rogue_builder *b,
 static void trans_nir_intrinsic_store_output_fs(rogue_builder *b,
                                                 nir_intrinsic_instr *intr)
 {
+   /* Pixel output registers can't be used with repeat > 1, so store_size
+    * will always be limited to 1.
+    */
+   rogue_ref src_data =
+      intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
    bool reg_store = nir_src_is_const(intr->src[1]);
    if (reg_store) {
+      /* Pixel output store. */
       unsigned reg_idx = nir_intrinsic_base(intr);
       rogue_ref dst = rogue_ref_reg(rogue_pixout_reg(b->shader, reg_idx));
 
-      /* Pixel output registers can't be used with repeat > 1, so store_size
-       * will always be limited to 1.
-       */
-      rogue_ref src =
-         intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
-
-      rogue_alu_instr *mov = rogue_MOV(b, dst, src);
+      rogue_alu_instr *mov = rogue_MOV(b, dst, src_data);
       rogue_add_instr_commentf(&mov->instr, "store_reg_output_fs");
    } else {
-      unreachable("Tile buffer stores are unsupported.");
+      /* Tile buffer store. */
+      nir_intrinsic_instr *addr_covmsk = nir_src_as_intrinsic(intr->src[1]);
+      rogue_ref64 src_addr = nir_ssa_intr_src64(b->shader, addr_covmsk, 0);
+      rogue_ref src_covmsk = intr_src(b->shader,
+                                      addr_covmsk,
+                                      1,
+                                      &(unsigned){ 1 },
+                                      ROGUE_REG_SIZE_BITS);
+
+      rogue_backend_instr *st = rogue_ST(b,
+                                         src_data,
+                                         rogue_ref_val(2),
+                                         rogue_ref_drc(0),
+                                         rogue_ref_val(1),
+                                         src_addr.ref64,
+                                         src_covmsk);
+      rogue_set_backend_op_mod(st, ROGUE_BACKEND_OP_MOD_TILED);
+      rogue_add_instr_commentf(&st->instr, "store_tiled_output_fs");
    }
 }
 
@@ -2838,6 +2856,47 @@ static void trans_nir_intrinsic_mutex_img(rogue_builder *b,
    rogue_set_ctrl_op_mod(mutex, mod);
 }
 
+static void
+trans_nir_intrinsic_load_tile_buffer_base_addr_img(rogue_builder *b,
+                                                   nir_intrinsic_instr *intr)
+{
+   unsigned buffer_id = nir_intrinsic_base(intr);
+
+   rogue_ref64 dst = nir_ssa_intr_dst64(b->shader, intr);
+
+   /* TODO: Do this properly. */
+   uint64_t addr = b->shader->ctx->tile_buffer_base_addr[buffer_id];
+
+   uint32_t addr_lo = addr & 0xffffffff;
+   rogue_alu_instr *mov = rogue_MOV(b, dst.lo32, rogue_ref_imm(addr_lo));
+   rogue_add_instr_comment(&mov->instr, "load_tile_buffer_base_addr_img.lo32");
+
+   uint32_t addr_hi = addr >> 32;
+   mov = rogue_MOV(b, dst.hi32, rogue_ref_imm(addr_hi));
+   rogue_add_instr_comment(&mov->instr, "load_tile_buffer_base_addr_img.hi32");
+}
+
+static void
+trans_nir_intrinsic_load_tile_buffer_offset_img(rogue_builder *b,
+                                                nir_intrinsic_instr *intr)
+{
+   unsigned channel = nir_intrinsic_base(intr);
+   assert(channel < 4); /* TODO: support up to 8, or don't bother? */
+   bool is_store = nir_intrinsic_tile_buffer_store_img(intr);
+
+   enum rogue_special_reg spec_reg = is_store
+                                        ? ROGUE_SPECIAL_REG_TILED_ST_COMP_0
+                                        : ROGUE_SPECIAL_REG_TILED_LD_COMP_0;
+   spec_reg += channel;
+
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
+
+   rogue_reg *src = rogue_special_reg(b->shader, spec_reg);
+
+   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_reg(src));
+   rogue_add_instr_comment(&mov->instr, "load_tile_buffer_offset_img");
+}
+
 static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 {
    switch (intr->intrinsic) {
@@ -2971,6 +3030,16 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_mutex_img:
       return trans_nir_intrinsic_mutex_img(b, intr);
+
+   case nir_intrinsic_load_tile_buffer_base_addr_img:
+      return trans_nir_intrinsic_load_tile_buffer_base_addr_img(b, intr);
+
+   case nir_intrinsic_load_tile_buffer_offset_img:
+      return trans_nir_intrinsic_load_tile_buffer_offset_img(b, intr);
+
+   case nir_intrinsic_pass_cov_mask_img:
+      /* Consumed. */
+      return;
 
    default:
       break;

@@ -532,7 +532,7 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
          [2] = T(DRC),
          [3] = T(REG) | T(VAL),
          [4] = T(REGARRAY),
-         [5] = T(REGARRAY) | T(IO),
+         [5] = T(REG) | T(REGARRAY) | T(IO),
       },
       .src_stride = {
          [4] = 1,
