@@ -4096,6 +4096,8 @@ typedef struct rogue_build_ctx {
    rogue_common_build_data common_data[MESA_SHADER_COMPUTE + 1];
    rogue_build_data stage_data;
    struct pvr_pipeline_layout *pipeline_layout;
+
+   uint64_t tile_buffer_base_addr[7];
 } rogue_build_ctx;
 
 /**

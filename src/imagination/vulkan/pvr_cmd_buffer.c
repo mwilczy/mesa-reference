@@ -480,13 +480,9 @@ pvr_cmd_buffer_upload_pds_data(struct pvr_cmd_buffer *const cmd_buffer,
                                     pds_upload_out);
 }
 
-/* pbe_cs_words must be an array of length emit_count with
- * ROGUE_NUM_PBESTATE_STATE_WORDS entries
- */
 static VkResult pvr_sub_cmd_gfx_per_job_fragment_programs_create_and_upload(
    struct pvr_cmd_buffer *const cmd_buffer,
-   const uint32_t emit_count,
-   const uint32_t *pbe_cs_words,
+   struct pvr_emit_state *emit_state,
    struct pvr_pds_upload *const pds_upload_out)
 {
    struct pvr_pds_event_program pixel_event_program = {
@@ -503,13 +499,19 @@ static VkResult pvr_sub_cmd_gfx_per_job_fragment_programs_create_and_upload(
    uint32_t usc_temp_count;
    VkResult result;
 
-   assert(emit_count > 0);
+   for (unsigned u = 0; u < emit_state->emit_count; u++) {
+      const struct pvr_device_tile_buffer_state *tile_buffer_state =
+         &device->tile_buffer_state;
+      uint32_t tile_buffer = emit_state->tile_buffer_id[u];
+      if (tile_buffer == ~0)
+         continue;
 
-   pvr_uscgen_eot("per-job EOT",
-                  emit_count,
-                  pbe_cs_words,
-                  &usc_temp_count,
-                  &eot_program_bin);
+      assert(tile_buffer < tile_buffer_state->buffer_count);
+      emit_state->tile_buffer_addr[u] =
+         tile_buffer_state->buffers[tile_buffer]->vma->dev_addr.addr;
+   }
+
+   pvr_uscgen_eot("per-job EOT", emit_state, &usc_temp_count, &eot_program_bin);
 
    result = pvr_cmd_buffer_upload_usc(cmd_buffer,
                                       eot_program_bin.data,
@@ -929,20 +931,22 @@ static inline uint32_t pvr_stride_from_pitch(uint32_t pitch, VkFormat vk_format)
    return pitch / cpp;
 }
 
-static void pvr_setup_pbe_state(
-   const struct pvr_device_info *dev_info,
-   const struct pvr_framebuffer *framebuffer,
-   uint32_t mrt_index,
-   const struct usc_mrt_resource *mrt_resource,
-   const struct pvr_image_view *const iview,
-   const VkRect2D *render_area,
-   const bool down_scale,
-   const uint32_t samples,
-   uint32_t pbe_cs_words[static const ROGUE_NUM_PBESTATE_STATE_WORDS],
-   uint64_t pbe_reg_words[static const ROGUE_NUM_PBESTATE_REG_WORDS])
+static void pvr_setup_pbe_state(const struct pvr_device_info *dev_info,
+                                const struct pvr_framebuffer *framebuffer,
+                                uint32_t mrt_index,
+                                const struct usc_mrt_resource *mrt_resource,
+                                const struct pvr_image_view *const iview,
+                                const VkRect2D *render_area,
+                                const bool down_scale,
+                                const uint32_t samples,
+                                struct pvr_emit_state *emit_state,
+                                uint32_t i)
 {
    const struct pvr_image *image = pvr_image_view_get_image(iview);
    uint32_t level_pitch = image->mip_levels[iview->vk.base_mip_level].pitch;
+
+   uint32_t *pbe_cs_words = emit_state->pbe_cs_words[i];
+   uint64_t *pbe_reg_words = emit_state->pbe_reg_words[i];
 
    struct pvr_pbe_surf_params surface_params;
    struct pvr_pbe_render_params render_params;
@@ -999,11 +1003,13 @@ static void pvr_setup_pbe_state(
 
    if (mrt_resource->type == USC_MRT_RESOURCE_TYPE_MEMORY) {
       position = mrt_resource->mem.offset_dw;
+      emit_state->tile_buffer_id[i] = mrt_resource->mem.tile_buffer;
    } else {
       assert(mrt_resource->type == USC_MRT_RESOURCE_TYPE_OUTPUT_REG);
       assert(mrt_resource->reg.offset == 0);
 
       position = mrt_resource->reg.output_reg;
+      emit_state->tile_buffer_id[i] = ~0;
    }
 
    assert(position <= 3 || PVR_HAS_FEATURE(dev_info, eight_output_registers));
@@ -1308,16 +1314,6 @@ pvr_sub_cmd_gfx_align_ds_subtiles(struct pvr_cmd_buffer *const cmd_buffer,
    return VK_SUCCESS;
 }
 
-struct pvr_emit_state {
-   uint32_t pbe_cs_words[PVR_MAX_COLOR_ATTACHMENTS]
-                        [ROGUE_NUM_PBESTATE_STATE_WORDS];
-
-   uint64_t pbe_reg_words[PVR_MAX_COLOR_ATTACHMENTS]
-                         [ROGUE_NUM_PBESTATE_REG_WORDS];
-
-   uint32_t emit_count;
-};
-
 static void
 pvr_setup_emit_state(const struct pvr_device_info *dev_info,
                      const struct pvr_renderpass_hwsetup_render *hw_render,
@@ -1333,6 +1329,7 @@ pvr_setup_emit_state(const struct pvr_device_info *dev_info,
                     state) {
          state.emptytile = true;
       }
+      emit_state->tile_buffer_id[0] = ~0;
       return;
    }
 
@@ -1385,8 +1382,8 @@ pvr_setup_emit_state(const struct pvr_device_info *dev_info,
                              &render_pass_info->render_area,
                              surface->need_resolve,
                              samples,
-                             emit_state->pbe_cs_words[emit_state->emit_count],
-                             emit_state->pbe_reg_words[emit_state->emit_count]);
+                             emit_state,
+                             emit_state->emit_count);
          emit_state->emit_count += 1;
       }
    }
@@ -1455,8 +1452,7 @@ static VkResult pvr_sub_cmd_gfx_job_init(const struct pvr_device_info *dev_info,
 
       result = pvr_sub_cmd_gfx_per_job_fragment_programs_create_and_upload(
          cmd_buffer,
-         emit_state.emit_count,
-         emit_state.pbe_cs_words[0],
+         &emit_state,
          &pds_pixel_event_program);
       if (result != VK_SUCCESS)
          return result;

@@ -2672,6 +2672,16 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
    if (!ctx)
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
+#if 1
+   {
+      for (unsigned u = 0; u < device->tile_buffer_state.buffer_count; ++u) {
+         uint64_t tile_buffer_addr =
+            device->tile_buffer_state.buffers[u]->vma->dev_addr.addr;
+         ctx->tile_buffer_base_addr[u] = tile_buffer_addr;
+      }
+   }
+#endif
+
    pvr_graphics_pipeline_assign_fs_io(ctx,
                                       &ctx->stage_data.fs,
                                       pass,

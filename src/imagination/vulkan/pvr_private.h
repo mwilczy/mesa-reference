@@ -1216,6 +1216,19 @@ CHECK_MASK_SIZE(pvr_load_op,
 
 #undef CHECK_MASK_SIZE
 
+struct pvr_emit_state {
+   uint32_t pbe_cs_words[PVR_MAX_COLOR_ATTACHMENTS]
+                        [ROGUE_NUM_PBESTATE_STATE_WORDS];
+
+   uint64_t pbe_reg_words[PVR_MAX_COLOR_ATTACHMENTS]
+                         [ROGUE_NUM_PBESTATE_REG_WORDS];
+
+   uint32_t tile_buffer_id[PVR_MAX_COLOR_ATTACHMENTS]; /* ~0 if on-chip */
+   uint64_t tile_buffer_addr[PVR_MAX_COLOR_ATTACHMENTS];
+
+   uint32_t emit_count;
+};
+
 uint32_t pvr_calc_fscommon_size_and_tiles_in_flight(
    const struct pvr_device_info *dev_info,
    const struct pvr_device_runtime_info *dev_runtime_info,

@@ -158,8 +158,7 @@ struct pvr_smp_layout {
 };
 
 void pvr_uscgen_eot(const char *name,
-                    uint32_t emit_count,
-                    const uint32_t *emit_state,
+                    const struct pvr_emit_state *emit_state,
                     unsigned *temps_used,
                     struct util_dynarray *binary);
 

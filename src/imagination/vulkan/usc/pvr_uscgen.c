@@ -39,10 +39,8 @@
 
 #include <stdbool.h>
 
-/* Expects emit_count ROGUE_NUM_PBESTATE_STATE_WORDS entries */
 void pvr_uscgen_eot(const char *name,
-                    uint32_t emit_count,
-                    const uint32_t *emit_state,
+                    const struct pvr_emit_state *emit_state,
                     unsigned *temps_used,
                     struct util_dynarray *binary)
 {
@@ -56,18 +54,56 @@ void pvr_uscgen_eot(const char *name,
    rogue_builder_init(&b, shader);
    rogue_push_block(&b);
 
-   for (unsigned u = 0; u < emit_count; u++) {
+   assert(emit_state->emit_count > 0);
+   for (unsigned u = 0; u < emit_state->emit_count; u++) {
       if (u > 0)
          rogue_WOP(&b);
 
-      rogue_MOV(&b, rogue_ref_reg(state_word_0), rogue_ref_imm(emit_state[0]));
-      rogue_MOV(&b, rogue_ref_reg(state_word_1), rogue_ref_imm(emit_state[1]));
+      /* TODO: hardcoded and not optimal for now */
+      if (emit_state->tile_buffer_id[u] != ~0) {
+         rogue_MOV(&b,
+                   rogue_ref_reg(state_word_0),
+                   rogue_ref_imm(emit_state->tile_buffer_addr[u] & 0xffffffff));
+         rogue_MOV(&b,
+                   rogue_ref_reg(state_word_1),
+                   rogue_ref_imm((emit_state->tile_buffer_addr[u] >> 32) &
+                                 0xffffffff));
+
+         rogue_ADD64_32(
+            &b,
+            rogue_ref_reg(state_word_0),
+            rogue_ref_reg(state_word_1),
+            rogue_ref_reg(state_word_0),
+            rogue_ref_reg(state_word_1),
+            rogue_ref_reg(
+               rogue_special_reg(shader, ROGUE_SPECIAL_REG_TILED_LD_COMP_0)),
+            rogue_none());
+
+         rogue_ref idx = rogue_ref_reg(rogue_index_reg(shader, 0));
+         rogue_MOV(&b, idx, rogue_ref_imm(0));
+         rogue_ref ld_dst =
+            rogue_ref_reg_indexed(rogue_pixout_reg(shader, 0), 0);
+
+         rogue_ref addr = rogue_ref_regarray(rogue_temp_regarray(shader, 2, 0));
+         /* TODO NEXT: check why burst size 1024 */
+         rogue_LD(&b,
+                  ld_dst,
+                  rogue_ref_drc(0),
+                  rogue_ref_reg(rogue_const_reg(shader, 0)),
+                  addr);
+         /* rogue_LD(&b, ld_dst, rogue_ref_drc(0), rogue_ref_val(4), addr); */
+      }
+
+      rogue_MOV(&b,
+                rogue_ref_reg(state_word_0),
+                rogue_ref_imm(emit_state->pbe_cs_words[u][0]));
+      rogue_MOV(&b,
+                rogue_ref_reg(state_word_1),
+                rogue_ref_imm(emit_state->pbe_cs_words[u][1]));
 
       emitpix = rogue_EMITPIX(&b,
                               rogue_ref_reg(state_word_0),
                               rogue_ref_reg(state_word_1));
-
-      emit_state += 2;
    }
 
    assert(emitpix);
@@ -607,6 +643,16 @@ void pvr_uscgen_load_op(struct pvr_device *device,
    struct rogue_build_ctx *rogue_ctx =
       rogue_build_context_create(device->pdevice->compiler, &pipeline_layout);
 
+#if 1
+   {
+      for (unsigned u = 0; u < device->tile_buffer_state.buffer_count; ++u) {
+         uint64_t tile_buffer_addr =
+            device->tile_buffer_state.buffers[u]->vma->dev_addr.addr;
+         rogue_ctx->tile_buffer_base_addr[u] = tile_buffer_addr;
+      }
+   }
+#endif
+
    struct rogue_fs_build_data *fs_data = &rogue_ctx->stage_data.fs;
    struct pvr_uscgen_load_op_context loadop_ctx = {
       .load_op = load_op,
@@ -624,7 +670,10 @@ void pvr_uscgen_load_op(struct pvr_device *device,
                                                   "pvr_load_op");
 
    /* fs_data->num_outputs = util_bitcount(rt_mask) + !!depth_to_reg; */
-   fs_data->num_outputs = util_last_bit(rt_mask) + !!depth_to_reg; /* In case bottom ones are zero */
+   fs_data->num_outputs = util_last_bit(rt_mask) + !!depth_to_reg; /* In case
+                                                                      bottom
+                                                                      ones are
+                                                                      zero */
    if (fs_data->num_outputs) {
       fs_data->outputs = rzalloc_array_size(rogue_ctx,
                                             sizeof(*fs_data->outputs),

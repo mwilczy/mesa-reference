@@ -723,6 +723,16 @@ void pvr_uscgen_tq_frag(const struct pvr_device *device,
    struct rogue_build_ctx *rogue_ctx =
       rogue_build_context_create(device->pdevice->compiler, &pipeline_layout);
 
+#if 1
+   {
+      for (unsigned u = 0; u < device->tile_buffer_state.buffer_count; ++u) {
+         uint64_t tile_buffer_addr =
+            device->tile_buffer_state.buffers[u]->vma->dev_addr.addr;
+         rogue_ctx->tile_buffer_base_addr[u] = tile_buffer_addr;
+      }
+   }
+#endif
+
    struct rogue_fs_build_data *fs_data = &rogue_ctx->stage_data.fs;
 
    unsigned pixel_size = pvr_pbe_pixel_size(layer_props->pbe_format);

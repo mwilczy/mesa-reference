@@ -622,10 +622,9 @@ pvr_spm_init_eot_state(struct pvr_device *device,
       .width = framebuffer->width,
       .height = framebuffer->height,
    };
-   uint32_t pbe_state_words[PVR_MAX_COLOR_ATTACHMENTS]
-                           [ROGUE_NUM_PBESTATE_STATE_WORDS];
-   const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
+   struct pvr_emit_state emit_state = { 0 };
    uint32_t total_render_target_used = 0;
+   const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
    struct pvr_pds_upload pds_eot_program;
    struct util_dynarray usc_shader_binary;
    uint32_t usc_temp_count;
@@ -652,8 +651,8 @@ pvr_spm_init_eot_state(struct pvr_device *device,
          USC_MRT_RESOURCE_TYPE_OUTPUT_REG,
          0,
          next_scratch_buffer_addr,
-         pbe_state_words[total_render_target_used],
-         pbe_state_words[total_render_target_used + 1],
+         emit_state.pbe_cs_words[total_render_target_used],
+         emit_state.pbe_cs_words[total_render_target_used + 1],
          spm_eot_state->pbe_reg_words[total_render_target_used],
          spm_eot_state->pbe_reg_words[total_render_target_used + 1],
          &render_targets_used);
@@ -679,8 +678,8 @@ pvr_spm_init_eot_state(struct pvr_device *device,
             USC_MRT_RESOURCE_TYPE_MEMORY,
             i,
             next_scratch_buffer_addr,
-            pbe_state_words[total_render_target_used],
-            pbe_state_words[total_render_target_used + 1],
+            emit_state.pbe_cs_words[total_render_target_used],
+            emit_state.pbe_cs_words[total_render_target_used + 1],
             spm_eot_state->pbe_reg_words[total_render_target_used],
             spm_eot_state->pbe_reg_words[total_render_target_used + 1],
             &render_targets_used);
@@ -698,7 +697,7 @@ pvr_spm_init_eot_state(struct pvr_device *device,
          PVR_PBE_STARTPOS_BIT0,
          hw_render->sample_count,
          next_scratch_buffer_addr,
-         pbe_state_words[total_render_target_used],
+         emit_state.pbe_cs_words[total_render_target_used],
          spm_eot_state->pbe_reg_words[total_render_target_used]);
 
       PVR_DEV_ADDR_ADVANCE(next_scratch_buffer_addr, mem_stored);
@@ -722,7 +721,7 @@ pvr_spm_init_eot_state(struct pvr_device *device,
             PVR_PBE_STARTPOS_BIT0,
             hw_render->sample_count,
             next_scratch_buffer_addr,
-            pbe_state_words[total_render_target_used],
+            emit_state.pbe_cs_words[total_render_target_used],
             spm_eot_state->pbe_reg_words[total_render_target_used]);
 
          PVR_DEV_ADDR_ADVANCE(next_scratch_buffer_addr, mem_stored);
@@ -733,11 +732,7 @@ pvr_spm_init_eot_state(struct pvr_device *device,
 
    emit_state.emit_count = total_render_target_used;
 
-   pvr_uscgen_eot("SPM EOT",
-                  total_render_target_used,
-                  pbe_state_words[0],
-                  &usc_temp_count,
-                  &usc_shader_binary);
+   pvr_uscgen_eot("SPM EOT", &emit_state, &usc_temp_count, &usc_shader_binary);
 
    /* TODO: Create a #define in the compiler code to replace the 16. */
    result = pvr_gpu_upload_usc(device,
