@@ -523,6 +523,9 @@ struct pfo_state {
          nir_intrinsic_instr *intr;
       } reg[8];
    } last_store[MAX_DRAW_BUFFERS];
+
+   /* The first store at the end of the shader. */
+   nir_instr *first_store;
 };
 
 static struct util_format_description *
@@ -1025,6 +1028,32 @@ static bool is_frag_intrinsic(const nir_instr *instr,
    return false;
 }
 
+static bool sink_frag_outs(nir_shader *shader, struct pfo_state *state)
+{
+   bool progress = false;
+
+   nir_instr *after_instr = nir_block_last_instr(
+      nir_impl_last_block(nir_shader_get_entrypoint(shader)));
+
+   for (unsigned l = 0; l < ARRAY_SIZE(state->last_store); ++l) {
+      for (unsigned r = 0; r < ARRAY_SIZE(state->last_store->reg); ++r) {
+         nir_intrinsic_instr *intr = state->last_store[l].reg[r].intr;
+         if (!intr)
+            continue;
+
+         progress |= nir_instr_move(nir_after_instr(after_instr), &intr->instr);
+         if (!state->first_store)
+            state->first_store = &intr->instr;
+
+         after_instr = &intr->instr;
+
+         progress |= true;
+      }
+   }
+
+   return progress;
+}
+
 PUBLIC
 bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
 {
@@ -1042,22 +1071,8 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
                                              lower_frag_out,
                                              &state);
 
-#if 0
    /* Fragment outputs - move to the end. */
-   nir_instr *after_instr = nir_block_last_instr(
-      nir_impl_last_block(nir_shader_get_entrypoint(shader)));
-
-   for (unsigned l = 0; l < ARRAY_SIZE(state.last_store); ++l) {
-      for (unsigned r = 0; r < ARRAY_SIZE(state.last_store->reg); ++r) {
-         nir_intrinsic_instr *intr = state.last_store[l].reg[r].intr;
-         if (!intr)
-            continue;
-
-         progress |= nir_instr_move(nir_after_instr(after_instr), &intr->instr);
-         after_instr = &intr->instr;
-      }
-   }
-#endif
+   progress |= sink_frag_outs(shader, &state);
 
    /* TODO: Depth/sample mask outputs. */
 
