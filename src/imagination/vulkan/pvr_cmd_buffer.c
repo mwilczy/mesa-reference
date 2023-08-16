@@ -3889,7 +3889,8 @@ pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
 
    case PVR_PDS_ADDR_LITERAL_NUM_WORKGROUPS: {
       assert(stage == PVR_STAGE_ALLOCATION_COMPUTE);
-      *addr_out = *num_workgroups_buff_addr;
+      *addr_out = num_workgroups_buff_addr ? *num_workgroups_buff_addr
+                                           : (pvr_dev_addr_t){ 0 };
       break;
    }
 

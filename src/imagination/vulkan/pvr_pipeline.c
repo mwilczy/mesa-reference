@@ -1033,6 +1033,7 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
    /* Reserve space for the descriptor set device address table base. */
    reg_layout.descriptor_set_addrs_table.present =
       !!(layout->shader_stage_mask & BITFIELD_BIT(stage));
+   reg_layout.descriptor_set_addrs_table.present = true;
 
    if (reg_layout.descriptor_set_addrs_table.present) {
       reg_layout.descriptor_set_addrs_table.offset = next_free_sh_reg;
@@ -1042,6 +1043,7 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
    /* Reserve space for the push constants base device address. */
    reg_layout.push_consts.present =
       !!(layout->push_constants_shader_stages & BITFIELD_BIT(stage));
+   reg_layout.push_consts.present = true;
 
    if (reg_layout.push_consts.present) {
       reg_layout.push_consts.offset = next_free_sh_reg;
@@ -1173,6 +1175,8 @@ static uint32_t pvr_compute_pipeline_alloc_shareds(
 
    reg_layout.num_workgroups.present =
       compute_pipeline->shader_state.uses_num_workgroups;
+   reg_layout.num_workgroups.present = true;
+
    if (reg_layout.num_workgroups.present) {
       reg_layout.num_workgroups.offset = next_free_sh_reg;
       next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
@@ -1743,6 +1747,8 @@ static uint32_t pvr_graphics_pipeline_alloc_shareds(
    reg_layout.blend_consts.present =
       (stage == PVR_STAGE_ALLOCATION_FRAGMENT &&
        pvr_graphics_pipeline_requires_dynamic_blend_consts(gfx_pipeline));
+   reg_layout.blend_consts.present = true;
+
    if (reg_layout.blend_consts.present) {
       reg_layout.blend_consts.offset = next_free_sh_reg;
       next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
