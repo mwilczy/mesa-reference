@@ -145,6 +145,15 @@ split_packs = [
    pack_2x16('uscaled'),
    pack_4x8('uscaled'),
    pack_2x16('half'),
+
+   (
+      ('pack_half_2x16_split', a, b),
+      ('pack_half_2x16_field',
+         ('pack_half_2x16_field',
+            0,
+         a, 0),
+      b, 1)
+   )
 ]
 
 algebraic_late += split_packs
