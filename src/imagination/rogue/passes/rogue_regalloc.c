@@ -175,6 +175,16 @@ bool rogue_regalloc(rogue_shader *shader)
 
    unsigned num_temps_prealloced =
       rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
+
+   /* If we're doing control flow, allocate extra temp(s) for the execution mask
+    * counter(s).
+    */
+   unsigned emc_reg = ROGUE_REG_UNUSED;
+   unsigned num_emc_regs = rogue_count_used_regs(shader, ROGUE_REG_CLASS_EMC);
+   assert(num_emc_regs <= 1); /* Should only be one for now. */
+   if (num_emc_regs)
+      emc_reg = num_temps_prealloced++;
+
    unsigned num_hw_temps =
       rogue_reg_class_infos[ROGUE_REG_CLASS_TEMP].num - num_temps_prealloced;
 
@@ -434,19 +444,10 @@ bool rogue_regalloc(rogue_shader *shader)
       }
    }
 
-   /* In debug builds this will check the temp regs are contiguous from zero. */
-   unsigned num_temp_regs = rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
-
-   /* If we're doing control flow, allocate extra temp(s) for the execution mask
-    * counter(s). */
-   unsigned num_emc_regs = rogue_count_used_regs(shader, ROGUE_REG_CLASS_EMC);
-   assert(num_emc_regs <= 1); /* Should only be one for now. */
-
-   /* TODO: commonise with above. */
-   unsigned next_temp = num_temp_regs;
    rogue_foreach_reg_safe (reg, shader, ROGUE_REG_CLASS_EMC) {
       assert(!reg->regarray);
-      unsigned hw_index = next_temp++;
+      assert(emc_reg != ROGUE_REG_UNUSED);
+      unsigned hw_index = emc_reg;
       enum rogue_reg_class new_class = single_class_info->hw_class;
 
       /* First time using new register, modify in place. */
@@ -462,6 +463,10 @@ bool rogue_regalloc(rogue_shader *shader)
 
    util_sparse_array_finish(&ra_class_info);
    ralloc_free(ra_regs);
+
+   /* In debug builds this will check the temp regs are contiguous from zero. */
+   UNUSED unsigned num_temp_regs =
+      rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
 
    return progress;
 }
