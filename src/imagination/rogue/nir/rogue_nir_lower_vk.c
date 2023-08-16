@@ -46,6 +46,7 @@ static inline bool descriptor_is_dynamic(VkDescriptorType type)
            type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC);
 }
 
+/* {base_addr_lo, base_addr_hi, size, offset} */
 static nir_def *lower_vk_io(nir_builder *b, nir_instr *instr, void *cb_data)
 {
    rogue_build_ctx *ctx = cb_data;
@@ -113,27 +114,74 @@ static nir_def *lower_vk_io(nir_builder *b, nir_instr *instr, void *cb_data)
    desc_offset += binding_layout->per_stage_offset_in_dwords[pvr_stage].primary;
 
    /* Add the offset of the descriptor within the binding. */
-   if (binding_layout->descriptor_count > 1) {
-      unsigned desc_elem = nir_src_as_uint(vk_res_idx->src[0]);
+   struct pvr_descriptor_size_info desc_size_info;
+   pvr_descriptor_size_info_init(ctx->compiler->dev_info,
+                                 pipeline_layout->robust_buffer_access,
+                                 binding_layout->type,
+                                 &desc_size_info);
 
-      struct pvr_descriptor_size_info desc_size_info;
-      pvr_descriptor_size_info_init(ctx->compiler->dev_info,
-                                    pipeline_layout->robust_buffer_access,
-                                    binding_layout->type,
-                                    &desc_size_info);
+   assert(load_bits / 32 == desc_size_info.primary);
 
-      desc_offset += desc_elem * desc_size_info.primary;
-   }
+   unsigned desc_elem = nir_src_as_uint(vk_res_idx->src[0]);
+   desc_offset += desc_elem * desc_size_info.primary;
 
    desc_offset = PVR_DW_TO_BYTES(desc_offset);
 
+   unsigned comps = intr->def.num_components;
+   unsigned bits = intr->def.bit_size;
+   unsigned align = bits / 8;
+
+   assert((bits == 64 && comps == 1) || (bits == 32 && comps == 4));
+   bool is_ubo = (bits == 64);
+
    /* Load the descriptor set table address for this set from memory. */
-   nir_def *desc_addr =
-      nir_load_global_constant(b,
-                               nir_iadd_imm(b, tbl_addr, desc_offset),
-                               load_align,
-                               intr->def.num_components,
-                               intr->def.bit_size);
+   nir_def *desc_addr;
+   if (is_ubo) {
+      desc_addr =
+         nir_load_global_constant(b,
+                                  nir_iadd_imm(b, tbl_addr, desc_offset),
+                                  align,
+                                  comps,
+                                  bits);
+   } else {
+      assert(bits / 32 == desc_size_info.secondary);
+
+      unsigned desc_size_offset = descriptor_is_dynamic(binding_layout->type)
+                                     ? (set_layout->total_size_in_dwords +
+                                        mem_layout->primary_dynamic_size)
+                                     : mem_layout->secondary_offset;
+      desc_size_offset +=
+         binding_layout->per_stage_offset_in_dwords[pvr_stage].secondary;
+      desc_size_offset += desc_elem * desc_size_info.secondary;
+      desc_size_offset = PVR_DW_TO_BYTES(desc_size_offset);
+
+      desc_addr =
+         nir_load_global_constant(b,
+                                  nir_iadd_imm(b, tbl_addr, desc_offset),
+                                  align,
+                                  2,
+                                  bits);
+
+      nir_def *desc_size =
+         nir_load_global_constant(b,
+                                  nir_iadd_imm(b, tbl_addr, desc_size_offset),
+                                  align,
+                                  1,
+                                  bits);
+
+      /* TODO: When re-doing descriptor (sets), we can store the buffer base
+       * address, offset, and size, and load all three. */
+      unsigned offset = 0;
+      nir_def *desc_offset = nir_imm_int(b, offset);
+
+      nir_def *components[4] = {
+         nir_channel(b, desc_addr, 0),
+         nir_channel(b, desc_addr, 1),
+         desc_size,
+         desc_offset,
+      };
+      desc_addr = nir_vec(b, components, ARRAY_SIZE(components));
+   }
 
    return desc_addr;
 }
