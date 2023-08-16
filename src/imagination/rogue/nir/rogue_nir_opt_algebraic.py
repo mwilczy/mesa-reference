@@ -102,6 +102,53 @@ split_unpacks = [
 
 algebraic_late += split_unpacks
 
+def pack_2x16(fmt):
+   return (
+      ('pack_' + fmt + '_2x16', a),
+      ('vec2',
+         ('unpack_' + fmt + '_2x16_split_x', a),
+         ('unpack_' + fmt + '_2x16_split_y', a)
+      )
+   )
+
+def pack_4x8(fmt):
+   return (
+      ('pack_' + fmt + '_4x8', a),
+      ('pack_' + fmt + '_4x8_field',
+         ('pack_' + fmt + '_4x8_field',
+            ('pack_' + fmt + '_4x8_field',
+               ('pack_' + fmt + '_4x8_field',
+                  0,
+               'a.x', 0),
+            'a.y', 1),
+         'a.z', 2),
+      'a.w', 3)
+   )
+
+def pack_2x16(fmt):
+   return (
+      ('pack_' + fmt + '_2x16', a),
+      ('pack_' + fmt + '_2x16_field',
+         ('pack_' + fmt + '_2x16_field',
+            0,
+         'a.x', 0),
+      'a.y', 1)
+   )
+
+split_packs = [
+   pack_2x16('snorm'),
+   pack_4x8('snorm'),
+   pack_2x16('unorm'),
+   pack_4x8('unorm'),
+   pack_2x16('sscaled'),
+   pack_4x8('sscaled'),
+   pack_2x16('uscaled'),
+   pack_4x8('uscaled'),
+   pack_2x16('half'),
+]
+
+algebraic_late += split_packs
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--import-path', required=True)

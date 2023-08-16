@@ -184,20 +184,20 @@ static unsigned instr_is_field_pack(const nir_instr *instr)
    nir_alu_instr *alu = nir_instr_as_alu(instr);
    switch (alu->op) {
    case nir_op_pack_r11g11b10f_field:
-   case nir_op_pack_snorm_2x16_field:
-   case nir_op_pack_snorm_4x8_field:
+   /* case nir_op_pack_snorm_2x16_field: */
+   /* case nir_op_pack_snorm_4x8_field: */
    case nir_op_pack_snorm_r10g10b10a2_field:
    case nir_op_pack_snorm_r5g6b5_field:
-   case nir_op_pack_sscaled_2x16_field:
-   case nir_op_pack_sscaled_4x8_field:
+   /* case nir_op_pack_sscaled_2x16_field: */
+   /* case nir_op_pack_sscaled_4x8_field: */
    case nir_op_pack_sscaled_r10g10b10a2_field:
    case nir_op_pack_sscaled_r5g6b5_field:
-   case nir_op_pack_unorm_2x16_field:
-   case nir_op_pack_unorm_4x8_field:
+   /* case nir_op_pack_unorm_2x16_field: */
+   /* case nir_op_pack_unorm_4x8_field: */
    case nir_op_pack_unorm_r10g10b10a2_field:
    case nir_op_pack_unorm_r5g6b5_field:
-   case nir_op_pack_uscaled_2x16_field:
-   case nir_op_pack_uscaled_4x8_field:
+   /* case nir_op_pack_uscaled_2x16_field: */
+   /* case nir_op_pack_uscaled_4x8_field: */
    case nir_op_pack_uscaled_r10g10b10a2_field:
    case nir_op_pack_uscaled_r5g6b5_field:
       return true;
