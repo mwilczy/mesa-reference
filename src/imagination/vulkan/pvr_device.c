@@ -180,6 +180,7 @@ static void pvr_physical_device_get_supported_extensions(
       .KHR_external_semaphore = PVR_USE_WSI_PLATFORM,
       .KHR_external_semaphore_fd = PVR_USE_WSI_PLATFORM,
       .KHR_get_memory_requirements2 = true,
+      .KHR_image_format_list = true,
       .KHR_relaxed_block_layout = true,
       .KHR_shader_float16_int8 = false,
       .KHR_storage_buffer_storage_class = true,
