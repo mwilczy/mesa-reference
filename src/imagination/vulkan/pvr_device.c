@@ -192,6 +192,7 @@ static void pvr_physical_device_get_supported_extensions(
       .EXT_scalar_block_layout = true,
       .EXT_shader_atomic_float = false,
       .EXT_shader_atomic_float2 = false,
+      .EXT_texel_buffer_alignment = true,
       .EXT_tooling_info = true,
    };
 }
@@ -279,6 +280,9 @@ static void pvr_physical_device_get_supported_features(
 
       /* Vulkan 1.3 / VK_EXT_private_data */
       .privateData = true,
+
+      /* Vulkan 1.3 / VK_EXT_texel_buffer_alignment */
+      .texelBufferAlignment = true,
 
       /* EXT_shader_atomic_float */
       .shaderBufferFloat32Atomics = false,
