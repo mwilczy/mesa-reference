@@ -184,6 +184,7 @@ static void pvr_physical_device_get_supported_extensions(
       .KHR_external_semaphore_fd = PVR_USE_WSI_PLATFORM,
       .KHR_get_memory_requirements2 = true,
       .KHR_image_format_list = true,
+      .KHR_maintenance2 = true,
       .KHR_relaxed_block_layout = true,
       .KHR_shader_float16_int8 = false,
       .KHR_storage_buffer_storage_class = true,
@@ -621,6 +622,10 @@ static bool pvr_physical_device_get_properties(
       .optimalBufferCopyOffsetAlignment = 4U,
       .optimalBufferCopyRowPitchAlignment = 4U,
       .nonCoherentAtomSize = 1U,
+
+      /* Vulkan 1.0 / VK_KHR_maintenance2 */
+      .pointClippingBehavior =
+         VK_POINT_CLIPPING_BEHAVIOR_USER_CLIP_PLANES_ONLY,
 
       /* Vulkan 1.2 / VK_KHR_driver_properties */
       .driverID = VK_DRIVER_ID_IMAGINATION_OPEN_SOURCE_MESA,
