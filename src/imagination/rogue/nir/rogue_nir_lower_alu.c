@@ -148,3 +148,49 @@ bool rogue_nir_lower_fquantize2f16(nir_shader *shader)
                                         lower_fquantize2f16,
                                         NULL);
 }
+
+static bool is_fround_even(const nir_instr *instr, const void *data)
+{
+   if (instr->type != nir_instr_type_alu)
+      return false;
+
+   nir_alu_instr *alu = nir_instr_as_alu(instr);
+   return alu->op == nir_op_fround_even;
+}
+
+static nir_def *
+lower_fround_even(struct nir_builder *b, nir_instr *instr, void *data)
+{
+   nir_alu_instr *alu = nir_instr_as_alu(instr);
+   nir_def *src = nir_ssa_for_src(b,
+                                  alu->src[0].src,
+                                  nir_src_num_components(alu->src[0].src));
+
+   nir_def *abs_src = nir_fabs(b, src);
+   nir_def *ffloor_temp = nir_ffloor(b, abs_src);
+   nir_def *ffract_temp = nir_ffract(b, abs_src);
+
+   nir_def *ceil_temp = nir_fadd_imm(b, ffloor_temp, 1.0f);
+   nir_def *even_temp = nir_fmul_imm(b, ffloor_temp, 0.5f);
+
+   nir_def *even_ffract_temp = nir_ffract(b, even_temp);
+
+   nir_def *ishalf_temp = nir_feq_imm(b, ffract_temp, 0.5f);
+   ffract_temp = nir_bcsel(b, ishalf_temp, even_ffract_temp, ffract_temp);
+
+   nir_def *lesshalf_temp = nir_flt_imm(b, ffract_temp, 0.5f);
+   nir_def *result_temp = nir_bcsel(b, lesshalf_temp, ffloor_temp, ceil_temp);
+
+   nir_def *res = nir_copysign_img(b, result_temp, src);
+
+   return res;
+}
+
+PUBLIC
+bool rogue_nir_lower_fround_even(nir_shader *shader)
+{
+   return nir_shader_lower_instructions(shader,
+                                        is_fround_even,
+                                        lower_fround_even,
+                                        NULL);
+}

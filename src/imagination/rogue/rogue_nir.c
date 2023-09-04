@@ -222,6 +222,7 @@ static void rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
       NIR_PASS(progress, nir, rogue_nir_lower_fquantize2f16);
 
       NIR_PASS(progress, nir, nir_opt_algebraic);
+      NIR_PASS(progress, nir, rogue_nir_lower_fround_even);
       NIR_PASS(progress, nir, nir_opt_constant_folding);
 
       NIR_PASS(progress, nir, nir_opt_remove_phis);
