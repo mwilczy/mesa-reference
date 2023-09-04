@@ -4117,6 +4117,7 @@ typedef struct rogue_common_build_data {
 typedef struct rogue_iterator_args {
    bool iterates_depth;
    bool triangle_fan;
+   bool provoking_vtx_last;
    uint32_t num_coeff_varyings;
    uint32_t num_fpu_iterators;
    uint32_t fpu_iterators[ROGUE_MAX_IO_VARYING_VARS * 4];

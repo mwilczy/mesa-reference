@@ -190,6 +190,7 @@ static void pvr_physical_device_get_supported_extensions(
       .EXT_external_memory_dma_buf = true,
       .EXT_host_query_reset = true,
       .EXT_private_data = true,
+      .EXT_provoking_vertex = true,
       .EXT_scalar_block_layout = true,
       .EXT_shader_atomic_float = false,
       .EXT_shader_atomic_float2 = false,
@@ -275,6 +276,10 @@ static void pvr_physical_device_get_supported_features(
 
       /* Vulkan 1.2 / VK_EXT_host_query_reset */
       .hostQueryReset = true,
+
+      /* VK_EXT_provoking_vertex */
+      .provokingVertexLast = true,
+      .transformFeedbackPreservesProvokingVertex = false,
 
       /* Vulkan 1.2 / VK_EXT_scalar_block_layout */
       .scalarBlockLayout = true,
@@ -627,6 +632,10 @@ static bool pvr_physical_device_get_properties(
 
       /* Vulkan 1.2 / VK_KHR_timeline_semaphore */
       .maxTimelineSemaphoreValueDifference = UINT64_MAX,
+
+      /* VK_EXT_provoking_vertex */
+      .provokingVertexModePerPipeline = true,
+      .transformFeedbackPreservesTriangleFanProvokingVertex = false,
    };
 
    snprintf(properties->deviceName,

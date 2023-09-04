@@ -2568,9 +2568,16 @@ static void pvr_generate_iterator_commands(struct rogue_build_ctx *ctx)
             break;
 
          case INTERP_MODE_FLAT:
-            douti_src.shademodel =
-               args->triangle_fan ? PVRX(PDSINST_DOUTI_SHADEMODEL_FLAT_VERTEX1)
-                                  : PVRX(PDSINST_DOUTI_SHADEMODEL_FLAT_VERTEX0);
+            if (args->provoking_vtx_last) {
+               douti_src.shademodel =
+                  PVRX(PDSINST_DOUTI_SHADEMODEL_FLAT_VERTEX2);
+            } else if (args->triangle_fan) {
+               douti_src.shademodel =
+                  PVRX(PDSINST_DOUTI_SHADEMODEL_FLAT_VERTEX1);
+            } else {
+               douti_src.shademodel =
+                  PVRX(PDSINST_DOUTI_SHADEMODEL_FLAT_VERTEX0);
+            }
             douti_src.perspective = false;
             break;
 
@@ -2738,6 +2745,10 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
                               struct pvr_graphics_pipeline *const gfx_pipeline,
                               const struct vk_graphics_pipeline_state *state)
 {
+   const VkPipelineRasterizationProvokingVertexStateCreateInfoEXT *rs_ext =
+      vk_find_struct_const(
+         pCreateInfo->pRasterizationState,
+         PIPELINE_RASTERIZATION_PROVOKING_VERTEX_STATE_CREATE_INFO_EXT);
    const uint32_t cache_line_size =
       rogue_get_slc_cache_line_size(&device->pdevice->dev_info);
    struct pvr_pipeline_layout *layout = gfx_pipeline->base.layout;
@@ -2793,6 +2804,11 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
    ctx->stage_data.fs.iterator_args.triangle_fan =
       pCreateInfo->pInputAssemblyState->topology ==
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+   if (rs_ext) {
+      ctx->stage_data.fs.iterator_args.provoking_vtx_last =
+         rs_ext->provokingVertexMode ==
+         VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT;
+   }
 
    /* NIR middle-end translation. */
    rogue_foreach_graphics_stage (stage) {

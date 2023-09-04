@@ -5514,13 +5514,17 @@ static void pvr_setup_ppp_control(struct pvr_cmd_buffer *const cmd_buffer)
    struct pvr_cmd_buffer_state *const state = &cmd_buffer->state;
    struct PVRX(TA_STATE_HEADER) *const header = &state->emit_header;
    struct pvr_ppp_state *const ppp_state = &state->ppp_state;
+   const bool provoking_vtx_last = dynamic_state->rs.provoking_vertex ==
+                                   VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT;
    uint32_t ppp_control;
 
    pvr_csb_pack (&ppp_control, TA_STATE_PPP_CTRL, control) {
       control.drawclippededges = true;
       control.wclampen = true;
 
-      if (topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN)
+      if (provoking_vtx_last)
+         control.flatshade_vtx = PVRX(TA_FLATSHADE_VTX_VERTEX_2);
+      else if (topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN)
          control.flatshade_vtx = PVRX(TA_FLATSHADE_VTX_VERTEX_1);
       else
          control.flatshade_vtx = PVRX(TA_FLATSHADE_VTX_VERTEX_0);
@@ -6070,10 +6074,13 @@ static void pvr_emit_dirty_vdm_state(struct pvr_cmd_buffer *const cmd_buffer,
       header = { pvr_cmd_header(VDMCTRL_VDM_STATE0) };
    struct vk_dynamic_graphics_state *const dynamic_state =
       &cmd_buffer->vk.dynamic_graphics_state;
+   const VkPrimitiveTopology topology = dynamic_state->ia.primitive_topology;
    const struct pvr_cmd_buffer_state *const state = &cmd_buffer->state;
    const struct pvr_vertex_shader_state *const vertex_shader_state =
       &state->gfx_pipeline->shader_state.vertex;
    struct pvr_csb *const csb = &sub_cmd->control_stream;
+   const bool provoking_vtx_last = dynamic_state->rs.provoking_vertex ==
+                                   VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT;
    uint32_t vs_output_size;
    uint32_t max_instances;
    uint32_t cam_size;
@@ -6101,15 +6108,12 @@ static void pvr_emit_dirty_vdm_state(struct pvr_cmd_buffer *const cmd_buffer,
          state0.cut_index_present = true;
       }
 
-      switch (dynamic_state->ia.primitive_topology) {
-      case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+      if (provoking_vtx_last)
+         state0.flatshade_control = PVRX(VDMCTRL_FLATSHADE_CONTROL_VERTEX_2);
+      else if (topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN)
          state0.flatshade_control = PVRX(VDMCTRL_FLATSHADE_CONTROL_VERTEX_1);
-         break;
-
-      default:
+      else
          state0.flatshade_control = PVRX(VDMCTRL_FLATSHADE_CONTROL_VERTEX_0);
-         break;
-      }
 
       /* If we've bound a different vertex buffer, or this draw-call requires
        * a different PDS attrib data-section from the last draw call (changed
