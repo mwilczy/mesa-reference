@@ -133,7 +133,10 @@ static bool rogue_nir_lower_image_store(nir_builder *b,
 
    b->cursor = nir_before_instr(&intr->instr);
 
-   nir_def *color = nir_ssa_for_src(b, intr->src[3], num_components);
+   nir_def *colors =
+      nir_ssa_for_src(b, intr->src[3], nir_src_num_components(intr->src[3]));
+   nir_def *color = nir_trim_vector(b, colors, num_components);
+
    nir_def *formatted = NULL;
 
    const unsigned bits_16[] = { 16, 16, 16, 16 };
