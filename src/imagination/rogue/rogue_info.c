@@ -909,7 +909,7 @@ const rogue_bitwise_op_info rogue_bitwise_op_infos[ROGUE_BITWISE_OP_COUNT] = {
          [1] = T(REG) | T(REGARRAY) | T(IO),
       },
       .supported_src_types = {
-         [0] = T(REG) | T(REGARRAY) | T(IO),
+         [0] = T(REG) | T(REGARRAY) | T(IO) | T(IMM),
          [1] = T(REG) | T(REGARRAY) | T(IO) | T(IMM),
       },
    },

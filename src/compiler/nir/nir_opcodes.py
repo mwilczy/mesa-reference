@@ -1738,3 +1738,5 @@ opcode("udot_2x16_uadd_sat", 0, tint32, [0, 0, 0], [tuint32, tuint32, tint32],
 
    dst = tmp >= UINT32_MAX ? UINT32_MAX : tmp;
 """)
+
+binop("copysign_img", tfloat, "", "bit_size == 64 ? copysign(src0, src1) : copysignf(src0, src1)")

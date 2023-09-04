@@ -3645,6 +3645,31 @@ static void trans_nir_alu_inot(rogue_builder *b, nir_alu_instr *alu)
    }
 }
 
+static void trans_nir_copysign_img(rogue_builder *b, nir_alu_instr *alu)
+{
+   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
+   rogue_ref src0 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 32);
+   rogue_ref src1 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, 32);
+
+   rogue_bitwise_instr *msk = rogue_MSK(b,
+                                        rogue_ref_io(ROGUE_IO_FT0),
+                                        rogue_ref_io(ROGUE_IO_FT1),
+                                        rogue_ref_imm(31),
+                                        rogue_ref_imm(0));
+   rogue_set_instr_group_next(&msk->instr, true);
+
+   rogue_bitwise_instr *byp0s =
+      rogue_BYP0S(b, rogue_ref_io(ROGUE_IO_FT2), src0);
+   rogue_set_instr_group_next(&byp0s->instr, true);
+
+   rogue_OR(b,
+            dst,
+            rogue_ref_io(ROGUE_IO_FT1),
+            rogue_ref_io(ROGUE_IO_FT2),
+            rogue_ref_io(ROGUE_IO_FT1),
+            src1);
+}
+
 static void trans_nir_ishr(rogue_builder *b, nir_alu_instr *alu)
 {
    unsigned bit_size = alu->def.bit_size;
@@ -4442,6 +4467,9 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 
    case nir_op_inot:
       return trans_nir_alu_inot(b, alu);
+
+   case nir_op_copysign_img:
+      return trans_nir_copysign_img(b, alu);
 
    case nir_op_fcsel:
    case nir_op_fcsel_gt:
