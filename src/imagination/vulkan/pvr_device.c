@@ -164,6 +164,7 @@ static void pvr_physical_device_get_supported_extensions(
    *extensions = (struct vk_device_extension_table){
       .KHR_8bit_storage = true,
       .KHR_16bit_storage = true,
+      .KHR_bind_memory2 = true,
       .KHR_copy_commands2 = true,
       /* TODO: enable this extension when the conformance tests get
        * updated to version 1.3.6.0, the current version does not
