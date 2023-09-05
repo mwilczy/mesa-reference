@@ -3070,6 +3070,9 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
 
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_INFO);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_WRT))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_WRT);
 }
 
 static void

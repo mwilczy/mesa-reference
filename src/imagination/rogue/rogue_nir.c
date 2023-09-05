@@ -474,6 +474,9 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    /* Lower samplers. */
    NIR_PASS_V(nir, nir_opt_dce);
    NIR_PASS_V(nir, nir_opt_deref);
+   NIR_PASS_V(nir, rogue_nir_lower_images_to_tex);
+   /* NIR_PASS_V(nir, nir_lower_readonly_images_to_tex, true); */
+   /* NIR_PASS_V(nir, nir_lower_image_atomics_to_global); */
    /* NIR_PASS_V(nir, rogue_nir_lower_tex, ctx); */
    /* NIR_PASS_V(nir, nir_lower_samplers); */
    NIR_PASS_V(nir, nir_lower_tex, &(nir_lower_tex_options){ .lower_txd_cube_map = true, });

@@ -3048,6 +3048,7 @@ nir_tex_instr_result_size(const nir_tex_instr *instr)
    case nir_texop_samples_identical:
    case nir_texop_fragment_mask_fetch_amd:
    case nir_texop_lod_bias_agx:
+   case nir_texop_txw_img:
       return 1;
 
    case nir_texop_descriptor_amd:
@@ -3088,6 +3089,7 @@ nir_tex_instr_is_query(const nir_tex_instr *instr)
    case nir_texop_samples_identical:
    case nir_texop_fragment_mask_fetch_amd:
    case nir_texop_fragment_fetch_amd:
+   case nir_texop_txw_img:
       return false;
    default:
       unreachable("Invalid texture opcode");
@@ -3120,6 +3122,7 @@ nir_tex_instr_src_type(const nir_tex_instr *instr, unsigned src)
       case nir_texop_samples_identical:
       case nir_texop_fragment_fetch_amd:
       case nir_texop_fragment_mask_fetch_amd:
+      case nir_texop_txw_img:
          return nir_type_int;
 
       default:
@@ -3133,6 +3136,7 @@ nir_tex_instr_src_type(const nir_tex_instr *instr, unsigned src)
       case nir_texop_txf_ms:
       case nir_texop_fragment_fetch_amd:
       case nir_texop_fragment_mask_fetch_amd:
+      case nir_texop_txw_img:
          return nir_type_int;
 
       default:
@@ -3161,6 +3165,7 @@ nir_tex_instr_src_type(const nir_tex_instr *instr, unsigned src)
    case nir_tex_src_sampler_offset:
    case nir_tex_src_texture_handle:
    case nir_tex_src_sampler_handle:
+   case nir_tex_src_wrdata:
       return nir_type_uint;
 
    case nir_num_tex_src_types:
@@ -3204,6 +3209,9 @@ nir_tex_instr_src_size(const nir_tex_instr *instr, unsigned src)
    if (instr->src[src].src_type == nir_tex_src_texture_handle ||
        instr->src[src].src_type == nir_tex_src_sampler_handle)
       return 0;
+
+   if (instr->src[src].src_type == nir_tex_src_wrdata)
+      return 4;
 
    return 1;
 }

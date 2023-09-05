@@ -246,6 +246,7 @@ enum rogue_smp_flag {
    ROGUE_SMP_FLAG_NNCOORDS,
    ROGUE_SMP_FLAG_INTEGER,
    ROGUE_SMP_FLAG_INFO,
+   ROGUE_SMP_FLAG_WRT,
 };
 
 enum rogue_smp_info {
@@ -4227,6 +4228,8 @@ bool rogue_nir_lower_tex(nir_shader *shader, rogue_build_ctx *ctx);
 #endif
 
 bool rogue_nir_lower_smp(nir_shader *shader, rogue_build_ctx *ctx);
+
+bool rogue_nir_lower_images_to_tex(nir_shader *shader);
 
 bool rogue_nir_lower_io(nir_shader *shader, rogue_build_ctx *ctx, bool late);
 

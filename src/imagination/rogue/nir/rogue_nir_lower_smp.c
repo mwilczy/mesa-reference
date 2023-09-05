@@ -38,6 +38,20 @@
 
 /* TODO: Probably want the binding -> base lookup part of this in rogue_nir_lower_vk_io.c */
 
+#if 0
+static unsigned tex_coord_components(const nir_tex_instr *tex)
+{
+   if (nir_tex_instr_src_index(tex, nir_tex_src_coord) < 0)
+      return 0;
+
+   unsigned coord_components = glsl_get_sampler_dim_coordinate_components(tex->sampler_dim);
+   if (tex->is_array)
+      coord_components++;
+
+   return coord_components;
+}
+#endif
+
 static nir_def *lower_txs(nir_builder *b, unsigned num_components, unsigned info_base, bool is_array)
 {
    assert(num_components <= 3);
@@ -79,11 +93,11 @@ static nir_def *lower_query_levels(nir_builder *b, unsigned tex_base)
    return query_levels;
 }
 
-static void lookup_base_regs(nir_tex_src *tex_state_src, nir_tex_src *smp_state_src, unsigned *tex_state_base, unsigned *smp_state_base, unsigned *info_base, enum pvr_stage_allocation pvr_stage, const rogue_build_ctx *ctx)
+static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, unsigned *tex_state_base, unsigned *smp_state_base, unsigned *info_base, enum pvr_stage_allocation pvr_stage, const rogue_build_ctx *ctx)
 {
    const struct pvr_pipeline_layout *pipeline_layout = ctx->pipeline_layout;
 
-   nir_binding combined_state_binding = nir_chase_binding(tex_state_src->src);
+   nir_binding combined_state_binding = nir_chase_binding(*tex_state_src);
    assert(combined_state_binding.success);
 
    const struct pvr_descriptor_set_layout *combined_set_layout = pipeline_layout->set_layout[combined_state_binding.desc_set];
@@ -91,7 +105,7 @@ static void lookup_base_regs(nir_tex_src *tex_state_src, nir_tex_src *smp_state_
 
    const struct pvr_descriptor_set_layout_binding *combined_binding_layout = pvr_get_descriptor_binding(combined_set_layout, combined_state_binding.binding);
    assert(combined_binding_layout);
-   assert(combined_binding_layout->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+   /* assert(combined_binding_layout->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); */
 
    struct pvr_descriptor_size_info combined_desc_size_info;
    pvr_descriptor_size_info_init(ctx->compiler->dev_info, pipeline_layout->robust_buffer_access, combined_binding_layout->type, &combined_desc_size_info);
@@ -110,19 +124,42 @@ static void lookup_base_regs(nir_tex_src *tex_state_src, nir_tex_src *smp_state_
       *tex_state_base = _tex_state_base;
 
    if (smp_state_base) {
-      /* If sampler state provided as well, make sure we're dealing with a combined image sampler. */
+      unsigned _smp_state_base = ROGUE_REG_UNUSED;
       if (smp_state_src) {
-         nir_binding smp_state_binding = nir_chase_binding(smp_state_src->src);
+         nir_binding smp_state_binding = nir_chase_binding(*smp_state_src);
          assert(smp_state_binding.success);
-         assert(combined_state_binding.desc_set == smp_state_binding.desc_set);
-         assert(combined_state_binding.binding == smp_state_binding.binding);
 
-         *smp_state_base = _tex_state_base + PVR_IMAGE_DESCRIPTOR_SIZE;
+         if (combined_binding_layout->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+            _smp_state_base = _tex_state_base + PVR_IMAGE_DESCRIPTOR_SIZE;
+         } else {
+            /* TODO: commonise this */
+            const struct pvr_descriptor_set_layout *smp_set_layout = pipeline_layout->set_layout[smp_state_binding.desc_set];
+            assert(smp_set_layout);
+
+            const struct pvr_descriptor_set_layout_binding *smp_binding_layout = pvr_get_descriptor_binding(smp_set_layout, smp_state_binding.binding);
+            assert(smp_binding_layout);
+
+            struct pvr_descriptor_size_info smp_desc_size_info;
+            pvr_descriptor_size_info_init(ctx->compiler->dev_info, pipeline_layout->robust_buffer_access, smp_binding_layout->type, &smp_desc_size_info);
+
+            /* Add the offset of the descriptor within the binding. */
+            unsigned smp_desc_elem = 0;
+            if (smp_binding_layout->descriptor_count > 1) {
+               assert(smp_state_binding.num_indices == 1);
+               smp_desc_elem = nir_src_as_uint(smp_state_binding.indices[0]);
+            }
+
+            _smp_state_base = pvr_get_required_descriptor_primary_sh_reg(pipeline_layout, pvr_stage, smp_state_binding.desc_set, smp_binding_layout);
+            _smp_state_base += smp_desc_elem * smp_desc_size_info.primary;
+         }
+
       } else {
          /* If not provided, point sampler needed. */
          assert(pipeline_layout->point_sampler_in_dwords_per_stage[pvr_stage] != ROGUE_REG_UNUSED);
-         *smp_state_base = pipeline_layout->point_sampler_in_dwords_per_stage[pvr_stage];
+         _smp_state_base = pipeline_layout->point_sampler_in_dwords_per_stage[pvr_stage];
       }
+
+      *smp_state_base = _smp_state_base;
    }
 
    unsigned _info_base = pvr_get_sampler_descriptor_secondary_sh_reg(pipeline_layout, pvr_stage, combined_state_binding.desc_set, combined_binding_layout);
@@ -153,6 +190,13 @@ static nir_def * chase_float_src(nir_builder *b, nir_def *val/* , bool round */)
    /* return nir_i2f32(b, val); */
 }
 
+static const int8_t default_tg4_offsets[4][2] = {
+   { 0, 1 },
+   { 1, 1 },
+   { 1, 0 },
+   { 0, 0 },
+};
+
 static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 {
    const rogue_build_ctx *ctx = cb_data;
@@ -166,11 +210,12 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    assert(tex->is_shadow == tex->is_new_style_shadow);
    assert(!tex->is_sparse);
 
-   assert(tex->component == 0); /* for tg4, ignore for now anyway */
+   /* TODO: tg4 */
+   assert(tex->component == 0);
+   assert(!memcmp(tex->tg4_offsets, default_tg4_offsets, sizeof(tex->tg4_offsets)));
 
    assert(!tex->array_is_lowered_cube);
    assert(!tex->is_gather_implicit_lod);
-   /* assert(tex->tg4_offsets == ...); */ /* TODO */
    assert(!tex->texture_non_uniform);
    assert(!tex->sampler_non_uniform);
 
@@ -180,8 +225,8 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    assert(tex->backend_flags == 0);
 
    nir_def *coords = NULL;
-   nir_tex_src *tex_state_src = NULL;
-   nir_tex_src *smp_state_src = NULL;
+   nir_src *tex_state_src = NULL;
+   nir_src *smp_state_src = NULL;
    nir_def *lod_replace = NULL;
    nir_def *lod_bias = NULL;
    nir_def *comparator = NULL;
@@ -189,6 +234,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    nir_def *proj = NULL;
    nir_def *ddx = NULL;
    nir_def *ddy = NULL;
+   nir_def *wrdata = NULL;
 
    unsigned flags = 0;
 
@@ -212,12 +258,12 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 
       case nir_tex_src_texture_deref:
          assert(!tex_state_src);
-         tex_state_src = &tex->src[u];
+         tex_state_src = &tex->src[u].src;
          break;
 
       case nir_tex_src_sampler_deref:
          assert(!smp_state_src);
-         smp_state_src = &tex->src[u];
+         smp_state_src = &tex->src[u].src;
          break;
 
       case nir_tex_src_lod:
@@ -257,6 +303,11 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       case nir_tex_src_ddy:
          assert(!ddy);
          ddy = tex->src[u].src.ssa;
+         break;
+
+      case nir_tex_src_wrdata:
+         assert(!wrdata);
+         wrdata = tex->src[u].src.ssa;
          break;
 
       default:
@@ -321,12 +372,6 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 
       /* Calculate the new array address. */
       tex_addr_override = nir_iadd(b, nir_u2u64(b, nir_imul(b, array_idx, nir_load_image_array_stride_img(b, .info_base_img = info_base))), nir_u2u64(b, nir_load_image_array_base_addr_img(b, .info_base_img = info_base)));
-
-#if 0
-      /* Hmm... */
-      if (!lod_replace && !lod_bias)
-         lod_bias = nir_imm_int(b, 0);
-#endif
    }
 
    unsigned chans = tex->def.num_components;
@@ -438,6 +483,15 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_SOO);
    }
 
+   if (wrdata) {
+      data[data_comps++] = nir_channel(b, wrdata, 0);
+      data[data_comps++] = nir_channel(b, wrdata, 1);
+      data[data_comps++] = nir_channel(b, wrdata, 2);
+      data[data_comps++] = nir_channel(b, wrdata, 3);
+
+      flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_WRT);
+   }
+
    assert(data_comps <= NIR_MAX_VEC_COMPONENTS);
 
    nir_def *data_vec = nir_vec(b, data, ARRAY_SIZE(data));
@@ -506,21 +560,10 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    return sample;
 }
 
+/* TODO: rename all to _tex? */
 static bool is_smp(const nir_instr *instr, UNUSED const void *cb_data)
 {
-   if (instr->type != nir_instr_type_tex)
-      return false;
-
-#if 0
-   /* TODO */
-   nir_tex_instr *tex = nir_instr_as_tex(instr);
-   if (nir_tex_instr_is_query(tex))
-      return false;
-#endif
-
-   /* TODO: rest. */
-
-   return true;
+   return instr->type == nir_instr_type_tex;
 }
 
 PUBLIC

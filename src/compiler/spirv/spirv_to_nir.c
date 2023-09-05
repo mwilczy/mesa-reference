@@ -2992,6 +2992,9 @@ vtn_handle_texture(struct vtn_builder *b, SpvOp opcode,
    case nir_texop_lod_bias_agx:
       vtn_fail("unexpected nir_texop_lod_bias_agx");
       break;
+   case nir_texop_txw_img:
+      vtn_fail("unexpected nir_texop_txw_img");
+      break;
    }
 
    unsigned idx = 4;

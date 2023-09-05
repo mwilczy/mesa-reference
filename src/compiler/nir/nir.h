@@ -2143,6 +2143,9 @@ typedef enum {
    /** Second backend-specific vec4 tex src argument, see nir_tex_src_backend1. */
    nir_tex_src_backend2,
 
+   /** Texture write data, 4 channels. */
+   nir_tex_src_wrdata,
+
    nir_num_tex_src_types
 } nir_tex_src_type;
 
@@ -2179,6 +2182,7 @@ typedef enum {
    nir_texop_descriptor_amd,          /**< Returns a buffer or image descriptor. */
    nir_texop_sampler_descriptor_amd,  /**< Returns a sampler descriptor. */
    nir_texop_lod_bias_agx,            /**< Returns the sampler's LOD bias */
+   nir_texop_txw_img,                 /**< Texture write */
 } nir_texop;
 
 /** Represents a texture instruction */

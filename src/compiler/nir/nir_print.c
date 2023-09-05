@@ -1639,6 +1639,9 @@ print_tex_instr(nir_tex_instr *instr, print_state *state)
    case nir_texop_lod_bias_agx:
       fprintf(fp, "lod_bias_agx ");
       break;
+   case nir_texop_txw_img:
+      fprintf(fp, "txw_img ");
+      break;
    default:
       unreachable("Invalid texture operation");
       break;
@@ -1715,6 +1718,9 @@ print_tex_instr(nir_tex_instr *instr, print_state *state)
          break;
       case nir_tex_src_plane:
          fprintf(fp, "(plane)");
+         break;
+      case nir_tex_src_wrdata:
+         fprintf(fp, "(wrdata)");
          break;
 
       default:
