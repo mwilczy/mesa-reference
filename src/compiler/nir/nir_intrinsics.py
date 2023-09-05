@@ -2009,3 +2009,25 @@ intrinsic("load_tile_buffer_offset_img", dest_comp=1, indices=[BASE, TILE_BUFFER
 intrinsic("pass_cov_mask_img", dest_comp=1, src_comp=[1, 1], indices=[BASE], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
 
 intrinsic("isp_feedback_img", src_comp=[1, 1], bit_sizes=[0, 0], indices=[], flags=[])
+
+# smp:
+# - texture state base
+# - data base
+# - sample state base
+# - shared lod base
+# - chans (implied by vec elems of dst)
+
+# smp(coords) (texture state base, sample state base)
+# TODO: make the coords argument a pointer to a scratch array.
+index("unsigned", "tex_state_base_img")
+index("unsigned", "smp_state_base_img")
+index("unsigned", "info_base_img")
+intrinsic("smp_img", src_comp=[16], dest_comp=0, bit_sizes=[32], indices=[TEX_STATE_BASE_IMG, SMP_STATE_BASE_IMG, IMAGE_DIM, FLAGS], flags=[])
+
+intrinsic("load_image_array_maxidx_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+intrinsic("load_image_array_stride_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+intrinsic("load_image_array_base_addr_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
+
+intrinsic("load_image_width_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+intrinsic("load_image_height_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+intrinsic("load_image_depth_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])

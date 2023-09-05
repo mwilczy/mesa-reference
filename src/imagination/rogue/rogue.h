@@ -235,6 +235,16 @@ enum rogue_fence_op {
    ROGUE_FENCE_OP_BARRIER,
 };
 
+enum rogue_smp_flag {
+   ROGUE_SMP_FLAG_FCNORM,
+   ROGUE_SMP_FLAG_LOD_REPLACE,
+   ROGUE_SMP_FLAG_LOD_BIAS,
+   ROGUE_SMP_FLAG_TAO,
+   ROGUE_SMP_FLAG_SOO,
+   ROGUE_SMP_FLAG_PROJ,
+   ROGUE_SMP_FLAG_GRADIENT,
+};
+
 #define ROGUE_ISA_DSTS 2
 #define ROGUE_ISA_SRCS 6
 #define ROGUE_ISA_ISSS 6
@@ -4184,8 +4194,10 @@ bool rogue_nir_lower_fquantize2f16(nir_shader *shader);
 
 bool rogue_nir_lower_fround_even(nir_shader *shader);
 
+#if 0
 bool rogue_nir_lower_input_attachments(nir_shader *shader,
                                        rogue_build_ctx *ctx);
+#endif
 
 bool rogue_nir_lower_barriers(nir_shader *shader);
 
@@ -4195,7 +4207,11 @@ bool rogue_nir_lower_blend_consts(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_lower_compute_intrinsics(nir_shader *shader);
 
+#if 0
 bool rogue_nir_lower_tex(nir_shader *shader, rogue_build_ctx *ctx);
+#endif
+
+bool rogue_nir_lower_smp(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_lower_io(nir_shader *shader, rogue_build_ctx *ctx, bool late);
 

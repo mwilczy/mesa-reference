@@ -285,7 +285,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 
 #if !defined(NDEBUG)
    bool nir_debug_print_shader_prev = nir_debug_print_shader[nir->info.stage];
-   if (nir->info.stage == MESA_SHADER_FRAGMENT)
+   /* if (nir->info.stage == MESA_SHADER_FRAGMENT) */
       nir_debug_print_shader[nir->info.stage] = ROGUE_DEBUG(NIR_PASSES);
 #endif /* !defined(NDEBUG) */
 
@@ -321,8 +321,10 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    NIR_PASS_V(nir, nir_split_var_copies);
    NIR_PASS_V(nir, nir_split_per_member_structs);
 
+#if 0
    if (nir->info.stage == MESA_SHADER_FRAGMENT)
       NIR_PASS_V(nir, rogue_nir_lower_input_attachments, ctx);
+#endif
 
    NIR_PASS_V(nir,
               nir_remove_dead_variables,
@@ -472,7 +474,11 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    /* Lower samplers. */
    NIR_PASS_V(nir, nir_opt_dce);
    NIR_PASS_V(nir, nir_opt_deref);
-   NIR_PASS_V(nir, rogue_nir_lower_tex, ctx);
+   /* NIR_PASS_V(nir, rogue_nir_lower_tex, ctx); */
+   /* NIR_PASS_V(nir, nir_lower_samplers); */
+   NIR_PASS_V(nir, nir_lower_tex, &(nir_lower_tex_options){ .lower_txd_cube_map = true, });
+   NIR_PASS_V(nir, nir_lower_tex, &(nir_lower_tex_options){ .lower_txs_lod = true, });
+   NIR_PASS_V(nir, rogue_nir_lower_smp, ctx);
 
    /* Lower atomic ops that aren't supported in hardware. */
    NIR_PASS_V(nir, rogue_nir_lower_atomics);

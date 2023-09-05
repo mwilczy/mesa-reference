@@ -194,6 +194,7 @@ static rogue_ref intr_dst(rogue_shader *shader,
    return rogue_ref_reg(rogue_ssa_reg(shader, index));
 }
 
+#if 0
 static rogue_ref nir_tex_src32(rogue_shader *shader,
                                const nir_tex_instr *tex,
                                unsigned src_num,
@@ -333,6 +334,7 @@ static rogue_ref nir_intr_dst32_component(rogue_shader *shader,
    return rogue_ref_regarray(
       rogue_ssa_vec_regarray(shader, 1, intr->def.index, component));
 }
+#endif
 
 /* 64-bit restricted to scalars. */
 static rogue_ref64 nir_ssa_alu_src64(rogue_shader *shader,
@@ -376,6 +378,7 @@ static rogue_ref64 nir_ssa_intr_dst64(rogue_shader *shader,
    return rogue_ssa_ref64(shader, intr->def.index);
 }
 
+#if 0
 static rogue_ref nir_shared_reg_indexed(rogue_builder *b,
                                         nir_src index,
                                         unsigned index_comp,
@@ -426,6 +429,7 @@ static rogue_ref64 nir_shared_reg_indexed64(rogue_builder *b,
 
    return dst_val;
 }
+#endif
 
 static inline nir_alu_type nir_cmp_type(nir_op op)
 {
@@ -531,6 +535,7 @@ static void trans_nir_jump(rogue_builder *b, nir_jump_instr *jump)
    unreachable("Unsupported NIR jump instruction type.");
 }
 
+#if 0
 struct rogue_nir_tex_smp_info {
    unsigned channels;
    bool pack_f16 : 1;
@@ -1317,6 +1322,7 @@ static void trans_nir_intrinsic_image(rogue_builder *b,
 
    rogue_nir_emit_texture_sample(b, dst, &info);
 }
+#endif
 
 static void trans_nir_load_const_bits(rogue_builder *b,
                                       nir_load_const_instr *load_const,
@@ -1571,12 +1577,15 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
 
          rogue_alu_instr *mov;
          if (load_size > 1) {
+#if 0
             rogue_ref dst_component =
                nir_intr_dst32_component(b->shader, intr, u);
             mov = rogue_MOV(b, dst_component, rogue_ref_reg(coeff_c));
             rogue_add_instr_commentf(&mov->instr,
                                      "load_input_fs_flat.%c",
                                      'x' + u);
+#endif
+            abort();
          } else {
             mov = rogue_MOV(b, dst, rogue_ref_reg(coeff_c));
             rogue_add_instr_comment(&mov->instr, "load_input_fs_flat");
@@ -2326,11 +2335,28 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
 
       /* Float -> (un)signed => movc write masking for dst_bits < 32. */
       if (CONV(float, 32, 1, uint, 8, 1, undef, false) ||
+          CONV(float, 32, 1, uint, 8, 1, rtne, false) ||
+          CONV(float, 32, 1, uint, 8, 1, rtz, false) ||
+
           CONV(float, 32, 1, uint, 16, 1, undef, false) ||
+          CONV(float, 32, 1, uint, 16, 1, rtne, false) ||
+          CONV(float, 32, 1, uint, 16, 1, rtz, false) ||
+
           CONV(float, 32, 1, uint, 32, 1, undef, false) ||
+          CONV(float, 32, 1, uint, 32, 1, rtne, false) ||
+          CONV(float, 32, 1, uint, 32, 1, rtz, false) ||
+
           CONV(float, 32, 1, int, 8, 1, undef, false) ||
+          CONV(float, 32, 1, int, 8, 1, rtne, false) ||
+          CONV(float, 32, 1, int, 8, 1, rtz, false) ||
+
           CONV(float, 32, 1, int, 16, 1, undef, false) ||
-          CONV(float, 32, 1, int, 32, 1, undef, false)) {
+          CONV(float, 32, 1, int, 16, 1, rtne, false) ||
+          CONV(float, 32, 1, int, 16, 1, rtz, false) ||
+
+          CONV(float, 32, 1, int, 32, 1, undef, false) ||
+          CONV(float, 32, 1, int, 32, 1, rtne, false) ||
+          CONV(float, 32, 1, int, 32, 1, rtz, false)) {
          rogue_alu_instr *mbyp0 =
             rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), rogue_ref_imm(0));
          rogue_set_instr_group_next(&mbyp0->instr, true);
@@ -2340,7 +2366,6 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
          switch (dst_sized_type) {
          case nir_type_uint8:
             pck = rogue_PCK_U8888(b, rogue_ref_io(ROGUE_IO_FT2), src);
-            rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_ROUNDZERO);
             break;
 
          case nir_type_uint16:
@@ -2350,22 +2375,33 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
 
          case nir_type_uint32:
             pck = rogue_PCK_U32(b, rogue_ref_io(ROGUE_IO_FT2), src);
-            rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_ROUNDZERO);
             break;
 
          case nir_type_int8:
             pck = rogue_PCK_S8888(b, rogue_ref_io(ROGUE_IO_FT2), src);
-            rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_ROUNDZERO);
             break;
 
          case nir_type_int16:
             pck = rogue_PCK_S1616(b, rogue_ref_io(ROGUE_IO_FT2), src);
-            rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_ROUNDZERO);
             break;
 
          case nir_type_int32:
             pck = rogue_PCK_S32(b, rogue_ref_io(ROGUE_IO_FT2), src);
+            break;
+
+         default:
+            unreachable();
+         }
+
+         switch (rounding_mode) {
+         /* Default to rtz. */
+         case nir_rounding_mode_undef:
+         case nir_rounding_mode_rtz:
             rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_ROUNDZERO);
+            break;
+
+         case nir_rounding_mode_rtne:
+            /* Do nothing; default for pck is rtne. */
             break;
 
          default:
@@ -2910,6 +2946,167 @@ trans_nir_intrinsic_load_tile_buffer_offset_img(rogue_builder *b,
    rogue_add_instr_comment(&mov->instr, "load_tile_buffer_offset_img");
 }
 
+static void
+trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   unsigned num_components = 0;
+   rogue_ref dst = intr_dst(b->shader, intr, &num_components, 32);
+   assert(num_components >= 1 && num_components <= 4);
+   rogue_ref chans = rogue_ref_val(num_components);
+
+   unsigned tex_state_base = nir_intrinsic_tex_state_base_img(intr);
+   unsigned smp_state_base = nir_intrinsic_smp_state_base_img(intr);
+   enum glsl_sampler_dim dim = nir_intrinsic_image_dim(intr);
+
+   rogue_ref tex_state = rogue_ref_regarray(rogue_shared_regarray(b->shader, PVR_IMAGE_DESCRIPTOR_SIZE, tex_state_base));
+   rogue_ref smp_state = rogue_ref_regarray(rogue_shared_regarray(b->shader, PVR_SAMPLER_DESCRIPTOR_SIZE, smp_state_base));
+
+   rogue_ref data = intr_src(b->shader, intr, 0, &(unsigned){ NIR_MAX_VEC_COMPONENTS }, ROGUE_REG_SIZE_BITS);
+
+   rogue_ref drc = rogue_ref_drc(0);
+
+   rogue_backend_instr *smp;
+   switch (dim) {
+   case GLSL_SAMPLER_DIM_1D:
+      smp = rogue_SMP1D(b,
+                        dst,
+                        drc,
+                        tex_state,
+                        data,
+                        smp_state,
+                        rogue_none(),
+                        chans);
+      break;
+
+   case GLSL_SAMPLER_DIM_2D:
+      smp = rogue_SMP2D(b,
+                        dst,
+                        drc,
+                        tex_state,
+                        data,
+                        smp_state,
+                        rogue_none(),
+                        chans);
+      break;
+
+   case GLSL_SAMPLER_DIM_3D:
+   case GLSL_SAMPLER_DIM_CUBE:
+      smp = rogue_SMP3D(b,
+                        dst,
+                        drc,
+                        tex_state,
+                        data,
+                        smp_state,
+                        rogue_none(),
+                        chans);
+      break;
+
+   default:
+      unreachable("Unsupported sampler dimensions.");
+   }
+
+   /* TODO: just set the backend op mod to flags if possible... */
+   unsigned flags = nir_intrinsic_flags(intr);
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_FCNORM))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_FCNORM);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_LOD_REPLACE)) {
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_REPLACE);
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_PPLOD);
+   }
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_LOD_BIAS)) {
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_BIAS);
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_PPLOD);
+   }
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_TAO))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_TAO);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_SOO))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_SOO);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_PROJ))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_PROJ);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_GRADIENT))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_GRADIENT);
+}
+
+static void
+trans_nir_intrinsic_image_info(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   unsigned info_base = nir_intrinsic_info_base_img(intr);
+
+   /* TODO: common up this stuff differently... */
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_image_array_maxidx_img: {
+      rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+      info_base += PVR_DESC_IMAGE_SECONDARY_OFFSET_ARRAYMAXINDEX(b->shader->ctx->compiler->dev_info);
+      rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, info_base));
+
+      rogue_MOV(b, dst, src);
+      break;
+   }
+
+   case nir_intrinsic_load_image_array_stride_img: {
+      rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+      info_base += PVR_DESC_IMAGE_SECONDARY_OFFSET_ARRAYSTRIDE;
+      rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, info_base));
+
+      rogue_MOV(b, dst, src);
+      break;
+   }
+
+   case nir_intrinsic_load_image_array_base_addr_img: {
+      rogue_ref64 dst = nir_ssa_intr_dst64(b->shader, intr);
+
+      info_base += PVR_DESC_IMAGE_SECONDARY_OFFSET_ARRAYBASE;
+      rogue_ref src_lo32 = rogue_ref_reg(rogue_shared_reg(b->shader, info_base));
+      rogue_ref src_hi32 = rogue_ref_reg(rogue_shared_reg(b->shader, info_base + 1));
+
+      rogue_MOV(b, dst.lo32, src_lo32);
+      rogue_MOV(b, dst.hi32, src_hi32);
+      break;
+   }
+
+   case nir_intrinsic_load_image_width_img: {
+      rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+      info_base += PVR_DESC_IMAGE_SECONDARY_OFFSET_WIDTH(b->shader->ctx->compiler->dev_info);
+      rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, info_base));
+
+      rogue_MOV(b, dst, src);
+      break;
+   }
+
+   case nir_intrinsic_load_image_height_img: {
+      rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+      info_base += PVR_DESC_IMAGE_SECONDARY_OFFSET_HEIGHT(b->shader->ctx->compiler->dev_info);
+      rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, info_base));
+
+      rogue_MOV(b, dst, src);
+      break;
+   }
+
+   case nir_intrinsic_load_image_depth_img: {
+      rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+      info_base += PVR_DESC_IMAGE_SECONDARY_OFFSET_DEPTH(b->shader->ctx->compiler->dev_info);
+      rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, info_base));
+
+      rogue_MOV(b, dst, src);
+      break;
+   }
+
+   default:
+      unreachable();
+   }
+}
+
 static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 {
    switch (intr->intrinsic) {
@@ -3026,12 +3223,14 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    case nir_intrinsic_global_atomic_swap:
       return trans_nir_intrinsic_global_atomic(b, intr);
 
+#if 0
    case nir_intrinsic_bindless_image_load:
    case nir_intrinsic_bindless_image_store:
    case nir_intrinsic_bindless_image_size:
    case nir_intrinsic_bindless_image_samples:
    case nir_intrinsic_bindless_image_texel_address:
       return trans_nir_intrinsic_image(b, intr);
+#endif
 
 #if 0
    case nir_intrinsic_barrier:
@@ -3050,6 +3249,17 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    case nir_intrinsic_pass_cov_mask_img:
       /* Consumed. */
       return;
+
+   case nir_intrinsic_smp_img:
+      return trans_nir_intrinsic_smp_img(b, intr);
+
+   case nir_intrinsic_load_image_array_maxidx_img:
+   case nir_intrinsic_load_image_array_stride_img:
+   case nir_intrinsic_load_image_array_base_addr_img:
+   case nir_intrinsic_load_image_width_img:
+   case nir_intrinsic_load_image_height_img:
+   case nir_intrinsic_load_image_depth_img:
+      return trans_nir_intrinsic_image_info(b, intr);
 
    default:
       break;
@@ -4411,6 +4621,12 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
    case nir_op_mov:
       return trans_nir_alu_mov(b, alu);
 
+/* TODO */
+#if 0
+   case nir_op_mov:
+      return trans_nir_alu_vecN(b, alu, 1);
+#endif
+
    case nir_op_vec2:
       return trans_nir_alu_vecN(b, alu, 2);
 
@@ -4419,6 +4635,15 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 
    case nir_op_vec4:
       return trans_nir_alu_vecN(b, alu, 4);
+
+   case nir_op_vec5:
+      return trans_nir_alu_vecN(b, alu, 5);
+
+   case nir_op_vec8:
+      return trans_nir_alu_vecN(b, alu, 8);
+
+   case nir_op_vec16:
+      return trans_nir_alu_vecN(b, alu, 16);
 
    case nir_op_iadd:
       return trans_nir_alu_iadd(b, alu, false);
@@ -4620,9 +4845,11 @@ static rogue_block *trans_nir_block(rogue_builder *b, nir_block *block)
          trans_nir_jump(b, nir_instr_as_jump(instr));
          break;
 
+#if 0
       case nir_instr_type_tex:
          trans_nir_tex(b, nir_instr_as_tex(instr));
          break;
+#endif
 
       default:
          unreachable("Unsupported NIR instruction type.");
