@@ -2031,3 +2031,5 @@ intrinsic("load_image_array_base_addr_img", src_comp=[], dest_comp=1, indices=[I
 intrinsic("load_image_width_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 intrinsic("load_image_height_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 intrinsic("load_image_depth_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+
+intrinsic("load_image_state_word_img", src_comp=[], dest_comp=1, indices=[TEX_STATE_BASE_IMG, COMPONENT], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])

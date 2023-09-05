@@ -727,10 +727,6 @@ static uint32_t pvr_get_required_descriptor_primary_sh_reg(
    primary_offset +=
       binding->required_per_stage_offset_in_dwords[stage].primary;
 
-   /* TODO: Do we need to do anything for bindings with multiple descriptors in
-    * them?
-    */
-
    return primary_offset;
 }
 
@@ -742,7 +738,7 @@ static uint32_t pvr_get_sampler_descriptor_secondary_sh_reg(
 {
    const struct pvr_descriptor_set_layout_mem_layout *reg_layout =
       &layout->required_register_layout_in_dwords_per_stage[stage][set_num];
-   uint32_t primary_offset;
+   uint32_t secondary_offset;
 
    switch (binding->type) {
    case VK_DESCRIPTOR_TYPE_SAMPLER:
@@ -762,15 +758,11 @@ static uint32_t pvr_get_sampler_descriptor_secondary_sh_reg(
    assert(layout->per_stage_descriptor_masks[stage] & BITFIELD_BIT(set_num));
    assert(set_num < layout->set_count);
 
-   primary_offset = reg_layout->secondary_offset;
-   primary_offset +=
+   secondary_offset = reg_layout->secondary_offset;
+   secondary_offset +=
       binding->required_per_stage_offset_in_dwords[stage].secondary;
 
-   /* TODO: Do we need to do anything for bindings with multiple descriptors in
-    * them?
-    */
-
-   return primary_offset;
+   return secondary_offset;
 }
 
 static void pvr_descriptor_size_info_init(

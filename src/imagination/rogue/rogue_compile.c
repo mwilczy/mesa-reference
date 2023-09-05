@@ -2282,52 +2282,79 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
        * extension.
        */
       if (CONV(uint, 8, 1, float, 32, 1, undef, false) ||
+          CONV(uint, 8, 1, float, 32, 1, rtne, false) ||
+          CONV(uint, 8, 1, float, 32, 1, rtz, false) ||
+
           CONV(uint, 16, 1, float, 32, 1, undef, false) ||
+          CONV(uint, 16, 1, float, 32, 1, rtne, false) ||
+          CONV(uint, 16, 1, float, 32, 1, rtz, false) ||
+
           CONV(uint, 32, 1, float, 32, 1, undef, false) ||
+          CONV(uint, 32, 1, float, 32, 1, rtne, false) ||
+          CONV(uint, 32, 1, float, 32, 1, rtz, false) ||
+
           CONV(int, 8, 1, float, 32, 1, undef, false) ||
+          CONV(int, 8, 1, float, 32, 1, rtne, false) ||
+          CONV(int, 8, 1, float, 32, 1, rtz, false) ||
+
           CONV(int, 16, 1, float, 32, 1, undef, false) ||
-          CONV(int, 32, 1, float, 32, 1, undef, false)) {
+          CONV(int, 16, 1, float, 32, 1, rtne, false) ||
+          CONV(int, 16, 1, float, 32, 1, rtz, false) ||
+
+          CONV(int, 32, 1, float, 32, 1, undef, false) ||
+          CONV(int, 32, 1, float, 32, 1, rtne, false) ||
+          CONV(int, 32, 1, float, 32, 1, rtz, false)) {
          rogue_alu_instr *upck;
          switch (src_sized_type) {
          case nir_type_uint8:
             upck = rogue_UPCK_U8888(b, dst, src);
-            /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
             rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          case nir_type_uint16:
             upck = rogue_UPCK_U1616(b, dst, src);
-            /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
             rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          case nir_type_uint32:
             upck = rogue_UPCK_U32(b, dst, src);
-            /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
             rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          case nir_type_int8:
             upck = rogue_UPCK_S8888(b, dst, src);
-            /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
             rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          case nir_type_int16:
             upck = rogue_UPCK_S1616(b, dst, src);
-            /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
             rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          case nir_type_int32:
             upck = rogue_UPCK_S32(b, dst, src);
-            /* rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO); */
             rogue_set_alu_src_mod(upck, 0, ROGUE_ALU_SRC_MOD_E0);
             break;
 
          default:
             unreachable();
          }
+
+         switch (rounding_mode) {
+         /* Default to rtne. */
+         case nir_rounding_mode_undef:
+         case nir_rounding_mode_rtne:
+            /* Do nothing; default for upck is rtne. */
+            break;
+
+         case nir_rounding_mode_rtz:
+            rogue_set_alu_op_mod(upck, ROGUE_ALU_OP_MOD_ROUNDZERO);
+            break;
+
+         default:
+            unreachable();
+         }
+
 
          instr = &upck->instr;
          break;
@@ -2370,7 +2397,6 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
 
          case nir_type_uint16:
             pck = rogue_PCK_U1616(b, rogue_ref_io(ROGUE_IO_FT2), src);
-            rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_ROUNDZERO);
             break;
 
          case nir_type_uint32:
@@ -2949,10 +2975,12 @@ trans_nir_intrinsic_load_tile_buffer_offset_img(rogue_builder *b,
 static void
 trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
 {
+   unsigned flags = nir_intrinsic_flags(intr);
+
    unsigned num_components = 0;
    rogue_ref dst = intr_dst(b->shader, intr, &num_components, 32);
-   assert(num_components >= 1 && num_components <= 4);
-   rogue_ref chans = rogue_ref_val(num_components);
+   /* assert(num_components >= 1 && num_components <= 4); */
+   rogue_ref chans = rogue_ref_val((flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO)) ? 1 : num_components);
 
    unsigned tex_state_base = nir_intrinsic_tex_state_base_img(intr);
    unsigned smp_state_base = nir_intrinsic_smp_state_base_img(intr);
@@ -3006,7 +3034,6 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
    }
 
    /* TODO: just set the backend op mod to flags if possible... */
-   unsigned flags = nir_intrinsic_flags(intr);
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_FCNORM))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_FCNORM);
 
@@ -3031,6 +3058,18 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
 
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_GRADIENT))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_GRADIENT);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_NNCOORDS))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_NNCOORDS);
+
+#if 0
+#else
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INTEGER))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_INTEGER);
+#endif
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_INFO);
 }
 
 static void
@@ -3105,6 +3144,18 @@ trans_nir_intrinsic_image_info(rogue_builder *b, nir_intrinsic_instr *intr)
    default:
       unreachable();
    }
+}
+
+static void
+trans_nir_intrinsic_load_image_state_word_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   unsigned tex_base = nir_intrinsic_tex_state_base_img(intr);
+   unsigned state_word_comp = nir_intrinsic_component(intr);
+
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+   rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, tex_base + state_word_comp));
+
+   rogue_MOV(b, dst, src);
 }
 
 static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
@@ -3260,6 +3311,9 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    case nir_intrinsic_load_image_height_img:
    case nir_intrinsic_load_image_depth_img:
       return trans_nir_intrinsic_image_info(b, intr);
+
+   case nir_intrinsic_load_image_state_word_img:
+      return trans_nir_intrinsic_load_image_state_word_img(b, intr);
 
    default:
       break;
