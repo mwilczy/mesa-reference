@@ -48,6 +48,7 @@ libpowervr_rogue_files = files(
   'rogue_encode.c',
   'rogue_info.c',
   'rogue_nir.c',
+  'rogue_nir_fmt_utils.c',
   'rogue_print.c',
   'rogue_validate.c',
 
