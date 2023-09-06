@@ -553,7 +553,8 @@ static nir_def *lower_frag_store_out(nir_builder *b,
                            value,
                            bit_size,
                            nir_imm_int(b, chan),
-                           chan_desc);
+                           chan_desc,
+                           false);
 
    /* srcs:
     * - 0: value

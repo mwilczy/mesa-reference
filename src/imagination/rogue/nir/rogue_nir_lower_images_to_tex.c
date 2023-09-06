@@ -24,6 +24,7 @@
 #include "nir.h"
 #include "nir_builder.h"
 #include "rogue.h"
+#include "rogue_nir_fmt_utils.h"
 
 static bool
 is_undef(nir_def *def)
@@ -189,13 +190,75 @@ static nir_def *lower_image_intrinsic(nir_builder *b,
 
    enum pipe_format image_format = var->data.image.format;
    enum pipe_format data_format = type_to_format(info->type);
-   /* TODO: support other types. */
-   assert(data_format == PIPE_FORMAT_R32G32B32A32_FLOAT);
    bool equal_types = image_format == data_format;
 
    bool store = intr->intrinsic == nir_intrinsic_image_deref_store;
-   if (store) {
+   if (store && !equal_types) {
+      /* TODO: support other types. */
+      /* assert(data_format == PIPE_FORMAT_R32G32B32A32_FLOAT); */
+
+      unsigned data_format_bits = nir_alu_type_get_type_size(info->type);
+      assert(data_format_bits == 32);
+
       /* Pack data to required format. */
+      const struct util_format_description *fmt_desc = util_format_description(image_format);
+
+      unsigned fmt_chans = fmt_desc->nr_channels;
+
+      /* Trim unused components. */
+      /* TODO NEXT: either don't trim the unused components, or don't hardcode write_data to be 4 (preferably the latter). */
+      /* TODO: Would be nice to make sure that the trimmed components are all nir_undef. */
+      info->write_data = nir_trim_vector(b, info->write_data, fmt_chans);
+
+      nir_def *write_data_packed[4] = { [0 ... 3] = nir_imm_int(b, 0), };
+
+      /* TODO: commonise this with all the similar code in pvfio/fmt_utils,
+       * and probably want vector versions of the scalar pack/unpacks.
+       */
+      for (unsigned c = 0; c < fmt_chans; ++c) {
+         enum pipe_swizzle chan = fmt_desc->swizzle[c];
+         assert(chan < fmt_chans);
+         assert(chan <= PIPE_SWIZZLE_W);
+
+         const struct util_format_channel_description *chan_desc = &fmt_desc->channel[chan];
+
+         unsigned chan_offset = chan_desc->shift;
+         unsigned chan_bits = chan_desc->size;
+         /* No support for 64-bit components (yet). */
+         assert(chan_bits <= 32);
+
+         /* Texture output register offset that contains this channel. */
+         ASSERTED unsigned texout_offset = chan_offset / ROGUE_REG_SIZE_BITS;
+
+         /* Make sure the channel doesn't span multiple registers. */
+         assert(texout_offset == ((chan_offset + chan_bits - 1) / ROGUE_REG_SIZE_BITS));
+
+         /* N.B. for samplers it's one register PER CHANNEL, i.e. don't pack multiple channels into a single register.
+          * The SMP instruction will take care of the packing.
+          */
+
+         /* Prepare store arguments. */
+         nir_def **write_data_out = &write_data_packed[chan]; /* TODO check this - maybe it needs to be c as well and we don't need to swizzle? */
+         nir_def *write_data_in = nir_channel(b, info->write_data, c);
+
+         unsigned num_texout_regs = PVR_BITS_TO_DW(fmt_desc->block.bits);
+         /* Adjust the channel component.
+          * E.g. for [R16G16][B16A16]:
+          * var.r => [0].x
+          * var.g => [0].y
+          * var.b => [1].x
+          * var.a => [1].y
+          */
+         assert(fmt_chans >= num_texout_regs);
+         chan %= DIV_ROUND_UP(fmt_chans, num_texout_regs);
+
+         /* Transform and pack the value to be stored. */
+         /* value = fmt_colorspace_transform_scalar(b, value, bit_size, chan, fmt_desc, true); */
+         *write_data_out = fmt_pack_scalar(b, *write_data_out, write_data_in, data_format_bits, nir_imm_int(b, chan), chan_desc, true);
+      }
+
+      info->write_data = nir_vec(b, write_data_packed, fmt_desc->nr_channels);
+      info->write_data = nir_pad_vector(b, info->write_data, 4);
    }
 
    setup_tex_srcs(tex, info);
@@ -211,9 +274,9 @@ static nir_def *lower_image_intrinsic(nir_builder *b,
 
    nir_def *res = nir_trim_vector(b, &tex->def, dst_comps);
 
-   if (!store) {
+   if (!store && !equal_types) {
       /* TODO: Unpacking. */
-      assert(equal_types);
+      assert(false);
    }
 
    return res;

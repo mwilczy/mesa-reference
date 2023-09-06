@@ -2980,7 +2980,14 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
    unsigned num_components = 0;
    rogue_ref dst = intr_dst(b->shader, intr, &num_components, 32);
    /* assert(num_components >= 1 && num_components <= 4); */
-   rogue_ref chans = rogue_ref_val((flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO)) ? 1 : num_components);
+   /* rogue_ref chans = rogue_ref_val((flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO)) ? 1 : num_components); */
+   unsigned channels = num_components;
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO))
+      channels = 1;
+   else if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_WRT))
+      channels = 4;
+
+   rogue_ref chans = rogue_ref_val(channels);
 
    unsigned tex_state_base = nir_intrinsic_tex_state_base_img(intr);
    unsigned smp_state_base = nir_intrinsic_smp_state_base_img(intr);
@@ -4343,7 +4350,7 @@ static void trans_nir_pack_format(rogue_builder *b,
       rogue_set_alu_op_mod(pck, ROGUE_ALU_OP_MOD_SCALE);
 
    if (partial) {
-      /* TODO: add support for other types. */
+      /* Other types should've been lowered in NIR (rogue_nir_opt_algebraic_late.legalise_field_packs). */
       assert(storage == ROGUE_STORAGE_4x8 || storage == ROGUE_STORAGE_2x16);
 
       rogue_set_instr_group_next(&pck->instr, true);

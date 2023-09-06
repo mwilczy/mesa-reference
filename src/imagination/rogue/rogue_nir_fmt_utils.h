@@ -44,7 +44,8 @@ fmt_pack_scalar(nir_builder *b,
                 nir_def *value,
                 unsigned dest_bits,
                 nir_def *chan,
-                const struct util_format_channel_description *chan_desc);
+                const struct util_format_channel_description *chan_desc,
+                bool is_texture_pack);
 
 nir_def *
 fmt_unpack_scalar(nir_builder *b,

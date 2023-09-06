@@ -42,7 +42,8 @@ fmt_pack_scalar(nir_builder *b,
                 nir_def *value,
                 unsigned dest_bits,
                 nir_def *chan,
-                const struct util_format_channel_description *chan_desc)
+                const struct util_format_channel_description *chan_desc,
+                bool is_texture_pack)
 {
    enum util_format_type type = chan_desc->type;
    unsigned offset = chan_desc->shift % ROGUE_REG_SIZE_BITS;
@@ -152,6 +153,9 @@ fmt_pack_scalar(nir_builder *b,
    } else {
       unreachable("Unsupported packing format.");
    }
+
+   if (is_texture_pack)
+      packed = nir_ubitfield_extract_imm(b, packed, offset, bits);
 
    assert(packed);
    return packed;
