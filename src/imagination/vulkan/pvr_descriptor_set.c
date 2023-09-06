@@ -1680,6 +1680,7 @@ static void pvr_descriptor_update_sampler(
    uint32_t start_stage,
    uint32_t end_stage)
 {
+   uint32_t *required_mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
    struct pvr_descriptor_size_info size_info;
 
    pvr_descriptor_size_info_init(device, binding->type, &size_info);
@@ -1723,8 +1724,6 @@ static void pvr_descriptor_update_sampler(
           * layouts.
           */
 
-         mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
-
          primary_offset = pvr_get_required_descriptor_primary_offset(
             device,
             set->layout,
@@ -1732,11 +1731,11 @@ static void pvr_descriptor_update_sampler(
             j,
             write_set->dstArrayElement + i);
 
-         memcpy(mem_ptr + primary_offset,
+         memcpy(required_mem_ptr + primary_offset,
                 sampler->descriptor.words,
                 sizeof(sampler->descriptor.words));
 
-         memcpy(mem_ptr + primary_offset + 4,
+         memcpy(required_mem_ptr + primary_offset + 4,
                 sampler->gather_descriptor.words,
                 sizeof(sampler->gather_descriptor.words));
       }
@@ -1823,6 +1822,7 @@ static void pvr_descriptor_update_sampler_texture(
    uint32_t start_stage,
    uint32_t end_stage)
 {
+   uint32_t *required_mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
    const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
    struct pvr_descriptor_size_info size_info;
 
@@ -1899,8 +1899,6 @@ static void pvr_descriptor_update_sampler_texture(
           * layouts.
           */
 
-         mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
-
          /* TODO: Use `struct pvr_combined_image_sampler_descriptor` ? */
 
          primary_offset = pvr_get_required_descriptor_primary_offset(
@@ -1920,7 +1918,8 @@ static void pvr_descriptor_update_sampler_texture(
          pvr_write_image_descriptor_primaries(dev_info,
                                               iview,
                                               write_set->descriptorType,
-                                              mem_ptr + primary_offset);
+                                              required_mem_ptr +
+                                                 primary_offset);
 
          if (!binding->has_immutable_samplers) {
             PVR_FROM_HANDLE(pvr_sampler,
@@ -1928,11 +1927,13 @@ static void pvr_descriptor_update_sampler_texture(
                             write_set->pImageInfo[i].sampler);
             set->descriptors[desc_idx].sampler = sampler;
 
-            memcpy(mem_ptr + primary_offset + PVR_IMAGE_DESCRIPTOR_SIZE,
+            memcpy(required_mem_ptr + primary_offset +
+                      PVR_IMAGE_DESCRIPTOR_SIZE,
                    sampler->descriptor.words,
                    sizeof(sampler->descriptor.words));
 
-            memcpy(mem_ptr + primary_offset + PVR_IMAGE_DESCRIPTOR_SIZE + 4,
+            memcpy(required_mem_ptr + primary_offset +
+                      PVR_IMAGE_DESCRIPTOR_SIZE + 4,
                    sampler->gather_descriptor.words,
                    sizeof(sampler->gather_descriptor.words));
          }
@@ -1940,7 +1941,8 @@ static void pvr_descriptor_update_sampler_texture(
          pvr_write_image_descriptor_secondaries(dev_info,
                                                 iview,
                                                 write_set->descriptorType,
-                                                mem_ptr + secondary_offset);
+                                                required_mem_ptr +
+                                                   secondary_offset);
       }
    }
 }
@@ -1954,6 +1956,7 @@ static void pvr_descriptor_update_texture(
    uint32_t start_stage,
    uint32_t end_stage)
 {
+   uint32_t *required_mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
    const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
 
    for (uint32_t i = 0; i < write_set->descriptorCount; i++) {
@@ -2007,8 +2010,6 @@ static void pvr_descriptor_update_texture(
           * layouts.
           */
 
-         mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
-
          primary_offset = pvr_get_required_descriptor_primary_offset(
             device,
             set->layout,
@@ -2026,12 +2027,14 @@ static void pvr_descriptor_update_texture(
          pvr_write_image_descriptor_primaries(dev_info,
                                               iview,
                                               write_set->descriptorType,
-                                              mem_ptr + primary_offset);
+                                              required_mem_ptr +
+                                                 primary_offset);
 
          pvr_write_image_descriptor_secondaries(dev_info,
                                                 iview,
                                                 write_set->descriptorType,
-                                                mem_ptr + secondary_offset);
+                                                required_mem_ptr +
+                                                   secondary_offset);
       }
    }
 }
@@ -2078,6 +2081,7 @@ static void pvr_descriptor_update_buffer_view(
    uint32_t start_stage,
    uint32_t end_stage)
 {
+   uint32_t *required_mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
    const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
    struct pvr_descriptor_size_info size_info;
 
@@ -2128,8 +2132,6 @@ static void pvr_descriptor_update_buffer_view(
           * layouts.
           */
 
-         mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
-
          primary_offset = pvr_get_required_descriptor_primary_offset(
             device,
             set->layout,
@@ -2148,8 +2150,8 @@ static void pvr_descriptor_update_buffer_view(
             dev_info,
             bview,
             write_set->descriptorType,
-            mem_ptr + primary_offset,
-            size_info.secondary ? mem_ptr + secondary_offset : NULL);
+            required_mem_ptr + primary_offset,
+            size_info.secondary ? required_mem_ptr + secondary_offset : NULL);
       }
    }
 }
@@ -2163,6 +2165,7 @@ static void pvr_descriptor_update_input_attachment(
    uint32_t start_stage,
    uint32_t end_stage)
 {
+   uint32_t *required_mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
    const struct pvr_device_info *dev_info = &device->pdevice->dev_info;
    struct pvr_descriptor_size_info size_info;
 
@@ -2225,8 +2228,6 @@ static void pvr_descriptor_update_input_attachment(
           * layouts.
           */
 
-         mem_ptr = pvr_bo_suballoc_get_map_addr(set->required_bo);
-
          primary_offset = pvr_get_required_descriptor_primary_offset(
             device,
             set->layout,
@@ -2237,9 +2238,11 @@ static void pvr_descriptor_update_input_attachment(
          pvr_write_image_descriptor_primaries(dev_info,
                                               iview,
                                               write_set->descriptorType,
-                                              mem_ptr + primary_offset);
+                                              required_mem_ptr +
+                                                 primary_offset);
 
-         *(uint64_t *)(mem_ptr + primary_offset + PVR_IMAGE_DESCRIPTOR_SIZE) =
+         *(uint64_t *)(required_mem_ptr + primary_offset +
+                       PVR_IMAGE_DESCRIPTOR_SIZE) =
             device->input_attachment_sampler;
 
          if (!PVR_HAS_FEATURE(dev_info, tpu_array_textures)) {
@@ -2254,7 +2257,8 @@ static void pvr_descriptor_update_input_attachment(
             pvr_write_image_descriptor_secondaries(dev_info,
                                                    iview,
                                                    write_set->descriptorType,
-                                                   mem_ptr + secondary_offset);
+                                                   required_mem_ptr +
+                                                      secondary_offset);
          }
       }
    }
