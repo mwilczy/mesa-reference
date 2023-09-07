@@ -272,14 +272,7 @@ static nir_def *lower_image_intrinsic(nir_builder *b,
       return NIR_LOWER_INSTR_PROGRESS_REPLACE;
    }
 
-   nir_def *res = nir_trim_vector(b, &tex->def, dst_comps);
-
-   if (!store && !equal_types) {
-      /* TODO: Unpacking. */
-      assert(false);
-   }
-
-   return res;
+   return nir_trim_vector(b, &tex->def, dst_comps);
 }
 
 static bool is_image_instr(const nir_instr *instr, UNUSED const void *cb_data)
@@ -507,12 +500,20 @@ setup_image_instr_info(nir_builder *b, const nir_intrinsic_instr *intr, struct i
 
    info->sample_index = image_instr_sample_index(intr);
 
-   if (nir_intrinsic_has_src_type(intr))
+   if (nir_intrinsic_has_src_type(intr)) {
       info->type = nir_intrinsic_src_type(intr);
-   else if (nir_intrinsic_has_dest_type(intr))
+   } else if (nir_intrinsic_has_dest_type(intr)) {
       info->type = nir_intrinsic_dest_type(intr);
-   else /* TODO: infer */
-      assert(false && "2");
+   } else {
+      switch (intr->intrinsic) {
+      case nir_intrinsic_image_deref_size:
+         info->type = nir_type_uint32;
+         break;
+
+      default:
+         unreachable("Unsupported image intrinsic.");
+      }
+   }
 }
 
 static nir_def *lower_image_instr(nir_builder *b, nir_instr *instr, UNUSED void *cb_data)
