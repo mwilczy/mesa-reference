@@ -62,4 +62,6 @@ fmt_colorspace_transform_scalar(nir_builder *b,
                                 const struct util_format_description *fmt_desc,
                                 bool to_colorspace);
 
+nir_def *get_unspec_chan(nir_builder *b, enum pipe_swizzle chan, unsigned bit_size, const struct util_format_description *fmt_desc);
+
 #endif /* ROGUE_NIR_FMT_UTILS_H */

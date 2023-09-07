@@ -300,3 +300,36 @@ fmt_colorspace_transform_scalar(nir_builder *b,
 
    unreachable("Unsupported colorspace.");
 }
+
+static inline const struct util_format_channel_description *
+get_first_non_void_channel(const struct util_format_description *fmt_desc)
+{
+   for (unsigned c = 0; c < ARRAY_SIZE(fmt_desc->channel); ++c)
+      if (fmt_desc->channel[c].type != UTIL_FORMAT_TYPE_VOID)
+         return &fmt_desc->channel[c];
+
+   unreachable();
+}
+
+static bool chan_is_float(unsigned chan,
+                          const struct util_format_description *fmt_desc)
+{
+   const struct util_format_channel_description *chan_desc =
+      (fmt_desc->channel[chan].type == UTIL_FORMAT_TYPE_VOID)
+         ? get_first_non_void_channel(fmt_desc)
+         : &fmt_desc->channel[chan];
+
+   return !chan_desc->pure_integer;
+}
+
+nir_def *get_unspec_chan(nir_builder *b, enum pipe_swizzle chan, unsigned bit_size, const struct util_format_description *fmt_desc)
+{
+   if (chan == PIPE_SWIZZLE_0)
+      return nir_imm_int(b, 0);
+
+   if (chan == PIPE_SWIZZLE_1)
+      return chan_is_float(chan, fmt_desc) ? nir_imm_floatN_t(b, 1.0f, bit_size)
+                                           : nir_imm_intN_t(b, 1, bit_size);
+
+   unreachable("Invalid unspecified channel.");
+}
