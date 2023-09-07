@@ -235,10 +235,13 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    nir_def *ddx = NULL;
    nir_def *ddy = NULL;
    nir_def *wrdata = NULL;
+   unsigned fixed_tex_base = ROGUE_REG_UNUSED;
+   unsigned fixed_smp_base = ROGUE_REG_UNUSED;
 
    unsigned flags = 0;
 
    bool int_comps = false;
+   bool is_array = tex->is_array;
    for (unsigned u = 0; u < tex->num_srcs; ++u) {
       switch (tex->src[u].src_type) {
       case nir_tex_src_coord:
@@ -310,6 +313,16 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
          wrdata = tex->src[u].src.ssa;
          break;
 
+      case nir_tex_src_texture_handle:
+         assert(fixed_tex_base == ROGUE_REG_UNUSED);
+         fixed_tex_base = nir_src_as_uint(tex->src[u].src);
+         break;
+
+      case nir_tex_src_sampler_handle:
+         assert(fixed_smp_base == ROGUE_REG_UNUSED);
+         fixed_smp_base = nir_src_as_uint(tex->src[u].src);
+         break;
+
       default:
          unreachable("Unsupported tex src type.");
       }
@@ -317,45 +330,57 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 
    assert(!(lod_replace && lod_bias));
 
-   assert(tex_state_src);
+   assert(!!tex_state_src != ((fixed_tex_base != ROGUE_REG_UNUSED) && (fixed_smp_base != ROGUE_REG_UNUSED)));
+
+   /* TODO NEXT: try not needing int flag and see if this is still needed. */
+   if (int_comps && sampler_dim == GLSL_SAMPLER_DIM_CUBE) {
+      sampler_dim = GLSL_SAMPLER_DIM_2D;
+      is_array = true;
+   }
 
    unsigned tex_base = ROGUE_REG_UNUSED;
    unsigned smp_base = ROGUE_REG_UNUSED;
    unsigned info_base = ROGUE_REG_UNUSED;
 
-   enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(b->shader->info.stage);
-   lookup_base_regs(tex_state_src, smp_state_src, &tex_base, &smp_base, &info_base, pvr_stage, ctx);
+   if (tex_state_src) {
+      enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(b->shader->info.stage);
+      lookup_base_regs(tex_state_src, smp_state_src, &tex_base, &smp_base, &info_base, pvr_stage, ctx);
+   } else {
+      tex_base = fixed_tex_base;
+      smp_base = fixed_smp_base;
+   }
 
    assert(tex_base != ROGUE_REG_UNUSED);
    assert(smp_base != ROGUE_REG_UNUSED);
-   assert(info_base != ROGUE_REG_UNUSED);
 
    bool smp_info = false;
-   if (nir_tex_instr_is_query(tex))
-   switch (tex->op) {
-   case nir_texop_txs:
-      return lower_txs(b, tex->def.num_components, info_base, tex->is_array);
+   if (nir_tex_instr_is_query(tex)) {
+      switch (tex->op) {
+      case nir_texop_txs:
+         assert(info_base != ROGUE_REG_UNUSED);
+         return lower_txs(b, tex->def.num_components, info_base, is_array);
 
-   case nir_texop_texture_samples:
-      return lower_texture_samples(b, tex_base);
+      case nir_texop_texture_samples:
+         return lower_texture_samples(b, tex_base);
 
-   case nir_texop_query_levels:
-      return lower_query_levels(b, tex_base);
+      case nir_texop_query_levels:
+         return lower_query_levels(b, tex_base);
 
-   case nir_texop_lod:
-      smp_info = true;
-      flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_INFO);
-      break;
+      case nir_texop_lod:
+         smp_info = true;
+         flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_INFO);
+         break;
 
-   default:
-      unreachable("Unsupported texture query op.");
+      default:
+         unreachable("Unsupported texture query op.");
+      }
    }
 
    assert(coords);
    assert(coords->num_components == tex->coord_components);
 
    nir_def *tex_addr_override = NULL;
-   if (tex->is_array && !nir_tex_instr_is_query(tex)) {
+   if (is_array && !nir_tex_instr_is_query(tex)) {
       /* Separate out the array index component. */
       /* TODO: nir_f2u32_rte? */
 
@@ -367,6 +392,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       coords = nir_trim_vector(b, coords, tex->coord_components - 1);
 
       /* Clamp array index. */
+      assert(info_base != ROGUE_REG_UNUSED);
       nir_def *image_array_maxidx = nir_load_image_array_maxidx_img(b, .info_base_img = info_base);
       array_idx = nir_bcsel(b, nir_ult(b, array_idx, image_array_maxidx), array_idx, image_array_maxidx);
 

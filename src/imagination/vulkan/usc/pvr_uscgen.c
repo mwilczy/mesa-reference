@@ -513,14 +513,16 @@ static void pvr_uscgen_load_op_loads_nir(nir_builder *b,
       fs_data->outputs[rt_idx].mrt_resource = mrt_resource;
       fs_data->outputs[rt_idx].format = vk_format_to_pipe_format(vk_format);
 
-      tex = nir_tex_instr_create(b->shader, !!msaa + 1);
-      tex->src[0].src_type = nir_tex_src_coord;
-      tex->src[0].src = nir_src_for_ssa(coords);
+      tex = nir_tex_instr_create(b->shader, 3 + !!msaa);
+      tex->src[0] = nir_tex_src_for_ssa(nir_tex_src_coord, coords);
+      tex->src[1] = nir_tex_src_for_ssa(nir_tex_src_texture_handle,
+                                        nir_imm_int(b, ctx->next_sh_reg));
+      tex->src[2] = nir_tex_src_for_ssa(
+         nir_tex_src_sampler_handle,
+         nir_imm_int(b, ctx->next_sh_reg + PVR_IMAGE_DESCRIPTOR_SIZE));
 
-      if (msaa) {
-         tex->src[1].src_type = nir_tex_src_ms_index;
-         tex->src[1].src = nir_src_for_ssa(sample_id);
-      }
+      if (msaa)
+         tex->src[3] = nir_tex_src_for_ssa(nir_tex_src_ms_index, sample_id);
 
       if (vk_format_is_int(vk_format))
          tex->dest_type = nir_type_int32;
@@ -532,8 +534,7 @@ static void pvr_uscgen_load_op_loads_nir(nir_builder *b,
       /* TODO: support 3D/2D array layered framebuffers */
       tex->coord_components = 2;
       tex->sampler_dim = msaa ? GLSL_SAMPLER_DIM_MS : GLSL_SAMPLER_DIM_2D;
-      tex->texture_index = ctx->next_sh_reg;
-      tex->sampler_index = ctx->next_sh_reg + PVR_IMAGE_DESCRIPTOR_SIZE;
+
       ctx->next_sh_reg +=
          PVR_IMAGE_DESCRIPTOR_SIZE + PVR_SAMPLER_DESCRIPTOR_SIZE;
 

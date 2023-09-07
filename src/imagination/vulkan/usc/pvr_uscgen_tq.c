@@ -606,9 +606,19 @@ pvr_uscgen_tq_frag_load(nir_builder *b,
    for (unsigned sample_idx = 0; sample_idx < num_samples; sample_idx++) {
       nir_tex_instr *tex;
 
-      tex = nir_tex_instr_create(b->shader, !!layer_props->msaa + 1);
-      tex->src[0].src_type = nir_tex_src_coord;
-      tex->src[0].src = nir_src_for_ssa(coords);
+      tex = nir_tex_instr_create(b->shader, 3 + !!layer_props->msaa);
+      tex->src[0] = nir_tex_src_for_ssa(nir_tex_src_coord, coords);
+      assert(load_idx < sh_reg_layout->combined_image_samplers.count);
+      tex->src[1] = nir_tex_src_for_ssa(
+         nir_tex_src_texture_handle,
+         nir_imm_int(
+            b,
+            sh_reg_layout->combined_image_samplers.offsets[load_idx].image));
+      tex->src[2] = nir_tex_src_for_ssa(
+         nir_tex_src_sampler_handle,
+         nir_imm_int(
+            b,
+            sh_reg_layout->combined_image_samplers.offsets[load_idx].sampler));
 
       if (layer_props->msaa) {
          unsigned resolved_idx = layer_props->resolve_op - PVR_RESOLVE_SAMPLE0;
@@ -623,8 +633,7 @@ pvr_uscgen_tq_frag_load(nir_builder *b,
             ms_idx = nir_imm_int(b, sample_idx);
          }
 
-         tex->src[1].src_type = nir_tex_src_ms_index;
-         tex->src[1].src = nir_src_for_ssa(ms_idx);
+         tex->src[3] = nir_tex_src_for_ssa(nir_tex_src_ms_index, ms_idx);
       }
 
       tex->dest_type = pvr_pbe_pixel_is_norm(layer_props->pbe_format)
@@ -638,12 +647,6 @@ pvr_uscgen_tq_frag_load(nir_builder *b,
          tex->sampler_dim = GLSL_SAMPLER_DIM_MS;
       else if (layer_props->sample)
          tex->sampler_dim = GLSL_SAMPLER_DIM_3D;
-
-      assert(load_idx < sh_reg_layout->combined_image_samplers.count);
-      tex->texture_index =
-         sh_reg_layout->combined_image_samplers.offsets[load_idx].image;
-      tex->sampler_index =
-         sh_reg_layout->combined_image_samplers.offsets[load_idx].sampler;
 
       nir_def_init(&tex->instr, &tex->def, 4, 32);
       nir_builder_instr_insert(b, &tex->instr);

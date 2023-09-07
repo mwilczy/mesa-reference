@@ -3003,6 +3003,7 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
    rogue_backend_instr *smp;
    switch (dim) {
    case GLSL_SAMPLER_DIM_1D:
+   case GLSL_SAMPLER_DIM_BUF:
       smp = rogue_SMP1D(b,
                         dst,
                         drc,
