@@ -3180,19 +3180,16 @@ trans_nir_intrinsic_load_image_state_word_img(rogue_builder *b, nir_intrinsic_in
    rogue_MOV(b, dst, src);
 }
 
-#if 0
-static void
-trans_nir_intrinsic_load_sampler_state_word_img(rogue_builder *b, nir_intrinsic_instr *intr)
+static void trans_nir_load_sample_mask_in(rogue_builder *b, nir_intrinsic_instr *intr)
 {
-   unsigned smp_base = nir_intrinsic_smp_state_base_img(intr);
-   unsigned state_word_comp = nir_intrinsic_component(intr);
+   struct rogue_fs_build_data *fs_data = &b->shader->ctx->stage_data.fs;
 
-   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
-   rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, smp_base + state_word_comp));
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, 32);
 
-   rogue_MOV(b, dst, src);
+   rogue_alu_instr *mov = rogue_MOV(b, dst, rogue_ref_imm(fs_data->sample_mask));
+   rogue_add_instr_comment(&mov->instr, "load_sample_mask_in");
 }
-#endif
+
 
 static void
 trans_nir_intrinsic_shadow_tst_img(rogue_builder *b, nir_intrinsic_instr *intr)
@@ -3373,10 +3370,8 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    case nir_intrinsic_load_image_state_word_img:
       return trans_nir_intrinsic_load_image_state_word_img(b, intr);
 
-#if 0
-   case nir_intrinsic_load_sampler_state_word_img:
-      return trans_nir_intrinsic_load_sampler_state_word_img(b, intr);
-#endif
+   case nir_intrinsic_load_sample_mask_in:
+      return trans_nir_load_sample_mask_in(b, intr);
 
    case nir_intrinsic_shadow_tst_img:
       return trans_nir_intrinsic_shadow_tst_img(b, intr);
