@@ -83,6 +83,7 @@ static bool is_input_attachment(const nir_instr *instr, UNUSED const void *cb_da
    enum glsl_sampler_dim image_dim = nir_intrinsic_image_dim(intr);
 
    /* TODO: support GLSL_SAMPLER_DIM_SUBPASS_MS */
+   /* assert(image_dim != GLSL_SAMPLER_DIM_SUBPASS_MS); */
    if (image_dim != GLSL_SAMPLER_DIM_SUBPASS)
       return false;
 

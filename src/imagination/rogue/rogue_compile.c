@@ -3015,7 +3015,9 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
       break;
 
    case GLSL_SAMPLER_DIM_2D:
+   case GLSL_SAMPLER_DIM_MS:
    case GLSL_SAMPLER_DIM_SUBPASS:
+   case GLSL_SAMPLER_DIM_SUBPASS_MS:
       smp = rogue_SMP2D(b,
                         dst,
                         drc,
@@ -3061,6 +3063,9 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
 
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_SOO))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_SOO);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_SNO))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_SNO);
 
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_PROJ))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_PROJ);

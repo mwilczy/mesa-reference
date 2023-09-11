@@ -202,8 +202,14 @@ static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, uns
          /* Add the offset of the descriptor within the binding. */
          unsigned smp_desc_elem = 0;
          if (smp_binding_layout->descriptor_count > 1) {
-            assert(smp_state_binding.num_indices == 1);
-            smp_desc_elem = nir_src_as_uint(smp_state_binding.indices[0]);
+            if (smp_state_binding.num_indices) {
+               assert(smp_state_binding.num_indices == 1);
+               smp_desc_elem = nir_src_as_uint(smp_state_binding.indices[0]);
+            } else {
+               nir_deref_instr *deref = nir_src_as_deref(*smp_state_src);
+               assert(deref->deref_type == nir_deref_type_array);
+               desc_elem = nir_src_as_uint(deref->arr.index);
+            }
          }
 
          _smp_state_base = pvr_get_required_descriptor_primary_sh_reg(pipeline_layout, pvr_stage, smp_state_binding.desc_set, smp_binding_layout);
@@ -285,6 +291,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    nir_def *lod_bias = NULL;
    nir_def *comparator = NULL;
    nir_def *offset = NULL;
+   nir_def *ms_index = NULL;
    nir_def *proj = NULL;
    nir_def *ddx = NULL;
    nir_def *ddy = NULL;
@@ -344,6 +351,11 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       case nir_tex_src_offset:
          assert(!offset);
          offset = tex->src[u].src.ssa;
+         break;
+
+      case nir_tex_src_ms_index:
+         assert(!ms_index);
+         ms_index = tex->src[u].src.ssa;
          break;
 
       case nir_tex_src_projector:
@@ -556,24 +568,37 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_TAO);
    }
 
-   if (offset) {
-      assert(offset->num_components == coords->num_components);
+   if (offset || ms_index) {
+      assert(!offset || offset->num_components == coords->num_components);
 
       nir_def* packed_offsets = nir_imm_int(b, 0);
 
-      unsigned packed_offset_start[] = { 0, 6, 12 };
-      unsigned packed_offset_size[] = { 6, 6, 4 };
+      if (offset) {
+         unsigned packed_offset_start[] = { 0, 6, 12 };
+         unsigned packed_offset_size[] = { 6, 6, 4 };
 
-      for (unsigned c = 0; c < offset->num_components; ++c) {
+         for (unsigned c = 0; c < offset->num_components; ++c) {
+            packed_offsets = nir_bitfield_insert(b,
+                                                  packed_offsets,
+                                                  nir_channel(b, offset, c),
+                                                  nir_imm_int(b, packed_offset_start[c]),
+                                                  nir_imm_int(b, packed_offset_size[c]));
+         }
+
+         flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_SOO);
+      }
+
+      if (ms_index) {
          packed_offsets = nir_bitfield_insert(b,
                                                packed_offsets,
-                                               nir_channel(b, offset, c),
-                                               nir_imm_int(b, packed_offset_start[c]),
-                                               nir_imm_int(b, packed_offset_size[c]));
+                                               ms_index,
+                                               nir_imm_int(b, 16),
+                                               nir_imm_int(b, 3));
+
+         flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_SNO);
       }
 
       data[data_comps++] = packed_offsets;
-      flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_SOO);
    }
 
    if (wrdata) {
