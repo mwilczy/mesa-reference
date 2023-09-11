@@ -2984,6 +2984,8 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
    unsigned channels = num_components;
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO))
       channels = 1;
+   else if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_DATA))
+      channels = 4;
    else if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_WRT))
       channels = 4;
 
@@ -3083,6 +3085,9 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
 
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INFO))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_INFO);
+
+   if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_DATA))
+      rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_DATA);
 
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_WRT))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_WRT);

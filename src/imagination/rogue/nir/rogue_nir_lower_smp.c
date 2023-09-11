@@ -147,7 +147,7 @@ static nir_def *lower_texel_address(nir_builder *b, nir_def *int_coords, unsigne
    return image_addr;
 }
 
-static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, unsigned *tex_state_base, unsigned *smp_state_base, unsigned *info_base, enum pvr_stage_allocation pvr_stage, const rogue_build_ctx *ctx)
+static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, unsigned *tex_state_base, unsigned *smp_state_base, unsigned *info_base, bool is_gather, enum pvr_stage_allocation pvr_stage, const rogue_build_ctx *ctx)
 {
    const struct pvr_pipeline_layout *pipeline_layout = ctx->pipeline_layout;
 
@@ -221,6 +221,10 @@ static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, uns
          _smp_state_base = pipeline_layout->point_sampler_in_dwords_per_stage[pvr_stage];
       }
 
+      /* Gather sampler follows. */
+      if (is_gather)
+         _smp_state_base += PVR_SAMPLER_DESCRIPTOR_SIZE;
+
       *smp_state_base = _smp_state_base;
    }
 
@@ -252,6 +256,60 @@ static nir_def * chase_float_src(nir_builder *b, nir_def *val, bool round)
    return as_float;
 }
 
+static nir_def *rogue_swizzle_tg4_offsets(nir_builder *b, nir_def *data, unsigned component, const int8_t tg4_offsets[4][2])
+{
+#if 1
+   static const int8_t rogue_tg4_offsets[4][2] = {
+      { 0, 0 },
+      { 1, 0 },
+      { 0, 1 },
+      { 1, 1 },
+   };
+
+   /* TODO NEXT: check which way round! */
+#if 0
+   unsigned swizzles[4];
+   unsigned c = 0;
+   for (unsigned r = 0; r < 4; ++r) {
+      unsigned *swizzle = &swizzles[r];
+      const int8_t *rogue_off = rogue_tg4_offsets[r];
+      for (unsigned t = 0; t < 4; ++t) {
+         const int8_t *tg4_off = tg4_offsets[t];
+         if (rogue_off[0] == tg4_off[0] && rogue_off[1] == tg4_off[1]) {
+            /* gather result is [0_comp0, 0_comp1, 0_comp2, 0_comp3, 1_comp0, 1_comp1, 1_comp2, 1_comp3, etc.] */
+            *swizzle = t * 4 + component;
+            ++c;
+            break;
+         }
+      }
+   }
+   assert(c == 4);
+#else
+   unsigned swizzles[4];
+   unsigned c = 0;
+
+   for (unsigned t = 0; t < 4; ++t) {
+      const int8_t *tg4_off = tg4_offsets[t];
+      unsigned *swizzle = &swizzles[t];
+      for (unsigned r = 0; r < 4; ++r) {
+         const int8_t *rogue_off = rogue_tg4_offsets[r];
+         if (rogue_off[0] == tg4_off[0] && rogue_off[1] == tg4_off[1]) {
+            /* gather result is [0_comp0, 0_comp1, 0_comp2, 0_comp3, 1_comp0, 1_comp1, 1_comp2, 1_comp3, etc.] */
+            *swizzle = r * 4 + component;
+            ++c;
+            break;
+         }
+      }
+   }
+   assert(c == 4);
+#endif
+
+   return nir_swizzle(b, data, swizzles, ARRAY_SIZE(swizzles));
+#else
+   return nir_swizzle(b, data, (unsigned[4]){ 2 * 4 + component, 3 * 4 + component, 1 * 4 + component, 0 * 4 + component }, 4);
+#endif
+}
+
 static const int8_t default_tg4_offsets[4][2] = {
    { 0, 1 },
    { 1, 1 },
@@ -264,6 +322,8 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    const rogue_build_ctx *ctx = cb_data;
 
    nir_tex_instr *tex = nir_instr_as_tex(instr);
+   bool is_gather = tex->op == nir_texop_tg4;
+   unsigned chans = tex->def.num_components;
 
    enum glsl_sampler_dim sampler_dim = tex->sampler_dim;
 
@@ -271,7 +331,6 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    assert(!tex->is_sparse);
 
    /* TODO: tg4 */
-   assert(tex->component == 0);
    assert(!memcmp(tex->tg4_offsets, default_tg4_offsets, sizeof(tex->tg4_offsets)));
 
    assert(!tex->array_is_lowered_cube);
@@ -396,6 +455,14 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 
    assert(!(lod_replace && lod_bias));
 
+   if (is_gather) {
+      /* TODO: Actually need to manually set lod_replace to imm 0? */
+      assert(!lod_replace && !lod_bias);
+      /* lod_replace = nir_imm_int(b, 0); */
+
+      flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_DATA);
+   }
+
    assert(!!tex_state_src != ((fixed_tex_base != ROGUE_REG_UNUSED) && (fixed_smp_base != ROGUE_REG_UNUSED)));
 
    if (int_coords && sampler_dim == GLSL_SAMPLER_DIM_CUBE) {
@@ -409,7 +476,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 
    if (tex_state_src) {
       enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(b->shader->info.stage);
-      lookup_base_regs(tex_state_src, smp_state_src, &tex_base, &smp_base, &info_base, pvr_stage, ctx);
+      lookup_base_regs(tex_state_src, smp_state_src, &tex_base, &smp_base, &info_base, is_gather, pvr_stage, ctx);
    } else {
       tex_base = fixed_tex_base;
       smp_base = fixed_smp_base;
@@ -478,8 +545,6 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       /* Calculate the new array address. */
       tex_addr_override = nir_iadd(b, nir_u2u64(b, nir_imul(b, array_idx, nir_load_image_array_stride_img(b, .info_base_img = info_base))), nir_u2u64(b, nir_load_image_array_base_addr_img(b, .info_base_img = info_base)));
    }
-
-   unsigned chans = tex->def.num_components;
 
    unsigned data_comps = 0;
    nir_def *undef = nir_undef(b, 1, 32);
@@ -620,7 +685,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    if (nir_alu_type_get_base_type(tex->dest_type) == nir_type_float)
       flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_FCNORM);
 
-   nir_def *sample = nir_smp_img(b, smp_info ? 16 : chans, data_vec, .tex_state_base_img = tex_base, .smp_state_base_img = smp_base, .image_dim = sampler_dim, .flags = flags);
+   nir_def *sample = nir_smp_img(b, (smp_info || is_gather) ? 16 : chans, data_vec, .tex_state_base_img = tex_base, .smp_state_base_img = smp_base, .image_dim = sampler_dim, .flags = flags);
 
    if (smp_info) {
       assert(!tex->is_shadow);
@@ -675,6 +740,12 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       /* sample = nir_bcsel(b, nir_flt(b, comparator, sample), nir_imm_float(b, 1.0f), nir_imm_float(b, 0.0f)); */
 
       sample = nir_shadow_tst_img(b, sample, comparator, .smp_state_base_img = smp_base);
+   }
+
+   if (is_gather) {
+      assert(chans == 4);
+
+      sample = rogue_swizzle_tg4_offsets(b, sample, tex->component, tex->tg4_offsets);
    }
 
    return sample;
