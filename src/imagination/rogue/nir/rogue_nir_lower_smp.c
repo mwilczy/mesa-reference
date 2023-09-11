@@ -167,8 +167,14 @@ static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, uns
    /* Add the offset of the descriptor within the binding. */
    unsigned desc_elem = 0;
    if (combined_binding_layout->descriptor_count > 1) {
-      assert(combined_state_binding.num_indices == 1);
-      desc_elem = nir_src_as_uint(combined_state_binding.indices[0]);
+      if (combined_state_binding.num_indices) {
+         assert(combined_state_binding.num_indices == 1);
+         desc_elem = nir_src_as_uint(combined_state_binding.indices[0]);
+      } else {
+         nir_deref_instr *deref = nir_src_as_deref(*tex_state_src);
+         assert(deref->deref_type == nir_deref_type_array);
+         desc_elem = nir_src_as_uint(deref->arr.index);
+      }
    }
 
    unsigned _tex_state_base = pvr_get_required_descriptor_primary_sh_reg(pipeline_layout, pvr_stage, combined_state_binding.desc_set, combined_binding_layout);
