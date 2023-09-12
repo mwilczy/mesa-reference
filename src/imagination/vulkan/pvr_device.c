@@ -189,6 +189,7 @@ static void pvr_physical_device_get_supported_extensions(
       .EXT_external_memory_dma_buf = true,
       .EXT_host_query_reset = true,
       .EXT_private_data = true,
+      .EXT_scalar_block_layout = true,
       .EXT_shader_atomic_float = false,
       .EXT_shader_atomic_float2 = false,
       .EXT_tooling_info = true,
@@ -272,6 +273,9 @@ static void pvr_physical_device_get_supported_features(
 
       /* Vulkan 1.2 / VK_EXT_host_query_reset */
       .hostQueryReset = true,
+
+      /* Vulkan 1.2 / VK_EXT_scalar_block_layout */
+      .scalarBlockLayout = true,
 
       /* Vulkan 1.3 / VK_EXT_private_data */
       .privateData = true,
