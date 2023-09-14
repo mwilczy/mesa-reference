@@ -327,16 +327,18 @@ pvr_get_physical_device_descriptor_limits(
       CS1536, /* Ultra-low-end 9XEP. */
       CS680,  /* lower limits for older devices. */
       CS408,  /* 7XE. */
+      CS_VK_LIMIT,
       /* clang-format on */
    };
 
    static const struct pvr_descriptor_limits descriptor_limits[] = {
-      [CS4096] = { 1160U, 256U, 192U, 144U, 256U, 256U, 8U, },
-      [CS2560] = {  648U, 128U, 128U, 128U, 128U, 128U, 8U, },
-      [CS2048] = {  584U, 128U,  96U,  64U, 128U, 128U, 8U, },
-      [CS1536] = {  456U,  64U,  96U,  64U, 128U,  64U, 8U, },
-      [CS680]  = {  224U,  32U,  64U,  36U,  48U,   8U, 8U, },
-      [CS408]  = {  128U,  16U,  40U,  28U,  16U,   8U, 8U, },
+      [CS4096]      = { 1160U, 256U, 192U, 144U, 256U, 256U, 8U, },
+      [CS2560]      = {  648U, 128U, 128U, 128U, 128U, 128U, 8U, },
+      [CS2048]      = {  584U, 128U,  96U,  64U, 128U, 128U, 8U, },
+      [CS1536]      = {  456U,  64U,  96U,  64U, 128U,  64U, 8U, },
+      [CS680]       = {  224U,  32U,  64U,  36U,  48U,   8U, 8U, },
+      [CS408]       = {  128U,  16U,  40U,  28U,  16U,   8U, 8U, },
+      [CS_VK_LIMIT] = {   56U,  16U,  12U,   4U,  16U,   4U, 4U, },
    };
 
    const uint32_t common_size =
@@ -346,19 +348,17 @@ pvr_get_physical_device_descriptor_limits(
                                                  1);
    enum pvr_descriptor_cs_level cs_level;
 
-   if (common_size >= 2048) {
-      cs_level = CS2048;
-   } else if (common_size >= 1526) {
-      cs_level = CS1536;
-   } else if (common_size >= 680) {
-      cs_level = CS680;
-   } else if (common_size >= 408) {
-      cs_level = CS408;
-   } else {
+   if (common_size < 408) {
       mesa_loge("This core appears to have a very limited amount of shared "
                 "register space and may not meet the Vulkan spec limits.");
       abort();
    }
+
+   /* FIXME: Set the appropriate `cs_level` based on the `common_size`. For now
+    * reporting the lowest limits required by Vulkan until the descriptor code
+    * is reworked.
+    */
+   cs_level = CS_VK_LIMIT;
 
    return &descriptor_limits[cs_level];
 }
