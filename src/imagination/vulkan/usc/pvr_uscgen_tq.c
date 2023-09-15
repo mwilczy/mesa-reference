@@ -278,7 +278,7 @@ static nir_def *merge_depth_stencil(nir_builder *b,
    else
       mask = BITFIELD_RANGE(24, 8);
 
-   return nir_ior(b, nir_iand_imm(b, src, mask), nir_iand_imm(b, src, ~mask));
+   return nir_ior(b, nir_iand_imm(b, src, mask), nir_iand_imm(b, dst, ~mask));
 }
 
 static nir_def *pvr_uscgen_tq_frag_pack(nir_builder *b,
