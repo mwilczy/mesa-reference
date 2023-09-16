@@ -534,6 +534,8 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
          array_idx = nir_channel(b, coords, tex->coord_components - 1);
          /* TODO: nir_f2u32_rte? */
          array_idx = nir_convert_alu_types(b, 32, array_idx, .src_type = nir_type_float32, .dest_type = nir_type_uint32, .rounding_mode = nir_rounding_mode_rtne);
+
+         lod_bias = nir_imm_int(b, 0);
       }
 
       coords = nir_trim_vector(b, coords, tex->coord_components - 1);
