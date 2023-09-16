@@ -1650,7 +1650,11 @@ static void trans_nir_intrinsic_load_output_fs(rogue_builder *b,
       rogue_alu_instr *mov = rogue_MOV(b, dst, src);
       rogue_add_instr_commentf(&mov->instr, "load_reg_output_fs");
    } else {
-      unreachable("Tile buffer loads are unsupported.");
+      /* Tile buffer load. */
+      rogue_ref64 src_addr = nir_ssa_intr_src64(b->shader, intr, 0);
+
+      rogue_backend_instr *ld = rogue_LD(b, dst, rogue_ref_drc(0), rogue_ref_val(1), src_addr.ref64);
+      rogue_add_instr_commentf(&ld->instr, "load_tiled_output_fs");
    }
 }
 
