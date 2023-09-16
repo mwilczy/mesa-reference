@@ -705,6 +705,9 @@ static void rogue_collect_early_fs_build_data(rogue_build_ctx *ctx,
       }
    }
 
+   fs_data->early_fragment_tests = info->fs.early_fragment_tests;
+   fs_data->depth_layout = info->fs.depth_layout;
+
    assert(!info->uses_control_barrier && !info->uses_memory_barrier);
 }
 

@@ -2114,7 +2114,10 @@ static void trans_nir_intrinsic_isp_feedback_img(rogue_builder *b,
    bool does_discard = !nir_src_is_const(intr->src[0]) ||
                        nir_src_as_bool(intr->src[0]);
    /* bool does_depth = !nir_src_is_undef(intr->src[1]); */
-   bool does_depth = fs_data->depth_feedback;
+   bool does_depth = fs_data->depth_feedback && !fs_data->early_fragment_tests;
+
+   if (!does_discard && !does_depth)
+      return;
 
    if (does_discard)
       rogue_SETPRED(b, rogue_ref_io(ROGUE_IO_P0), src_discard_cond);

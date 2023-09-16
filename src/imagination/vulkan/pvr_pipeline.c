@@ -1631,7 +1631,9 @@ pvr_fragment_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
    fragment_state->needs_iterated_depth = fs_data->iterator_args.iterates_depth;
 
    /* TODO: handle other cases. */
-   if (fs_data->discard)
+   if (fs_data->depth_feedback && !fs_data->early_fragment_tests)
+      fragment_state->pass_type = PVRX(TA_PASSTYPE_DEPTH_FEEDBACK);
+   else if (fs_data->discard)
       fragment_state->pass_type = PVRX(TA_PASSTYPE_PUNCH_THROUGH);
    else if (fs_data->translucent)
       fragment_state->pass_type = PVRX(TA_PASSTYPE_TRANSLUCENT);

@@ -4029,6 +4029,8 @@ typedef struct rogue_build_data {
       bool depth_feedback;
       bool side_effects;
       bool translucent;
+      bool early_fragment_tests;
+      enum gl_frag_depth_layout depth_layout;
 
       const struct vk_color_blend_state *cb_state;
 
