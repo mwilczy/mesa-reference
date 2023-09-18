@@ -181,7 +181,7 @@ VkResult pvr_border_color_table_init(struct pvr_border_color_table *const table,
                          PVR_BO_ALLOC_FLAG_CPU_MAPPED,
                          &table->table);
    if (result != VK_SUCCESS)
-      return vk_error(device, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+      goto err_out;
 
    BITSET_CLEAR_RANGE_INSIDE_WORD(table->unused_entries,
                                   0,
@@ -202,6 +202,9 @@ VkResult pvr_border_color_table_init(struct pvr_border_color_table *const table,
    pvr_bo_cpu_unmap(device, table->table);
 
    return VK_SUCCESS;
+
+err_out:
+   return result;
 }
 
 void pvr_border_color_table_finish(struct pvr_border_color_table *const table,
