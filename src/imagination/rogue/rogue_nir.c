@@ -23,6 +23,7 @@
 
 #include "compiler/spirv/nir_spirv.h"
 #include "nir/nir.h"
+#include "nir/nir_builder.h"
 #include "nir/nir_legacy.h"
 #include "rogue.h"
 #include "util/macros.h"
@@ -271,6 +272,29 @@ shared_var_info(const struct glsl_type *type, unsigned *size, unsigned *align)
    *size = comp_size * length, *align = comp_size;
 }
 
+static bool
+has_side_effects(struct nir_builder *b, nir_instr *instr, void *data)
+{
+   bool *_has_side_effects = (bool *)data;
+
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   *_has_side_effects |= nir_intrinsic_writes_external_memory(intr);
+
+   return false;
+}
+
+static bool rogue_nir_has_side_effects(nir_shader *shader)
+{
+   bool _has_side_effects = false;
+
+   nir_shader_instructions_pass(shader, has_side_effects, nir_metadata_block_index | nir_metadata_dominance, &_has_side_effects);
+
+   return _has_side_effects;
+}
+
 /**
  * \brief Applies optimizations and passes required to lower the NIR shader into
  * a form suitable for lowering to Rogue IR.
@@ -291,6 +315,11 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 #endif /* !defined(NDEBUG) */
 
    nir_validate_shader(nir, "after spirv_to_nir");
+
+   if (nir->info.stage == MESA_SHADER_VERTEX)
+      ctx->stage_data.vs.side_effects = rogue_nir_has_side_effects(nir);
+   else if (nir->info.stage == MESA_SHADER_FRAGMENT)
+      ctx->stage_data.fs.side_effects = rogue_nir_has_side_effects(nir);
 
    if (nir->info.stage == MESA_SHADER_COMPUTE)
       NIR_PASS_V(nir, rogue_nir_compute_instance_check);

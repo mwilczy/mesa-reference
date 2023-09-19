@@ -1561,7 +1561,7 @@ pvr_vertex_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
    vertex_state->stage_state.uses_atomic_ops = vs_data->has.atomic_ops;
    vertex_state->stage_state.uses_texture_rw = false;
    vertex_state->stage_state.uses_barrier = vs_data->has.barrier;
-   vertex_state->stage_state.has_side_effects = false;
+   vertex_state->stage_state.has_side_effects = vs_data->side_effects;
    vertex_state->stage_state.empty_program = false;
 
    /* This ends up unused since we'll use the temp_usage for the PDS program we
@@ -2557,6 +2557,14 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
    }
 
    fs_data->z_replicate = hw_subpass->z_replicate;
+   if (hw_subpass->z_replicate >= 0) {
+      unsigned mrt_idx = hw_subpass->z_replicate;
+      const struct usc_mrt_resource *mrt_resource =
+         &hw_subpass->setup.mrt_resources[mrt_idx];
+      fs_data->outputs[mrt_idx].accum_format = PVR_PBE_ACCUM_FORMAT_F32;
+      fs_data->outputs[mrt_idx].format = PIPE_FORMAT_R32_FLOAT;
+      fs_data->outputs[mrt_idx].mrt_resource = mrt_resource;
+   }
 
    fs_data->num_inputs = subpass->input_count;
    fs_data->inputs =

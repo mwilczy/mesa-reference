@@ -779,21 +779,13 @@ static bool sink_frag_outs(nir_shader *shader, struct pfo_state *state)
    return progress;
 }
 
-static bool is_isp_fb_instr(const nir_instr *instr, UNUSED const void *data)
+static bool is_discard(const nir_instr *instr)
 {
    if (instr->type != nir_instr_type_intrinsic)
       return false;
 
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
-   if (intr->intrinsic == nir_intrinsic_store_output) {
-      nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
-      if (sem.location != FRAG_RESULT_DEPTH)
-         return false;
-
-      assert(nir_src_num_components(intr->src[0]) == 1);
-      assert(nir_src_as_uint(intr->src[1]) == 0);
-   } else if (intr->intrinsic != nir_intrinsic_discard &&
-              intr->intrinsic != nir_intrinsic_discard_if) {
+   if (intr->intrinsic != nir_intrinsic_discard && intr->intrinsic != nir_intrinsic_discard_if) {
       return false;
    }
 
@@ -804,9 +796,9 @@ static bool is_isp_fb_instr(const nir_instr *instr, UNUSED const void *data)
 }
 
 static bool
-lower_isp_fb_instr(struct nir_builder *b, nir_instr *instr, void *data)
+lower_discard(struct nir_builder *b, nir_instr *instr, void *data)
 {
-   if (!is_isp_fb_instr(instr, data))
+   if (!is_discard(instr))
       return false;
 
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
@@ -815,21 +807,6 @@ lower_isp_fb_instr(struct nir_builder *b, nir_instr *instr, void *data)
    b->cursor = nir_after_instr(instr);
 
    switch (intr->intrinsic) {
-   case nir_intrinsic_store_output: {
-      nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
-      switch (sem.location) {
-      case FRAG_RESULT_DEPTH:
-         assert(state->depth_feedback_src->parent_instr->type ==
-                nir_instr_type_undef);
-         state->depth_feedback_src = intr->src[0].ssa;
-         break;
-
-      default:
-         unreachable();
-      }
-      break;
-   }
-
    case nir_intrinsic_discard:
       state->discard_cond_accum =
          nir_ior(b, state->discard_cond_accum, nir_imm_true(b));
@@ -850,14 +827,17 @@ lower_isp_fb_instr(struct nir_builder *b, nir_instr *instr, void *data)
 
 static bool lower_isp_fb(nir_builder *b, struct pfo_state *state)
 {
+   bool has_depth_feedback = state->depth_feedback_src->parent_instr->type != nir_instr_type_undef;
+   /* TODO: Sample mask support. */
+
    bool progress = false;
 
    progress |= nir_shader_instructions_pass(b->shader,
-                                            lower_isp_fb_instr,
+                                            lower_discard,
                                             nir_metadata_block_index |
                                                nir_metadata_dominance,
                                             state);
-   if (!progress)
+   if (!progress && !has_depth_feedback)
       return false;
 
    /* Insert isp feedback instruction before the first store,
@@ -873,12 +853,89 @@ static bool lower_isp_fb(nir_builder *b, struct pfo_state *state)
                         state->discard_cond_accum,
                         state->depth_feedback_src);
 
+   /* TODO: Change where lower undef pass is used such that this check can happen outside of this pass. */
    if (state->depth_feedback_src->parent_instr->type != nir_instr_type_undef)
       state->fs_data->depth_feedback = true;
 
    /* TODO: try to fold the condition check into isp_feedback_img
     * so that ACMP can be used
     */
+
+   return progress;
+}
+
+static bool is_depth_feedback(const nir_instr *instr)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   if (intr->intrinsic != nir_intrinsic_store_output)
+      return false;
+
+   nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
+   if (sem.location != FRAG_RESULT_DEPTH)
+      return false;
+
+   assert(nir_src_num_components(intr->src[0]) == 1);
+   assert(nir_src_as_uint(intr->src[1]) == 0);
+
+   /* Instructions shouldn't be in any control flow. */
+   /* assert(instr->block->cf_node.parent->type == nir_cf_node_function); */
+
+   return true;
+}
+
+static bool
+_lower_depth_feedback(struct nir_builder *b, nir_instr *instr, void *data)
+{
+   if (!is_depth_feedback(instr))
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   struct pfo_state *state = data;
+
+   b->cursor = nir_after_instr(instr);
+
+   assert(state->depth_feedback_src->parent_instr->type == nir_instr_type_undef);
+   state->depth_feedback_src = intr->src[0].ssa;
+
+   nir_instr_remove(instr);
+   return true;
+}
+
+static bool lower_depth_feedback(nir_builder *b, struct pfo_state *state)
+{
+   bool progress = false;
+
+   progress |= nir_shader_instructions_pass(b->shader,
+                                            _lower_depth_feedback,
+                                            nir_metadata_block_index |
+                                               nir_metadata_dominance,
+                                            state);
+
+   /* TODO NEXT: pfo currently happens before other i/o is lowered so instead of just checking shader info for whether memory is written to,
+    * we have to do this whole song and dance. Move pass to later, and make sure that the smp write variant also sets the "writes to memory". */
+   bool has_depth_feedback = state->depth_feedback_src->parent_instr->type != nir_instr_type_undef;
+   if (state->fs_data->side_effects && !has_depth_feedback) {
+      nir_variable *var_pos = nir_find_variable_with_location (b->shader, nir_var_shader_in, VARYING_SLOT_POS);
+
+      if (!var_pos) {
+         var_pos = nir_create_variable_with_location(b->shader,
+               nir_var_shader_in,
+               VARYING_SLOT_POS,
+               glsl_vec4_type());
+         var_pos->data.interpolation = INTERP_MODE_NOPERSPECTIVE;
+      }
+
+      /* b->cursor = nir_after_instr(nir_block_last_instr(nir_impl_last_block(nir_shader_get_entrypoint(b->shader)))); */
+      b->cursor = nir_before_block(nir_start_block(nir_shader_get_entrypoint(b->shader)));
+
+      /* TODO: vector when vectorizing */
+      state->depth_feedback_src = nir_load_input(b, 1, 32, nir_imm_int(b, 0), .base = 0, .component = 2, .dest_type = nir_type_float32, .io_semantics.location = VARYING_SLOT_POS, .io_semantics.num_slots = 1);
+
+      progress |= true;
+   }
 
    return progress;
 }
@@ -900,6 +957,9 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
       .depth_feedback_src = nir_undef(&b, 1, 32),
    };
 
+   /* Lower depth feedback, inserting it if required. */
+   progress |= lower_depth_feedback(&b, &state);
+
    /* Fragment outputs - lower to pack components. */
    progress |= nir_shader_lower_instructions(shader,
                                              is_frag_out,
@@ -909,9 +969,39 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
    /* Fragment outputs - move to the end. */
    progress |= sink_frag_outs(shader, &state);
 
-   /* TODO: Sample mask outputs. */
    /* Lower ISP feedback (discards, depth, etc.) */
    progress |= lower_isp_fb(&b, &state);
+
+#if 1
+   /* Z-replicate */
+   {
+      struct rogue_fs_build_data *fs_data = &ctx->stage_data.fs;
+      if (fs_data->z_replicate >= 0 && fs_data->depth_write) {
+         /* TODO: test */
+         assert(fs_data->z_replicate < fs_data->num_outputs);
+         unsigned mrt_idx = fs_data->z_replicate;
+         const struct usc_mrt_resource *mrt_resource =
+            fs_data->outputs[mrt_idx].mrt_resource;
+
+         assert(mrt_resource->type == USC_MRT_RESOURCE_TYPE_OUTPUT_REG);
+         assert(mrt_resource->reg.offset == 0);
+
+         nir_instr *last_instr = nir_block_last_instr(nir_impl_last_block(nir_shader_get_entrypoint(shader)));
+         b.cursor = nir_after_instr(last_instr);
+
+         nir_store_output(&b,
+                          state.depth_feedback_src,
+                          nir_imm_int(&b, 0),
+                          .base = mrt_resource->reg.output_reg,
+                          .write_mask = 1,
+                          .component = 2, /* z */
+                          .src_type = nir_type_invalid,
+                             .io_semantics.location =
+                                FRAG_RESULT_DATA0 + mrt_idx,
+                             .io_semantics.num_slots = 1);
+      }
+   }
+#endif
 
    /* Frag intrinsics. */
    progress |= nir_shader_lower_instructions(shader,

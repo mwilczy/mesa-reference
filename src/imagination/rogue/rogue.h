@@ -4084,6 +4084,8 @@ typedef struct rogue_build_data {
       unsigned num_f16_flat_varyings; /* Number of f16 flat varyings. */
       unsigned num_f16_linear_varyings; /* Number of f16 linear varyings. */
 
+      bool side_effects;
+
       struct {
          bool barrier;
          bool atomic_ops;
