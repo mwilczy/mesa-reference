@@ -203,7 +203,6 @@ static bool is_frag_out(const nir_instr *instr, UNUSED const void *cb_data)
    nir_io_semantics io_sem = nir_intrinsic_io_semantics(intr);
    assert(io_sem.dual_source_blend_index == 0 && "Should have been lowered");
 
-   /* TODO: Depth, sample mask, etc. support. */
    if (io_sem.location < FRAG_RESULT_DATA0 ||
        io_sem.location > FRAG_RESULT_DATA7)
       return false;
@@ -785,8 +784,17 @@ static bool is_discard(const nir_instr *instr)
       return false;
 
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
-   if (intr->intrinsic != nir_intrinsic_discard && intr->intrinsic != nir_intrinsic_discard_if) {
-      return false;
+   switch (intr->intrinsic) {
+      case nir_intrinsic_discard:
+      case nir_intrinsic_discard_if:
+         break;
+
+      case nir_intrinsic_store_output:
+         if (nir_intrinsic_io_semantics(intr).location == FRAG_RESULT_SAMPLE_MASK)
+            break;
+
+      default:
+         return false;
    }
 
    /* Instructions shouldn't be in any control flow. */
@@ -816,6 +824,16 @@ lower_discard(struct nir_builder *b, nir_instr *instr, void *data)
       state->discard_cond_accum =
          nir_ior(b, state->discard_cond_accum, intr->src[0].ssa);
       break;
+
+   case nir_intrinsic_store_output: /* FRAG_RESULT_SAMPLE_MASK */ {
+      nir_def *smp_msk = nir_ishl(b, nir_imm_int(b, 1), nir_load_sample_id(b));
+      smp_msk = nir_iand(b, smp_msk, nir_load_sample_mask_in(b));
+      smp_msk = nir_iand(b, smp_msk, intr->src[0].ssa);
+      smp_msk = nir_iand(b, smp_msk, nir_load_savmsk_vm_img(b)); /* TODO NEXT: do this properly... */
+
+      state->discard_cond_accum = nir_ior(b, nir_ieq_imm(b, smp_msk, 0), state->discard_cond_accum);
+      break;
+   }
 
    default:
       unreachable();
@@ -969,7 +987,7 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
    /* Fragment outputs - move to the end. */
    progress |= sink_frag_outs(shader, &state);
 
-   /* Lower ISP feedback (discards, depth, etc.) */
+   /* Lower ISP feedback (discards, etc.) */
    progress |= lower_isp_fb(&b, &state);
 
 #if 1
