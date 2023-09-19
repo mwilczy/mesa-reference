@@ -232,6 +232,10 @@ static inline bool rogue_lower_SETPRED(rogue_builder *b,
          : rogue_TNZ(b, rogue_ref_io(ROGUE_IO_P0), rogue_ref_io(ROGUE_IO_FT3));
    rogue_merge_instr_comment(&tst->instr, &setpred->instr, "setpred (test)");
 
+   /* TODO NEXT: need to propagate exec_cond for other ops too. */
+   rogue_set_instr_exec_cond(&byp0c->instr, setpred->instr.exec_cond);
+   rogue_set_instr_exec_cond(&tst->instr, setpred->instr.exec_cond);
+
    rogue_instr_delete(&setpred->instr);
 
    return true;

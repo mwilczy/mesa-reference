@@ -321,6 +321,9 @@ static inline void rogue_print_block_label(FILE *fp, const rogue_block *block)
 
    if (block->label)
       fprintf(fp, " %s", block->label);
+
+   if (block->function)
+      fprintf(fp, " [function]");
 }
 
 static inline void rogue_print_backend_dst(FILE *fp, const rogue_instr_dst *dst)

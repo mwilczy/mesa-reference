@@ -433,6 +433,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    };
    NIR_PASS_V(nir, nir_opt_access, &opt_access_options);
 
+   NIR_PASS_V(nir, nir_opt_barrier_modes);
+
    /* Apply PVO code to the vertex shader input. */
    if (nir->info.stage == MESA_SHADER_VERTEX) {
       NIR_PASS_V(nir, rogue_nir_pvo, ctx);
@@ -861,8 +863,12 @@ static void rogue_collect_early_cs_build_data(rogue_build_ctx *ctx,
    cs_data->work_size = info->workgroup_size[0] * info->workgroup_size[1] *
                         info->workgroup_size[2];
 
+#if 0
    cs_data->has.barrier = info->uses_control_barrier &&
                           (cs_data->work_size > ROGUE_MAX_INSTANCES_PER_TASK);
+#endif
+
+   cs_data->has.barrier = info->uses_control_barrier;
 }
 
 static void rogue_collect_early_build_data(rogue_build_ctx *ctx,

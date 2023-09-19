@@ -1994,9 +1994,10 @@ intrinsic("store_shared_img", src_comp=[1, 1], bit_sizes=[32])
 intrinsic("shared_atomic_img",  src_comp=[1, 1], dest_comp=1, indices=[ATOMIC_OP], bit_sizes=[32])
 intrinsic("shared_atomic_swap_img",  src_comp=[1, 1, 1], dest_comp=1, indices=[ATOMIC_OP], bit_sizes=[32])
 
-# TODO: commonise these into special case load_shared_img, since it's just a coeff reg.
-intrinsic("load_barrier_counter_img", dest_comp=1, bit_sizes=[32])
-intrinsic("store_barrier_counter_img", src_comp=[1], bit_sizes=[32])
+# barrier_counter = [ flags ] ? barrier_counter + { value } : { value }
+intrinsic("barrier_counter_set_img", src_comp=[1], indices=[FLAGS], bit_sizes=[32])
+# barrier_counter == { value }
+intrinsic("barrier_counter_cmp_img", src_comp=[1], dest_comp=1, bit_sizes=[32])
 
 # Hardware that doesn't have load_front_face has this instead.
 intrinsic("load_face_orientation_img", dest_comp=1, bit_sizes=[32])

@@ -1552,6 +1552,11 @@ static void trans_nir_intrinsic_load_scratch_base_ptr(rogue_builder *b, nir_intr
                 rogue_none());
 }
 
+static void trans_nir_intrinsic_nop(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   rogue_NOP(b);
+}
+
 static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
@@ -2646,6 +2651,26 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
 
 #undef CONV
 
+static inline bool is_compound_atomic_op(nir_atomic_op op)
+{
+   switch (op) {
+   case nir_atomic_op_imin:
+   case nir_atomic_op_umin:
+   case nir_atomic_op_imax:
+   case nir_atomic_op_umax:
+   case nir_atomic_op_fmin:
+   case nir_atomic_op_fmax:
+   case nir_atomic_op_cmpxchg:
+   case nir_atomic_op_fcmpxchg:
+      return true;
+
+   default:
+      break;
+   }
+
+   return false;
+}
+
 static rogue_instr *shared_atomic_alu(rogue_builder *b,
                                       nir_atomic_op op,
                                       nir_alu_type type,
@@ -2654,8 +2679,9 @@ static rogue_instr *shared_atomic_alu(rogue_builder *b,
                                       rogue_ref *data,
                                       rogue_ref *data_swap)
 {
+
    /* Copy existing value to destination (and/via FT1). */
-   rogue_alu_instr *mbyp1 = rogue_MBYP1(b, *dst, *coeff);
+   rogue_alu_instr *mbyp1 = rogue_MBYP1(b, is_compound_atomic_op(op) ? rogue_ref_io(ROGUE_IO_FT1) : *dst, *coeff);
    rogue_set_instr_group_next(&mbyp1->instr, true);
    rogue_set_instr_atom(&mbyp1->instr, true);
 
@@ -2719,12 +2745,12 @@ static rogue_instr *shared_atomic_alu(rogue_builder *b,
 
       atom = rogue_MOVC(b,
                         *coeff,
-                        rogue_none(),
+                        *dst,
                         rogue_ref_io(ROGUE_IO_FTT),
                         rogue_ref_io(ROGUE_IO_FT0),
                         rogue_ref_io(ROGUE_IO_FT1),
-                        rogue_none(),
-                        rogue_none());
+                        rogue_ref_io(ROGUE_IO_FT1),
+                        rogue_ref_io(ROGUE_IO_FT1));
 
       break;
    }
@@ -2763,12 +2789,12 @@ static rogue_instr *shared_atomic_alu(rogue_builder *b,
 
       atom = rogue_MOVC(b,
                         *coeff,
-                        rogue_none(),
+                        *dst,
                         rogue_ref_io(ROGUE_IO_FTT),
                         *data,
                         rogue_ref_io(ROGUE_IO_FT1),
-                        rogue_none(),
-                        rogue_none());
+                        rogue_ref_io(ROGUE_IO_FT1),
+                        rogue_ref_io(ROGUE_IO_FT1));
 
       break;
    }
@@ -2935,12 +2961,14 @@ static void trans_nir_intrinsic_global_atomic(rogue_builder *b,
 static void trans_nir_intrinsic_barrier(rogue_builder *b,
                                         nir_intrinsic_instr *intr)
 {
+   mesa_scope exec_scope = nir_intrinsic_execution_scope(intr);
+#if 0
    const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
 
-   nir_intrinsic_execution_scope(intr);
-   nir_intrinsic_memory_scope(intr);
-   nir_intrinsic_memory_semantics(intr);
-   nir_intrinsic_memory_modes(intr);
+   mesa_scope exec_scope = nir_intrinsic_execution_scope(intr);
+   mesa_scope mem_scope = nir_intrinsic_memory_scope(intr);
+   nir_memory_semantics mem_smnt = nir_intrinsic_memory_semantics(intr);
+   nir_variable_mode mem_modes = nir_intrinsic_memory_modes(intr);
 
    switch (intr->intrinsic) {
    case nir_intrinsic_memory_barrier:
@@ -2967,6 +2995,14 @@ static void trans_nir_intrinsic_barrier(rogue_builder *b,
    default:
       unreachable();
    }
+#endif
+   if (exec_scope == SCOPE_NONE) {
+      rogue_fence_branch(b);
+      return;
+   }
+
+   rogue_BARRIER(b);
+   rogue_push_block(b);
 }
 #endif
 
@@ -2999,18 +3035,22 @@ static void trans_nir_intrinsic_mutex_img(rogue_builder *b,
       unreachable();
    }
 
-   if (mutex_op == ROGUE_MUTEX_OP_LOCK) {
-      /* Make sure we don't double lock. */
-      assert(shader->mutex_state == ROGUE_MUTEX_STATE_RELEASED);
-      shader->mutex_state |= ROGUE_MUTEX_STATE_LOCKED;
-   } else {
-      assert(shader->mutex_state & ROGUE_MUTEX_STATE_LOCKED);
+   /* TODO: Might need one mutex id per barrier */
+   /* TODO: Might be better to not automatically do this fence here, and instead just insert it in the NIR for coeff stuff? */
+   if (mutex_id != ROGUE_MUTEX_ID_BARRIER) {
+      if (mutex_op == ROGUE_MUTEX_OP_LOCK) {
+         /* Make sure we don't double lock. */
+         assert(shader->mutex_state == ROGUE_MUTEX_STATE_RELEASED);
+         shader->mutex_state |= ROGUE_MUTEX_STATE_LOCKED;
+      } else {
+         assert(shader->mutex_state & ROGUE_MUTEX_STATE_LOCKED);
 
-      /* Before releasing, check if we need to emit a coeff fence. */
-      if (shader->mutex_state & ROGUE_MUTEX_STATE_WROTE_COEFF)
-         rogue_fence_coeff_write(b);
+         /* Before releasing, check if we need to emit a coeff fence. */
+         if (shader->mutex_state & ROGUE_MUTEX_STATE_WROTE_COEFF)
+            rogue_fence_branch(b);
 
-      shader->mutex_state = ROGUE_MUTEX_STATE_RELEASED;
+         shader->mutex_state = ROGUE_MUTEX_STATE_RELEASED;
+      }
    }
 
    rogue_ctrl_instr *mutex = rogue_MUTEX(b, rogue_ref_val(mutex_id));
@@ -3300,6 +3340,69 @@ trans_nir_intrinsic_shadow_tst_img(rogue_builder *b, nir_intrinsic_instr *intr)
 }
 
 static void
+trans_nir_intrinsic_fence_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   enum rogue_fence_op fence_op = nir_intrinsic_fence_op_img(intr);
+
+   switch (fence_op) {
+   case ROGUE_FENCE_OP_BRANCH:
+      return rogue_fence_branch(b);
+
+   case ROGUE_FENCE_OP_LOCAL:
+      return rogue_fence_local(b);
+
+   case ROGUE_FENCE_OP_LOCAL_BARRIER_COUNTER: {
+      const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
+      unsigned barrier_reg_idx = cs_data->barrier_reg;
+      assert(barrier_reg_idx != ROGUE_REG_UNUSED);
+      rogue_ref barrier_reg = rogue_ref_reg(rogue_coeff_reg(b->shader, barrier_reg_idx));
+
+      return rogue_fence_local_ref(b, barrier_reg);
+   }
+
+   case ROGUE_FENCE_OP_GLOBAL:
+   case ROGUE_FENCE_OP_IMAGE:
+   default:
+      break;
+   }
+
+   unreachable("Unsupported fence_op.");
+}
+
+static void
+trans_nir_intrinsic_barrier_counter_set_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
+   unsigned barrier_reg_idx = cs_data->barrier_reg;
+   assert(barrier_reg_idx != ROGUE_REG_UNUSED);
+   rogue_ref barrier_reg = rogue_ref_reg(rogue_coeff_reg(b->shader, barrier_reg_idx));
+
+   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+   bool is_incr = nir_intrinsic_flags(intr);
+   if (is_incr) {
+      rogue_IADD32(b, barrier_reg, barrier_reg, src);
+   } else {
+      rogue_MOV(b, barrier_reg, src);
+   }
+}
+
+static void
+trans_nir_intrinsic_barrier_counter_cmp_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
+   unsigned barrier_reg_idx = cs_data->barrier_reg;
+   assert(barrier_reg_idx != ROGUE_REG_UNUSED);
+   rogue_ref barrier_reg = rogue_ref_reg(rogue_coeff_reg(b->shader, barrier_reg_idx));
+
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+   /* TODO: atomic? probably not... */
+   rogue_cmp(b, &dst, &barrier_reg, &src, COMPARE_FUNC_EQUAL, nir_type_uint32);
+}
+
+static void
 trans_nir_intrinsic_load_savmsk_vm_img(rogue_builder *b, nir_intrinsic_instr *intr)
 {
    rogue_ref dst =
@@ -3483,6 +3586,15 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
    case nir_intrinsic_shadow_tst_img:
       return trans_nir_intrinsic_shadow_tst_img(b, intr);
 
+   case nir_intrinsic_fence_img:
+      return trans_nir_intrinsic_fence_img(b, intr);
+
+   case nir_intrinsic_barrier_counter_set_img:
+      return trans_nir_intrinsic_barrier_counter_set_img(b, intr);
+
+   case nir_intrinsic_barrier_counter_cmp_img:
+      return trans_nir_intrinsic_barrier_counter_cmp_img(b, intr);
+
    case nir_intrinsic_load_savmsk_vm_img:
       return trans_nir_intrinsic_load_savmsk_vm_img(b, intr);
 
@@ -3500,6 +3612,9 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_load_scratch_base_ptr:
       return trans_nir_intrinsic_load_scratch_base_ptr(b, intr);
+
+   case nir_intrinsic_nop:
+      return trans_nir_intrinsic_nop(b, intr);
 
    default:
       break;

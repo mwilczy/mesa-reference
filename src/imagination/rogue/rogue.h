@@ -30,6 +30,15 @@
  * \brief Main header.
  */
 
+/* TODO: Temporary and only for anthill; calc dynamically, rename, etc. */
+#define RGX_USC_MAX_TOTAL_INSTANCES 448
+#define COMPUTE_MAX_WORK_GROUP_SIZE 32
+#define RGX_USCINST_REGBANK_SIZE_TEMP 128
+#define RGX_INSTANCES_PER_SLOT 32
+#define RGX_MIN_ATTR_IN_USRM_LINES 2
+#define RGX_USRM_LINE_SIZE 16
+#define RGX_USRM_GRANULARITY_IN_REGISTERS 4
+
 #define __pvr_address_type pvr_dev_addr_t
 #define __pvr_get_address(pvr_dev_addr) (pvr_dev_addr).addr
 /* clang-format off */
@@ -229,10 +238,11 @@ enum rogue_mutex_id {
 static_assert(ROGUE_MUTEX_ID_COUNT <= 16, "Too many mutex IDs.");
 
 enum rogue_fence_op {
+   ROGUE_FENCE_OP_BRANCH,
    ROGUE_FENCE_OP_LOCAL,
+   ROGUE_FENCE_OP_LOCAL_BARRIER_COUNTER,
    ROGUE_FENCE_OP_GLOBAL,
    ROGUE_FENCE_OP_IMAGE,
-   ROGUE_FENCE_OP_BARRIER,
 };
 
 enum rogue_smp_flag {
@@ -502,6 +512,9 @@ typedef struct rogue_block {
 
    unsigned nir_index;
    unsigned index; /** Block index. */
+
+   bool function;
+
    const char *label; /** Block label. */
 } rogue_block;
 
@@ -1699,6 +1712,7 @@ enum rogue_ctrl_op {
    /* Pseudo-instructions. */
    ROGUE_CTRL_OP_PSEUDO,
    ROGUE_CTRL_OP_END = ROGUE_CTRL_OP_PSEUDO,
+   ROGUE_CTRL_OP_BARRIER,
 
    ROGUE_CTRL_OP_COUNT,
 };
@@ -2776,6 +2790,14 @@ static inline rogue_cursor rogue_cursor_before_shader(rogue_shader *shader)
    };
 }
 
+static inline rogue_cursor rogue_cursor_after_shader(rogue_shader *shader)
+{
+   return (rogue_cursor){
+      .block = true,
+      .prev = &list_last_entry(&shader->blocks, rogue_block, link)->link,
+   };
+}
+
 /**
  * \brief Returns a cursor set to before a block.
  *
@@ -3663,6 +3685,8 @@ static inline bool rogue_find_instrs_impl(const rogue_instr *instr,
    unreachable("Unsupported instruction type.");
    return false;
 }
+
+/* TODO: convert into an instruction iterator w/cb and builder instead. */
 
 static inline void rogue_find_instrs(const rogue_shader *shader,
                                      const rogue_instr_filter *filter,

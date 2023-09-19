@@ -1120,7 +1120,14 @@ pvr_compute_pipeline_alloc_coeffs(struct rogue_cs_build_data *cs_data)
 {
    uint32_t next_free_reg = 0;
 
+   if (cs_data->has.barrier)
+      cs_data->barrier_reg = next_free_reg++;
+   else
+      cs_data->barrier_reg = ROGUE_REG_UNUSED;
+
    /* Workgroup ID regs need to be 128-bit (4-byte) aligned. */
+   next_free_reg = ALIGN_POT(next_free_reg, 4);
+
    if (cs_data->has.work_group_id_x)
       cs_data->workgroup_regs[0] = next_free_reg++;
    else
@@ -1135,14 +1142,6 @@ pvr_compute_pipeline_alloc_coeffs(struct rogue_cs_build_data *cs_data)
       cs_data->workgroup_regs[2] = next_free_reg++;
    else
       cs_data->workgroup_regs[2] = ROGUE_REG_UNUSED;
-
-   /* Barrier coefficient needs to be 128-bit aligned. */
-   next_free_reg = ALIGN_POT(next_free_reg, 4);
-
-   if (cs_data->has.barrier)
-      cs_data->barrier_reg = next_free_reg++;
-   else
-      cs_data->barrier_reg = ROGUE_REG_UNUSED;
 
    /* Align shared/local memory allocation.
     * TODO: Check if this is actually needed.

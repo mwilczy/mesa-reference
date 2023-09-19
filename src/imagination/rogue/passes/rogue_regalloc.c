@@ -340,6 +340,38 @@ static bool rogue_reg_can_spill(rogue_reg *reg)
    return true;
 }
 
+static unsigned calc_max_wg_temps(unsigned temps, unsigned wg_size, bool has_barrier)
+{
+   assert(wg_size <= RGX_USC_MAX_TOTAL_INSTANCES);
+   if (!wg_size)
+      return COMPUTE_MAX_WORK_GROUP_SIZE;
+
+	if (wg_size > RGX_INSTANCES_PER_SLOT && has_barrier) {
+      /* Number of slots allocated for each workgroup. */
+      unsigned slots_per_wg = (wg_size + RGX_INSTANCES_PER_SLOT - 1) / RGX_INSTANCES_PER_SLOT;
+
+      /* Lines of USRM lines available for each slot (+1 for fragmentation / coarse checking). */
+      unsigned lines_per_slot = RGX_MIN_ATTR_IN_USRM_LINES / (slots_per_wg + 1);
+
+      unsigned max_allocs;
+      if (lines_per_slot != 0)
+         max_allocs = lines_per_slot * RGX_USRM_LINE_SIZE; /* Convert lines to USRM allocs. */
+      else
+         max_allocs = (RGX_MIN_ATTR_IN_USRM_LINES * RGX_USRM_LINE_SIZE) / (slots_per_wg + 1);
+
+      /* Convert USRM allocs to temporary registers. */
+      unsigned max_temps_for_barrier = max_allocs * RGX_USRM_GRANULARITY_IN_REGISTERS;
+
+      /* Clamp to provided limit */
+      temps = MIN2(temps, max_temps_for_barrier);
+
+      if (ROGUE_DEBUG(REGALLOC))
+         printf("wg_size = %u > %u && barrier - clamping temps to %u\n", wg_size, RGX_INSTANCES_PER_SLOT, temps);
+   }
+
+   return temps;
+}
+
 static bool rogue_regalloc_try(rogue_shader *shader)
 {
    assert(!shader->is_grouped);
@@ -362,8 +394,14 @@ static bool rogue_regalloc_try(rogue_shader *shader)
    num_temps_prealloced += num_emc_regs;
 
    /* TODO: assert that this is not negative! */
-   unsigned num_hw_temps = rogue_reg_class_infos[ROGUE_REG_CLASS_TEMP].num -
-                           num_temps_prealloced;
+   unsigned num_hw_temps = rogue_reg_class_infos[ROGUE_REG_CLASS_TEMP].num;
+
+   if (shader->stage == MESA_SHADER_COMPUTE)
+      num_hw_temps = calc_max_wg_temps(num_hw_temps, shader->ctx->stage_data.cs.work_size, shader->ctx->stage_data.cs.has.barrier);
+
+   num_hw_temps -= num_temps_prealloced;
+
+   assert(!(num_hw_temps & 0x80000000));
 
 #if 1
    const char *env_temps = getenv("TEMPS");

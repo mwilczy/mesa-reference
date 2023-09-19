@@ -274,7 +274,7 @@ static rogue_alu_instr *rogue_csel(rogue_builder *b,
    return csel;
 }
 
-static void rogue_fence_coeff_write(rogue_builder *b)
+static void rogue_fence_branch(rogue_builder *b)
 {
    /* Instruction writing to a predicate. */
    rogue_ref p0_val =
@@ -295,7 +295,7 @@ static void rogue_fence_coeff_write(rogue_builder *b)
    rogue_NOP(b);
 }
 
-static void rogue_fence_local(rogue_builder *b)
+static void rogue_fence_local_ref(rogue_builder *b, rogue_ref src)
 {
    rogue_ref fence_reg =
       rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
@@ -305,7 +305,7 @@ static void rogue_fence_local(rogue_builder *b)
 
    /* Issue a write to the fence reg. */
    rogue_alu_instr *mbyp0 =
-      rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), rogue_ref_imm(1));
+      rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), src);
    rogue_set_instr_group_next(&mbyp0->instr, true);
    rogue_MOVC(b,
               fence_reg,
@@ -321,6 +321,11 @@ static void rogue_fence_local(rogue_builder *b)
    /* Create a data hazard by using the fence reg, dummy read. */
    mbyp0 = rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), fence_reg);
    rogue_add_instr_comment(&mbyp0->instr, "fence_local_r");
+}
+
+static void rogue_fence_local(rogue_builder *b)
+{
+   return rogue_fence_local_ref(b, rogue_ref_imm(1));
 }
 
 static void rogue_fence_global(rogue_builder *b)

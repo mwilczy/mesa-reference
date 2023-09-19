@@ -370,6 +370,7 @@ const rogue_ctrl_op_mod_info rogue_ctrl_op_mod_infos[ROGUE_CTRL_OP_MOD_COUNT] = 
 const rogue_ctrl_op_info rogue_ctrl_op_infos[ROGUE_CTRL_OP_COUNT] = {
    [ROGUE_CTRL_OP_INVALID] = { .str = "!INVALID!", },
    [ROGUE_CTRL_OP_END] = { .str = "end", .ends_block = true, },
+   [ROGUE_CTRL_OP_BARRIER] = { .str = "barrier", .ends_block = true, },
    [ROGUE_CTRL_OP_NOP] = { .str = "nop",
       .supported_op_mods = OM(END),
    },
