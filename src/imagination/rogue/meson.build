@@ -81,7 +81,7 @@ libpowervr_rogue = shared_library(
     inc_compiler,
     inc_src,
   ],
-  c_args : [no_override_init_args],
+  c_args : [imagination_c_args, no_override_init_args],
   gnu_symbol_visibility : 'hidden',
   dependencies : [idep_mesautil, idep_nir, idep_vulkan_runtime, dep_csbgen],
   install : true,
