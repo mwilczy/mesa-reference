@@ -4046,6 +4046,9 @@ typedef struct rogue_build_data {
          SWAP_FRONT_FACE_FORCE,
       } swap_front_face;
 
+      bool alpha_to_coverage_enable;
+      bool alpha_to_one_enable;
+
       unsigned num_outputs;
       struct {
          struct util_format_description fmt_desc;

@@ -3230,6 +3230,17 @@ trans_nir_intrinsic_load_savmsk_vm_img(rogue_builder *b, nir_intrinsic_instr *in
    rogue_set_backend_op_mod(savmsk, ROGUE_BACKEND_OP_MOD_VM);
 }
 
+static void
+trans_nir_intrinsic_alpha_to_coverage_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   rogue_ref dst =
+      intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+   rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+   rogue_PCK_COVMASK(b, dst, src);
+}
+
 static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 {
    switch (intr->intrinsic) {
@@ -3395,6 +3406,9 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_load_savmsk_vm_img:
       return trans_nir_intrinsic_load_savmsk_vm_img(b, intr);
+
+   case nir_intrinsic_alpha_to_coverage_img:
+      return trans_nir_intrinsic_alpha_to_coverage_img(b, intr);
 
    default:
       break;

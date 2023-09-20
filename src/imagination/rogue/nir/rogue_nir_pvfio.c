@@ -438,6 +438,7 @@ static nir_def *lower_frag_store_out(nir_builder *b,
    assert(pbe_dwords == num_fragout_regs);
 
    unsigned store_component = nir_intrinsic_component(intr);
+   bool is_alpha = store_component == 3;
    enum pipe_swizzle chan = fmt_desc->swizzle[store_component];
    if (chan > PIPE_SWIZZLE_W)
       return NIR_LOWER_INSTR_PROGRESS_REPLACE;
@@ -506,6 +507,16 @@ static nir_def *lower_frag_store_out(nir_builder *b,
       write_mask |= nir_intrinsic_write_mask(*last_store);
       component = MIN2(component, nir_intrinsic_component(*last_store));
       nir_instr_remove(&(*last_store)->instr);
+   }
+
+   /* Handle alpha-to-one. */
+   if (fs_data->alpha_to_one_enable && is_alpha)
+      value = nir_imm_float(b, 1.0f);
+
+   /* Handle alpha-to-coverage. */
+   if (fs_data->alpha_to_coverage_enable && is_alpha) {
+      nir_def *alpha_cov_msk = nir_iand(b, nir_alpha_to_coverage_img(b, value), nir_ishl(b, nir_imm_int(b, 1), nir_load_sample_id(b)));
+      nir_discard_if(b, nir_ieq_imm(b, alpha_cov_msk, 0));
    }
 
    /* Transform and pack the value to be stored. */

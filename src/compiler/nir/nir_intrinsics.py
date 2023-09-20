@@ -2040,3 +2040,5 @@ intrinsic("load_image_state_word_img", src_comp=[], dest_comp=1, indices=[TEX_ST
 intrinsic("shadow_tst_img", src_comp=[1, 1], dest_comp=1, indices=[SMP_STATE_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 
 intrinsic("load_savmsk_vm_img", src_comp=[], dest_comp=1, indices=[], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+
+intrinsic("alpha_to_coverage_img", src_comp=[1], dest_comp=1, indices=[], flags=[CAN_REORDER], bit_sizes=[32])
