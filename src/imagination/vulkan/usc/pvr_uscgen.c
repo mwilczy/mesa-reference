@@ -583,11 +583,10 @@ pvr_uscgen_load_op_clears_nir(nir_builder *b,
    }
 }
 
-static void
-pvr_uscgen_load_op_nir(struct pvr_device *device,
-                       struct util_dynarray *binary,
-                       struct pvr_uscgen_properties *load_op_properties,
-                       const struct pvr_load_op *load_op)
+void pvr_uscgen_load_op(struct pvr_device *device,
+                        struct util_dynarray *binary,
+                        struct pvr_uscgen_properties *load_op_properties,
+                        const struct pvr_load_op *load_op)
 {
    struct pvr_pipeline_layout pipeline_layout = { 0 };
    struct rogue_build_ctx *rogue_ctx =
@@ -639,50 +638,6 @@ pvr_uscgen_load_op_nir(struct pvr_device *device,
 
    ralloc_free(b.shader);
    ralloc_free(rogue_ctx);
-}
-
-void pvr_uscgen_load_op(struct pvr_device *device,
-                        struct util_dynarray *binary,
-                        struct pvr_uscgen_properties *load_op_properties,
-                        const struct pvr_load_op *load_op)
-{
-   if (PVR_IS_DEBUG_SET(LOADOP_NIR)) {
-      pvr_uscgen_load_op_nir(device, binary, load_op_properties, load_op);
-      return;
-   }
-
-   struct pvr_uscgen_load_op_context ctx;
-
-   rogue_builder b;
-   rogue_shader *shader = rogue_shader_create(NULL, MESA_SHADER_FRAGMENT);
-   rogue_set_shader_name(shader, "load_op");
-   rogue_builder_init(&b, shader);
-   rogue_push_block(&b);
-
-   ctx.load_op = load_op;
-   ctx.next_sh_reg = 0;
-   ctx.next_temp_reg = 0;
-
-   ctx.load_op_properties = load_op_properties;
-   load_op_properties->shareds_dest_offset = ctx.next_sh_reg;
-   load_op_properties->msaa_mode = ROGUE_MSAA_MODE_PIXEL;
-
-   if (load_op->clears_loads_state.rt_clear_mask)
-      pvr_uscgen_load_op_clears(&b, &ctx);
-
-   if (load_op->clears_loads_state.rt_load_mask)
-      pvr_uscgen_load_op_loads(&b, &ctx);
-
-   rogue_END(&b);
-
-   rogue_shader_passes(shader);
-   rogue_encode_shader(NULL, shader, binary);
-
-   load_op_properties->const_shareds_count = ctx.next_sh_reg;
-   load_op_properties->temps_count =
-      rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
-
-   ralloc_free(shader);
 }
 
 void pvr_uscgen_idfwdf(struct util_dynarray *binary,
