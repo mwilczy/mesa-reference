@@ -464,30 +464,27 @@ VkResult pvr_CreateBufferView(VkDevice _device,
    struct pvr_buffer_view *bview;
    VkResult result;
 
-   bview = vk_object_alloc(&device->vk,
-                           pAllocator,
-                           sizeof(*bview),
-                           VK_OBJECT_TYPE_BUFFER_VIEW);
+   bview = vk_buffer_view_create(&device->vk,
+                                 pCreateInfo,
+                                 pAllocator,
+                                 sizeof(*bview));
    if (!bview)
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
-
-   bview->format = pCreateInfo->format;
-   bview->range =
-      vk_buffer_range(&buffer->vk, pCreateInfo->offset, pCreateInfo->range);
 
    /* If the remaining size of the buffer is not a multiple of the element
     * size of the format, the nearest smaller multiple is used.
     */
-   bview->range -= bview->range % vk_format_get_blocksize(bview->format);
+   bview->vk.range -=
+      bview->vk.range % vk_format_get_blocksize(bview->vk.format);
 
    /* The range of the buffer view shouldn't be smaller than one texel. */
-   assert(bview->range >= vk_format_get_blocksize(bview->format));
+   assert(bview->vk.range >= vk_format_get_blocksize(bview->vk.format));
 
    info.base_level = 0U;
    info.mip_levels = 1U;
    info.mipmaps_present = false;
    /* TODO: Convert to 2D to support more than 16k maxTexelBufferElements */
-   info.extent.width = bview->range / vk_format_get_blocksize(bview->format);
+   info.extent.width = bview->vk.elements;
    info.extent.height = 1;
    info.extent.depth = 0U;
    info.sample_count = 1U;
@@ -498,7 +495,7 @@ VkResult pvr_CreateBufferView(VkDevice _device,
    info.is_cube = false;
    info.type = VK_IMAGE_VIEW_TYPE_1D;
    info.tex_state_type = PVR_TEXTURE_STATE_SAMPLE;
-   info.format = bview->format;
+   info.format = bview->vk.format;
    info.flags = PVR_TEXFLAGS_INDEX_LOOKUP;
    info.aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
 
@@ -532,5 +529,5 @@ void pvr_DestroyBufferView(VkDevice _device,
    if (!bview)
       return;
 
-   vk_object_free(&device->vk, pAllocator, bview);
+   vk_buffer_view_destroy(&device->vk, pAllocator, &bview->vk);
 }
