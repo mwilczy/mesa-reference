@@ -1012,16 +1012,34 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
          const struct usc_mrt_resource *mrt_resource =
             fs_data->outputs[mrt_idx].mrt_resource;
 
-         assert(mrt_resource->type == USC_MRT_RESOURCE_TYPE_OUTPUT_REG);
-         assert(mrt_resource->reg.offset == 0);
+         /* TODO: deduplicate with above. */
+         unsigned base;
+         nir_def *offset;
+         if (mrt_resource->type == USC_MRT_RESOURCE_TYPE_OUTPUT_REG) {
+            assert(mrt_resource->reg.offset == 0);
+
+            base = mrt_resource->reg.output_reg;
+            offset = nir_imm_int(&b, 0);
+         }
+         /* Off-chip tile buffer store. */
+         else if (USC_MRT_RESOURCE_TYPE_MEMORY) {
+            nir_def *cov_msk;
+            nir_def *addr =
+               build_tiled_address(&b, mrt_resource, 0, &cov_msk);
+
+            base = 0;
+            offset = nir_pass_cov_mask_img(&b, addr, cov_msk);
+         } else {
+            unreachable("Invalid MRT resource type.");
+         }
 
          nir_instr *last_instr = nir_block_last_instr(nir_impl_last_block(nir_shader_get_entrypoint(shader)));
          b.cursor = nir_after_instr(last_instr);
 
          nir_store_output(&b,
                           state.depth_feedback_src,
-                          nir_imm_int(&b, 0),
-                          .base = mrt_resource->reg.output_reg,
+                          offset,
+                          .base = base,
                           .write_mask = 1,
                           .component = 2, /* z */
                           .src_type = nir_type_invalid,
