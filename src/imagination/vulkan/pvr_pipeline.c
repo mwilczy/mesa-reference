@@ -2537,7 +2537,7 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
 {
    fs_data->num_outputs = hw_subpass->setup.num_render_targets;
    fs_data->outputs =
-      ralloc_array_size(ctx, sizeof(*fs_data->outputs), fs_data->num_outputs);
+      rzalloc_array_size(ctx, sizeof(*fs_data->outputs), fs_data->num_outputs);
 
    for (unsigned u = 0; u < subpass->color_count; ++u) {
       unsigned idx = subpass->color_attachments[u];
