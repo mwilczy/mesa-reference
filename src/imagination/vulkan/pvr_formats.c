@@ -625,6 +625,9 @@ pvr_get_image_format_features2(const struct pvr_format *pvr_format,
          flags |= VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT |
                   VK_FORMAT_FEATURE_2_BLIT_SRC_BIT;
       }
+
+      if (vk_format_has_stencil(vk_format))
+         flags &= ~VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT;
    }
 
    if (pvr_get_pbe_accum_format(vk_format) != PVR_PBE_ACCUM_FORMAT_INVALID) {
