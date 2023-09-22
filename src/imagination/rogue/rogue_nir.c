@@ -174,6 +174,7 @@ static const nir_shader_compiler_options nir_options = {
    /* .has_isub = true, */
    .lower_fsat = true,
    .lower_ldexp = true,
+   .lower_interpolate_at = true,
    .support_8bit_alu = true,
    .support_16bit_alu = true,
    .max_unroll_iterations = 16,
@@ -441,6 +442,14 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 
    /* Lower load_consts to scalars. */
    NIR_PASS_V(nir, nir_lower_load_const_to_scalar);
+
+   if (nir->info.stage == MESA_SHADER_FRAGMENT) {
+      unsigned samples = ctx->stage_data.fs.rasterization_samples;
+      if (samples < 2)
+         NIR_PASS_V(nir, nir_lower_single_sampled);
+
+      NIR_PASS_V(nir, rogue_nir_lower_interpolation, samples);
+   }
 
    /* Lower ALU operations to scalars. */
    NIR_PASS_V(nir, nir_lower_alu_to_scalar, NULL, NULL);

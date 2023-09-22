@@ -4048,6 +4048,7 @@ typedef struct rogue_build_data {
 
       bool alpha_to_coverage_enable;
       bool alpha_to_one_enable;
+      uint32_t rasterization_samples;
 
       unsigned num_outputs;
       struct {
@@ -4252,6 +4253,8 @@ bool rogue_nir_lower_smp(nir_shader *shader, rogue_build_ctx *ctx);
 bool rogue_nir_lower_images_to_tex(nir_shader *shader);
 
 bool rogue_nir_lower_io(nir_shader *shader, rogue_build_ctx *ctx, bool late);
+
+bool rogue_nir_lower_interpolation(nir_shader *shader, unsigned samples);
 
 bool rogue_nir_lower_vk_io(nir_shader *shader, rogue_build_ctx *ctx);
 

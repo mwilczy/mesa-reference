@@ -1481,6 +1481,33 @@ static void trans_nir_intrinsic_store_preamble(rogue_builder *b,
    rogue_alu_instr *mov = rogue_MOV(b, sh_reg, src);
    rogue_add_instr_comment(&mov->instr, "store_preamble");
 }
+static void trans_nir_intrinsic_load_fs_input_coeff_img(rogue_builder *b,
+                                              nir_intrinsic_instr *intr)
+{
+   struct rogue_fs_build_data *fs_data = &b->shader->ctx->stage_data.fs;
+
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+   assert(nir_src_as_uint(intr->src[0]) == 0); /* offset */
+   assert(nir_intrinsic_base(intr) == 0);
+
+   struct nir_io_semantics io_semantics = nir_intrinsic_io_semantics(intr);
+   unsigned component = nir_intrinsic_component(intr);
+   unsigned element = nir_intrinsic_element(intr);
+
+   unsigned coeff_base_index;
+
+   /* Special case: w */
+   if (io_semantics.location == VARYING_SLOT_POS) {
+      coeff_base_index = rogue_coeff_index_fs(&fs_data->iterator_args, ~0, 0) * ROGUE_COEFF_ALIGN;
+   } else {
+      coeff_base_index = rogue_coeff_index_fs(&fs_data->iterator_args, io_semantics.location, component) * ROGUE_COEFF_ALIGN;
+   }
+
+   rogue_ref src = rogue_ref_reg(rogue_coeff_reg(b->shader, coeff_base_index + element));
+
+   rogue_MOV(b, dst, src);
+}
 
 static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
@@ -3409,6 +3436,15 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_alpha_to_coverage_img:
       return trans_nir_intrinsic_alpha_to_coverage_img(b, intr);
+
+   case nir_intrinsic_load_fs_tile_coord_img:
+      return trans_nir_load_special_reg(b,
+                                        intr,
+                                        nir_intrinsic_component(intr) ? ROGUE_SPECIAL_REG_TILE_Y_P : ROGUE_SPECIAL_REG_TILE_X_P,
+                                        nir_intrinsic_component(intr) ? "load_fs_tile_coord_y_img" : "load_fs_tile_coord_x_img");
+
+   case nir_intrinsic_load_fs_input_coeff_img:
+      return trans_nir_intrinsic_load_fs_input_coeff_img(b, intr);
 
    default:
       break;

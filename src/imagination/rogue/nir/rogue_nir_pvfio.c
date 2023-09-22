@@ -1043,3 +1043,179 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
 
    return progress;
 }
+
+////
+
+static bool is_interp(const nir_instr *instr, UNUSED const void *data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   return intr->intrinsic == nir_intrinsic_load_interpolated_input;
+}
+
+static nir_def *
+alu_iteration(nir_builder *b, nir_def *x, nir_def *y, nir_def *offset, unsigned base, unsigned component, nir_io_semantics io_sem)
+{
+   nir_def *plane_a = nir_load_fs_input_coeff_img(b, offset, .base = base, .component = component, .element = 0, .io_semantics = io_sem, );
+   nir_def *plane_b = nir_load_fs_input_coeff_img(b, offset, .base = base, .component = component, .element = 1, .io_semantics = io_sem, );
+   nir_def *plane_c = nir_load_fs_input_coeff_img(b, offset, .base = base, .component = component, .element = 2, .io_semantics = io_sem, );
+
+   nir_def *res = nir_ffma(b, plane_b, y, plane_c);
+   res = nir_ffma(b, plane_a, x, res);
+
+   return res;
+}
+
+static nir_def *
+lower_interp(nir_builder *b, nir_instr *instr, UNUSED void *data)
+{
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+
+   nir_intrinsic_instr *load_bary = nir_src_as_intrinsic(intr->src[0]);
+
+   nir_def *offset = intr->src[1].ssa;
+
+   unsigned base = nir_intrinsic_base(intr);
+   unsigned component = nir_intrinsic_component(intr);
+   nir_io_semantics io_sem = nir_intrinsic_io_semantics(intr);
+   enum glsl_interp_mode interp_mode = nir_intrinsic_interp_mode(load_bary);
+   if (interp_mode == INTERP_MODE_FLAT)
+      return nir_load_fs_input_coeff_img(b, offset, .base = base, .component = component, .element = 2, .io_semantics = io_sem, ); /* c */
+
+   nir_def *x = nir_load_fs_tile_coord_img(b, .component = 0);
+   nir_def *y = nir_load_fs_tile_coord_img(b, .component = 1);
+
+   /*
+   x = nir_fadd_imm(b, x, 0.5f);
+   y = nir_fadd_imm(b, y, 0.5f);
+   */
+
+   switch (load_bary->intrinsic) {
+   case nir_intrinsic_load_barycentric_at_offset:
+      x = nir_fadd(b, x, nir_channel(b, load_bary->src[0].ssa, 0));
+      y = nir_fadd(b, y, nir_channel(b, load_bary->src[0].ssa, 1));
+      break;
+
+   case nir_intrinsic_load_barycentric_pixel:
+      break;
+
+   default:
+      unreachable("Unsupported load_barycentric variant");
+   }
+
+   nir_def *iter = alu_iteration(b, x, y, offset, base, component, io_sem);
+
+   if (interp_mode == INTERP_MODE_SMOOTH) {
+      nir_io_semantics w_io_sem = {
+         .location = VARYING_SLOT_POS,
+         .num_slots = 1,
+      };
+      nir_def *w = alu_iteration(b, x, y, offset, base, component, w_io_sem);
+
+      iter = nir_fdiv(b, iter, w);
+   }
+
+   return iter;
+}
+
+static bool should_lower_load_bary(const nir_instr *instr, UNUSED const void *data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_barycentric_at_sample:
+      return true;
+
+   case nir_intrinsic_load_sample_pos:
+      return true;
+
+   default:
+      break;
+   }
+
+   return false;
+}
+
+static nir_def *
+lower_load_bary(nir_builder *b, nir_instr *instr, UNUSED void *data)
+{
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+
+   /* TODO: handle separately, tidy function(s) */
+   if (intr->intrinsic == nir_intrinsic_load_barycentric_at_sample) {
+      enum glsl_interp_mode interp_mode = nir_intrinsic_interp_mode(intr);
+      unsigned bit_size = intr->def.bit_size;
+      assert(bit_size == 32);
+
+      return nir_load_barycentric_at_offset(b, bit_size, nir_fadd_imm(b, nir_load_sample_pos(b), -0.5f), .interp_mode = interp_mode);
+   }
+
+   unsigned samples = *(unsigned *)data;
+
+   /* TODO: Store this in state, don't emit it again each time! */
+   /* TODO: Good candidate for testing scratch memory */
+
+   nir_def *offsets_2_samples[] = {
+      nir_imm_vec2(b,  0.75f, 0.75f ),
+      nir_imm_vec2(b,  0.25f, 0.25f ),
+   };
+
+   nir_def *offsets_4_samples[] = {
+      nir_imm_vec2(b, 0.375f, 0.125f ),
+      nir_imm_vec2(b, 0.875f, 0.375f ),
+      nir_imm_vec2(b, 0.125f, 0.625f ),
+      nir_imm_vec2(b, 0.625f, 0.875f ),
+   };
+
+   nir_def *offsets_8_samples[] = {
+      nir_imm_vec2(b, 0.5625f, 0.3125f ),
+      nir_imm_vec2(b, 0.4375f, 0.6875f ),
+      nir_imm_vec2(b, 0.8125f, 0.5625f ),
+      nir_imm_vec2(b, 0.3125f, 0.1875f ),
+      nir_imm_vec2(b, 0.1875f, 0.8125f ),
+      nir_imm_vec2(b, 0.0625f, 0.4375f ),
+      nir_imm_vec2(b, 0.6875f, 0.9375f ),
+      nir_imm_vec2(b, 0.9375f, 0.0625f )
+   };
+
+   nir_def **offset_array;
+   switch (samples) {
+   case 1:
+      return nir_imm_vec2(b, 0.5f, 0.5f);
+
+   case 2:
+      offset_array = offsets_2_samples;
+      break;
+
+   case 4:
+      offset_array = offsets_4_samples;
+      break;
+
+   case 8:
+      offset_array = offsets_8_samples;
+      break;
+
+   default:
+      unreachable("Unsupported number of samples.");
+   }
+
+   nir_def *offset = nir_select_from_ssa_def_array(b, offset_array, samples, nir_load_sample_id(b));
+
+   return offset;
+   /* return nir_vec2(b, nir_channel(b, offset, 1), nir_channel(b, offset, 0)); */
+}
+
+PUBLIC
+bool rogue_nir_lower_interpolation(nir_shader *shader, unsigned samples)
+{
+   bool progress = false;
+
+   progress |= nir_shader_lower_instructions(shader, should_lower_load_bary, lower_load_bary, &samples);
+   progress |= nir_shader_lower_instructions(shader, is_interp, lower_interp, NULL);
+
+   return progress;
+}

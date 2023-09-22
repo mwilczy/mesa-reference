@@ -2610,6 +2610,7 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
       fs_data->sample_mask = state->ms->sample_mask;
       fs_data->alpha_to_coverage_enable = state->ms->alpha_to_coverage_enable;
       fs_data->alpha_to_one_enable = state->ms->alpha_to_one_enable;
+      fs_data->rasterization_samples = state->ms->rasterization_samples;
    } else {
       fs_data->sample_mask = ~0;
    }
