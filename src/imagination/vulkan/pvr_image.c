@@ -480,20 +480,21 @@ VkResult pvr_CreateBufferView(VkDevice _device,
    /* The range of the buffer view shouldn't be smaller than one texel. */
    assert(bview->vk.range >= vk_format_get_blocksize(bview->vk.format));
 
+   bview->num_rows = DIV_ROUND_UP(bview->vk.elements, PVR_BUFFER_VIEW_WIDTH);
+
    info.base_level = 0U;
    info.mip_levels = 1U;
    info.mipmaps_present = false;
-   /* TODO: Convert to 2D to support more than 16k maxTexelBufferElements */
-   info.extent.width = bview->vk.elements;
-   info.extent.height = 1;
+   info.extent.width = PVR_BUFFER_VIEW_WIDTH;
+   info.extent.height = bview->num_rows;
    info.extent.depth = 0U;
    info.sample_count = 1U;
-   info.stride = info.extent.width;
+   info.stride = PVR_BUFFER_VIEW_WIDTH;
    info.offset = 0U;
    info.addr = PVR_DEV_ADDR_OFFSET(buffer->dev_addr, pCreateInfo->offset);
    info.mem_layout = PVR_MEMLAYOUT_LINEAR;
    info.is_cube = false;
-   info.type = VK_IMAGE_VIEW_TYPE_1D;
+   info.type = VK_IMAGE_VIEW_TYPE_2D;
    info.tex_state_type = PVR_TEXTURE_STATE_SAMPLE;
    info.format = bview->vk.format;
    info.flags = PVR_TEXFLAGS_INDEX_LOOKUP;
