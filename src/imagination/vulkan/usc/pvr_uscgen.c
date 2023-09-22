@@ -570,7 +570,7 @@ pvr_uscgen_load_op_clears_nir(nir_builder *b,
 
       /* Replicated depth is a single F32 value */
       nir_store_output(b,
-                       nir_load_preamble(b, 1, 32, .base = depth_idx),
+                       nir_load_preamble(b, 1, 32, .base = ctx->next_sh_reg++),
                        nir_imm_int(b, 0),
                        .base = 0,
                        .src_type = nir_type_float32,
