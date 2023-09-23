@@ -125,6 +125,38 @@ static bool rogue_dce_regs(rogue_shader *shader)
    return progress;
 }
 
+/* Super basic - for now this just removes simple immediate MOVs that don't get used by anything. */
+static bool rogue_dce_instrs(rogue_shader *shader)
+{
+   bool progress = false;
+
+   rogue_foreach_instr_in_shader_safe (instr, shader) {
+      if (instr->type != ROGUE_INSTR_TYPE_ALU)
+         continue;
+
+      rogue_alu_instr *alu = rogue_instr_as_alu(instr);
+      if (alu->op != ROGUE_ALU_OP_MOV)
+         continue;
+
+      if (alu->mod || alu->src[0].mod || alu->dst[0].mod)
+         continue;
+
+      if (rogue_ref_is_imm(&alu->src[0].ref))
+         continue;
+
+      if (!rogue_ref_is_ssa_reg(&alu->dst[0].ref))
+         continue;
+
+      if (!list_is_empty(&alu->dst[0].ref.reg->uses))
+         continue;
+
+      rogue_instr_delete(instr);
+      progress = true;
+   }
+
+   return progress;
+}
+
 PUBLIC
 bool rogue_dce(rogue_shader *shader)
 {
@@ -133,9 +165,7 @@ bool rogue_dce(rogue_shader *shader)
 
    bool progress = false;
 
-#if 0
    progress |= rogue_dce_instrs(shader);
-#endif
    progress |= rogue_dce_regs(shader);
 
    return progress;

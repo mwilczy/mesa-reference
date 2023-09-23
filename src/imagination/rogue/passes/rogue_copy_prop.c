@@ -147,17 +147,24 @@ static bool rogue_const_prop(rogue_alu_instr *mov)
    if (!rogue_ref_is_ssa_reg(&mov->dst[0].ref))
       return false;
 
+   if (mov->mod || mov->src[0].mod || mov->dst[0].mod)
+      return false;
+
    rogue_reg *mov_src = mov->src[0].ref.reg;
    rogue_reg *mov_dst = mov->dst[0].ref.reg;
 
-   bool success = true;
+   bool all_replaced = true;
    rogue_foreach_reg_use_safe (use, mov_dst) {
-      success &= rogue_src_reg_replace(use, mov_src);
+      if (use->instr->type == ROGUE_INSTR_TYPE_BACKEND && rogue_instr_as_backend(use->instr)->op == ROGUE_BACKEND_OP_ST) {
+         all_replaced = false;
+         continue;
+      }
+
+      all_replaced &= rogue_src_reg_replace(use, mov_src);
    }
 
-   assert(success);
-
-   rogue_instr_delete(&mov->instr);
+   if (all_replaced)
+      rogue_instr_delete(&mov->instr);
 
    return true;
 }
