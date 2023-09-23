@@ -415,9 +415,19 @@ static nir_def *lower_frag_store_out(nir_builder *b,
    unsigned store_components = nir_src_num_components(intr->src[0]);
    assert(store_components == 1);
 
+   unsigned store_component = nir_intrinsic_component(intr);
+   bool is_alpha = store_component == 3;
+
+   /* Handle alpha-to-coverage. */
+   if (fs_data->alpha_to_coverage_enable && is_alpha) {
+      nir_def *alpha_cov_msk = nir_iand(b, nir_alpha_to_coverage_img(b, value), nir_ishl(b, nir_imm_int(b, 1), nir_load_sample_id(b)));
+      nir_discard_if(b, nir_ieq_imm(b, alpha_cov_msk, 0));
+   }
+
    nir_io_semantics io_sem = nir_intrinsic_io_semantics(intr);
    unsigned l = io_sem.location - FRAG_RESULT_DATA0;
-   assert(l < fs_data->num_outputs);
+   if (l >= fs_data->num_outputs)
+      return NIR_LOWER_INSTR_PROGRESS_REPLACE;
 
    /* struct util_format_description *fmt_desc = &fs_data->outputs[l].fmt_desc;
     */
@@ -431,14 +441,13 @@ static nir_def *lower_frag_store_out(nir_builder *b,
 
    const struct usc_mrt_resource *mrt_resource =
       fs_data->outputs[l].mrt_resource;
-   assert(mrt_resource);
+   if (!mrt_resource)
+      return NIR_LOWER_INSTR_PROGRESS_REPLACE;
 
    unsigned pbe_dwords = PVR_BYTES_TO_DW(mrt_resource->intermediate_size);
    /* TODO: If we always pass this, can probably  get rid of pbe_dwords. */
    assert(pbe_dwords == num_fragout_regs);
 
-   unsigned store_component = nir_intrinsic_component(intr);
-   bool is_alpha = store_component == 3;
    enum pipe_swizzle chan = fmt_desc->swizzle[store_component];
    if (chan > PIPE_SWIZZLE_W)
       return NIR_LOWER_INSTR_PROGRESS_REPLACE;
@@ -512,12 +521,6 @@ static nir_def *lower_frag_store_out(nir_builder *b,
    /* Handle alpha-to-one. */
    if (fs_data->alpha_to_one_enable && is_alpha)
       value = nir_imm_float(b, 1.0f);
-
-   /* Handle alpha-to-coverage. */
-   if (fs_data->alpha_to_coverage_enable && is_alpha) {
-      nir_def *alpha_cov_msk = nir_iand(b, nir_alpha_to_coverage_img(b, value), nir_ishl(b, nir_imm_int(b, 1), nir_load_sample_id(b)));
-      nir_discard_if(b, nir_ieq_imm(b, alpha_cov_msk, 0));
-   }
 
    /* Transform and pack the value to be stored. */
    value =
