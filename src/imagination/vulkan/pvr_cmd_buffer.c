@@ -1329,8 +1329,7 @@ pvr_setup_emit_state(const struct pvr_device_info *dev_info,
       return;
    }
 
-   emit_state->emit_count = hw_render->eot_surface_count;
-
+   emit_state->emit_count = 0;
    for (uint32_t i = 0; i < hw_render->eot_surface_count; i++) {
       const struct pvr_framebuffer *framebuffer = render_pass_info->framebuffer;
       const struct pvr_renderpass_hwsetup_eot_surface *surface =
@@ -1359,7 +1358,7 @@ pvr_setup_emit_state(const struct pvr_device_info *dev_info,
 
       pvr_setup_pbe_state(dev_info,
                           framebuffer,
-                          surface->mrt_idx,
+                          emit_state->emit_count,
                           mrt_resource,
                           iview,
                           &render_pass_info->render_area,
@@ -1367,6 +1366,7 @@ pvr_setup_emit_state(const struct pvr_device_info *dev_info,
                           samples,
                           emit_state->pbe_cs_words[i],
                           emit_state->pbe_reg_words[i]);
+      emit_state->emit_count += 1;
    }
 }
 
