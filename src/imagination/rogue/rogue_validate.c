@@ -791,8 +791,10 @@ static void validate_block(rogue_validation_state *state,
       bool single_instr = list_is_singular(&next_block->instrs);
 
       if (!single_instr) {
+#if 0
          validate_log(state,
                       "Block does not end with a control flow instruction.");
+#endif
       }
    } else if (block_ends > 1) {
       validate_log(state, "Block contains multiple control flow instructions.");

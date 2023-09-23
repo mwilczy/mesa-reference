@@ -161,17 +161,191 @@ rogue_extend_loop_reg_lifetimes(rogue_shader *shader,
    ralloc_free(loop_live_range);
 }
 
-PUBLIC
-bool rogue_regalloc(rogue_shader *shader)
+static void insert_spill(rogue_builder *b, unsigned spill_index, bool load)
 {
-   if (shader->is_grouped)
+   rogue_shader *shader = b->shader;
+
+   rogue_instr *instr = &rogue_BYP0B(b,
+               rogue_ref_io(ROGUE_IO_FT0),
+               shader->spill_staging_addr.lo32,
+               rogue_ref_io(ROGUE_IO_S0),
+               rogue_ref_val(spill_index))->instr;
+   rogue_add_instr_comment(instr, "spill_p0");
+
+   /* rogue_ref const4 = rogue_ref_reg(rogue_special_reg(shader, 4)); */
+   rogue_ref const4 = rogue_ref_reg(rogue_const_reg(shader, 4));
+
+   /* umadd64 r2, r3, sc4, index, base.lo32, base.hi32 */
+   instr = &rogue_MADD64(b,
+                shader->spill_staging_addr.lo32,
+                shader->spill_staging_addr.hi32,
+                const4,
+                shader->spill_staging_addr.lo32,
+                shader->inst_base_addr.lo32,
+                shader->inst_base_addr.hi32,
+                rogue_none())->instr;
+   rogue_add_instr_comment(instr, "spill_p1");
+
+   if (load) {
+      rogue_backend_instr *ld = rogue_LD(b,
+                                         shader->spill_staging_reg,
+                                         rogue_ref_drc(0),
+                                         rogue_ref_val(1),
+                                         shader->spill_staging_addr.ref64);
+      rogue_add_instr_commentf(&ld->instr, "spill %u ld", spill_index);
+   } else {
+      rogue_backend_instr *st = rogue_ST(b,
+                                         shader->spill_staging_reg,
+                                         rogue_ref_val(2),
+                                         rogue_ref_drc(0),
+                                         rogue_ref_val(1),
+                                         shader->spill_staging_addr.ref64,
+                                         rogue_none());
+      rogue_add_instr_commentf(&st->instr, "spill %u st", spill_index);
+   }
+}
+
+static bool rogue_instr_is_wdf(const rogue_instr *instr)
+{
+   if (instr->type != ROGUE_INSTR_TYPE_CTRL)
       return false;
 
-   bool progress = false;
+   const rogue_ctrl_instr *ctrl = rogue_instr_as_ctrl(instr);
+   return ctrl->op == ROGUE_CTRL_OP_WDF;
+}
+
+static void
+rogue_spill_reg(rogue_shader *shader, rogue_reg *reg, unsigned spill_index)
+{
+   rogue_builder b;
+   rogue_builder_init(&b, shader);
+
+   /* Insert a store for the reg write. */
+   assert(list_is_singular(&reg->writes));
+   rogue_foreach_reg_write_safe (write, reg) {
+      rogue_dst_reg_replace(write, shader->spill_staging_reg.reg);
+
+#if 1
+      rogue_instr *instr = rogue_instr_next_after_grouping(write->instr);
+
+      /* If there's a DRC after this, insert spill code after the DRC! */
+      /* TODO: get the instr drc and follow the link instead */
+      if (rogue_instr_is_wdf(rogue_instr_next(instr)))
+         instr = rogue_instr_next(instr);
+
+      b.cursor = rogue_cursor_after_instr(instr);
+#else
+      b.cursor = rogue_cursor_after_instr_group(write->instr);
+#endif
+      insert_spill(&b, spill_index, false);
+   }
+
+   /* Replace uses with the loaded value. */
+   rogue_foreach_reg_use_safe (use, reg) {
+      b.cursor = rogue_cursor_before_instr_group(use->instr);
+      insert_spill(&b, spill_index, true);
+
+      rogue_src_reg_replace(use, shader->spill_staging_reg.reg);
+   }
+
+   /* Remove the spilled register. */
+   rogue_reg_delete(reg);
+}
+
+static inline bool rogue_instr_refs_temps(const rogue_instr *instr)
+{
+   switch (instr->type) {
+   case ROGUE_INSTR_TYPE_ALU: {
+      const rogue_alu_instr *alu = rogue_instr_as_alu(instr);
+      const rogue_alu_op_info *info = &rogue_alu_op_infos[alu->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_is_temp_reg(&alu->src[s].ref))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_is_temp_reg(&alu->dst[d].ref))
+            return true;
+
+      break;
+   }
+
+   case ROGUE_INSTR_TYPE_BACKEND: {
+      const rogue_backend_instr *backend = rogue_instr_as_backend(instr);
+      const rogue_backend_op_info *info = &rogue_backend_op_infos[backend->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_is_temp_reg(&backend->src[s].ref))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_is_temp_reg(&backend->dst[d].ref))
+            return true;
+
+      break;
+   }
+
+   case ROGUE_INSTR_TYPE_CTRL: {
+      const rogue_ctrl_instr *ctrl = rogue_instr_as_ctrl(instr);
+      const rogue_ctrl_op_info *info = &rogue_ctrl_op_infos[ctrl->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_is_temp_reg(&ctrl->src[s].ref))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_is_temp_reg(&ctrl->dst[d].ref))
+            return true;
+
+      break;
+   }
+
+   case ROGUE_INSTR_TYPE_BITWISE: {
+      const rogue_bitwise_instr *bitwise = rogue_instr_as_bitwise(instr);
+      const rogue_bitwise_op_info *info = &rogue_bitwise_op_infos[bitwise->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_is_temp_reg(&bitwise->src[s].ref))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_is_temp_reg(&bitwise->dst[d].ref))
+            return true;
+
+      break;
+   }
+
+   default:
+      unreachable("Unsupported instruction type.");
+      break;
+   }
+
+   return false;
+}
+
+static bool rogue_reg_can_spill(rogue_reg *reg)
+{
+   /* Don't spill regarrays. */
+   if (reg->regarray)
+      return false;
+
+   /* Don't spill ops that already use temps.  */
+   rogue_foreach_reg_use (use, reg) {
+      if (rogue_instr_refs_temps(use->instr))
+         return false;
+   }
+
+   rogue_foreach_reg_write (write, reg) {
+      if (rogue_instr_refs_temps(write->instr))
+         return false;
+   }
+
+   return true;
+}
+
+static bool rogue_regalloc_try(rogue_shader *shader)
+{
+   assert(!shader->is_grouped);
 
    unsigned num_ssa_regs = rogue_count_used_regs(shader, ROGUE_REG_CLASS_SSA);
    if (!num_ssa_regs)
-      return false;
+      return true;
 
    unsigned num_temps_prealloced =
       rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
@@ -183,10 +357,18 @@ bool rogue_regalloc(rogue_shader *shader)
    unsigned num_emc_regs = rogue_count_used_regs(shader, ROGUE_REG_CLASS_EMC);
    assert(num_emc_regs <= 1); /* Should only be one for now. */
    if (num_emc_regs)
-      emc_reg = num_temps_prealloced++;
+      emc_reg = num_temps_prealloced;
+   num_temps_prealloced += num_emc_regs;
 
-   unsigned num_hw_temps =
-      rogue_reg_class_infos[ROGUE_REG_CLASS_TEMP].num - num_temps_prealloced;
+   /* TODO: assert that this is not negative! */
+   unsigned num_hw_temps = rogue_reg_class_infos[ROGUE_REG_CLASS_TEMP].num -
+                           num_temps_prealloced;
+
+#if 1
+   const char *env_temps = getenv("TEMPS");
+   if (env_temps)
+      num_hw_temps = atoi(env_temps) - num_temps_prealloced;
+#endif
 
    struct ra_regs *ra_regs = ra_alloc_reg_set(shader, num_hw_temps, true);
 
@@ -342,9 +524,64 @@ bool rogue_regalloc(rogue_shader *shader)
       }
    }
 
-   /* TODO: Spilling support. */
-   if (!ra_allocate(ra_graph))
-      unreachable("Register allocation failed.");
+   bool is_internal = shader->ctx->nir[shader->stage]->info.internal;
+   if (!ra_allocate(ra_graph)) {
+      /* abort(); */
+      /* Internal shaders can't spill. */
+      assert(!is_internal);
+
+      struct spill_state *spill_state =
+         &shader->ctx->common_data[shader->stage].spill_state;
+      float *spill_cost =
+         ralloc_array_size(ra_regs, sizeof(float), num_ssa_regs);
+
+      /* TODO: Move hard-coded init stuff to here, i.e. don't insert the
+       * spilling setup code unless we actually need to spill.
+       */
+
+      /* Calculate spill costs. */
+#if 1
+      for (unsigned u = 0; u < num_ssa_regs; ++u) {
+         spill_cost[u] = INFINITY;
+      }
+#endif
+
+      rogue_foreach_reg (reg, shader, ROGUE_REG_CLASS_SSA) {
+         unsigned i = reg->index;
+
+         if (!rogue_reg_can_spill(reg)) {
+            spill_cost[i] = INFINITY;
+            continue;
+         }
+
+         unsigned uses = list_length(&reg->uses);
+         /* TODO: more info to help choose which one to spill. */
+         spill_cost[i] = (float)uses * 10.0f;
+      }
+
+      /* Set spill costs. */
+      for (unsigned u = 0; u < num_ssa_regs; ++u)
+         ra_set_node_spill_cost(ra_graph, u, spill_cost[u]);
+
+      /* Get best spill node and spill. */
+      unsigned spill_reg_idx = ra_get_best_spill_node(ra_graph);
+      assert(spill_reg_idx != ~0 && "Failed to get best spill node.");
+      rogue_reg *reg = rogue_ssa_reg(shader, spill_reg_idx);
+
+      assert(spill_state->dwords < 1024);
+      unsigned spill_index = spill_state->dwords++;
+      rogue_spill_reg(shader, reg, spill_index);
+
+      util_sparse_array_finish(&ra_class_info);
+      ralloc_free(ra_regs);
+
+      /* Re-index instructions and regs. */
+      rogue_trim(shader);
+
+      if (ROGUE_DEBUG(REGALLOC))
+         printf("Spilling attempt %u\n", spill_index);
+      return false;
+   }
 
    /* Print allocations. */
    if (ROGUE_DEBUG(REGALLOC)) {
@@ -401,7 +638,7 @@ bool rogue_regalloc(rogue_shader *shader)
       enum rogue_reg_class new_class = class_info->hw_class;
 
       bool used = false;
-      for (unsigned r = 0; r < regarray->size; ++r) {
+      for (unsigned r = 0; r < stride; ++r) {
          if (rogue_reg_is_used(shader, new_class, hw_base_index + r)) {
             used = true;
             break;
@@ -410,19 +647,17 @@ bool rogue_regalloc(rogue_shader *shader)
 
       /* First time using new regarray, modify in place. */
       if (!used) {
-         progress |=
-            rogue_regarray_rewrite(shader, regarray, new_class, hw_base_index);
+         rogue_regarray_rewrite(shader, regarray, new_class, hw_base_index);
       } else {
          /* Regarray has already been used, replace references and delete. */
 
          /* Replace parent regarray first. */
          rogue_regarray *new_regarray = rogue_regarray_cached(shader,
-                                                              regarray->size,
+                                                              stride,
                                                               new_class,
                                                               hw_base_index,
                                                               true);
-         progress |=
-            rogue_regarray_replace(shader, regarray, new_regarray, true);
+         rogue_regarray_replace(shader, regarray, new_regarray, true);
       }
    }
 
@@ -435,12 +670,12 @@ bool rogue_regalloc(rogue_shader *shader)
 
       /* First time using new register, modify in place. */
       if (!rogue_reg_is_used(shader, new_class, hw_index)) {
-         progress |= rogue_reg_rewrite(shader, reg, new_class, hw_index);
+         rogue_reg_rewrite(shader, reg, new_class, hw_index);
       } else {
          /* Register has already been used, replace references and delete. */
          assert(list_is_singular(&reg->writes)); /* SSA reg. */
          rogue_reg *new_reg = rogue_temp_reg(shader, hw_index);
-         progress |= rogue_reg_replace(reg, new_reg);
+         rogue_reg_replace(reg, new_reg);
       }
    }
 
@@ -452,12 +687,12 @@ bool rogue_regalloc(rogue_shader *shader)
 
       /* First time using new register, modify in place. */
       if (!rogue_reg_is_used(shader, new_class, hw_index)) {
-         progress |= rogue_reg_rewrite(shader, reg, new_class, hw_index);
+         rogue_reg_rewrite(shader, reg, new_class, hw_index);
       } else {
          /* Register has already been used, replace references and delete. */
          assert(list_is_singular(&reg->writes)); /* SSA reg. */
          rogue_reg *new_reg = rogue_temp_reg(shader, hw_index);
-         progress |= rogue_reg_replace(reg, new_reg);
+         rogue_reg_replace(reg, new_reg);
       }
    }
 
@@ -468,5 +703,17 @@ bool rogue_regalloc(rogue_shader *shader)
    UNUSED unsigned num_temp_regs =
       rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
 
-   return progress;
+   if (ROGUE_DEBUG(REGALLOC))
+      printf("temps: %u\n", num_temp_regs);
+
+   return true;
+}
+
+PUBLIC
+bool rogue_regalloc(rogue_shader *shader)
+{
+   while (!rogue_regalloc_try(shader))
+      ;
+
+   return true;
 }

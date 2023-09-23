@@ -5530,6 +5530,51 @@ static rogue_shader *nir_to_rogue(rogue_build_ctx *ctx,
 
    nir_index_blocks(entry);
 
+   /* Insert hard-coded reg spill stuff. */
+   if (!nir->info.internal) {
+      unsigned next_temp = rogue_count_used_regs(shader, ROGUE_REG_CLASS_TEMP);
+      shader->inst_base_addr = rogue_temp_ref64(shader, next_temp);
+      shader->spill_staging_addr = rogue_temp_ref64(shader, next_temp + 2);
+      shader->spill_staging_reg =
+         rogue_ref_reg(rogue_temp_reg(shader, next_temp + 4));
+
+      const struct pvr_pipeline_layout *pipeline_layout =
+         shader->ctx->pipeline_layout;
+      enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(shader->stage);
+
+      assert(pipeline_layout->sh_reg_layout_per_stage[pvr_stage]
+                .temp_spill_buffer.present);
+      unsigned inst_base_addr_offset =
+         pipeline_layout->sh_reg_layout_per_stage[pvr_stage]
+            .temp_spill_buffer.offset;
+      rogue_ref addr_lo =
+         rogue_ref_reg(rogue_shared_reg(shader, inst_base_addr_offset));
+      rogue_ref addr_hi =
+         rogue_ref_reg(rogue_shared_reg(shader, inst_base_addr_offset + 1));
+
+      rogue_ref local_addr_inst = rogue_ref_reg(
+         rogue_special_reg(shader, ROGUE_SPECIAL_REG_LOCAL_ADDR_INST_NUM));
+
+      rogue_push_block(&b);
+
+      /* Store block size. */
+      rogue_BYP0B(&b,
+                  rogue_ref_io(ROGUE_IO_FT0),
+                  shader->inst_base_addr.lo32,
+                  rogue_ref_io(ROGUE_IO_S0),
+                  rogue_ref_val(1024 * 4));
+
+      /* Store per-instance base address */
+      rogue_MADD64(&b,
+                   shader->inst_base_addr.lo32,
+                   shader->inst_base_addr.hi32,
+                   shader->inst_base_addr.lo32, /* block size */
+                   local_addr_inst,
+                   addr_lo,
+                   addr_hi,
+                   rogue_none());
+   }
+
    /* Translate shader entrypoint. */
    trans_nir_cf_nodes(&b, &entry->body);
    rogue_END(&b);
@@ -5614,6 +5659,7 @@ void rogue_shader_passes(rogue_shader *shader)
    ROGUE_PASS_V(shader, rogue_schedule_uvsw, false);
    ROGUE_PASS_V(shader, rogue_trim);
    ROGUE_PASS_V(shader, rogue_regalloc);
+   ROGUE_PASS_V(shader, rogue_schedule_wdf, false);
    ROGUE_PASS_V(shader, rogue_lower_late_ops);
    /* ROGUE_PASS_V(shader, rogue_dce); */
    ROGUE_PASS_V(shader, rogue_schedule_instr_groups, false);

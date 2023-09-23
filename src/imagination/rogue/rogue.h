@@ -624,9 +624,9 @@ static inline rogue_instr *rogue_instr_next(rogue_instr *instr)
    return list_entry(list->next, rogue_instr, link);
 }
 
-static inline rogue_instr *rogue_instr_prev(rogue_instr *instr)
+static inline rogue_instr *rogue_instr_prev(const rogue_instr *instr)
 {
-   struct list_head *list = &instr->link;
+   const struct list_head *list = &instr->link;
    bool first = instr->link.prev == &instr->block->instrs;
 
    if (first)
@@ -910,6 +910,12 @@ typedef struct rogue_ref {
    enum rogue_idx idx;
 } rogue_ref;
 
+typedef struct rogue_ref64 {
+   rogue_ref ref64;
+   rogue_ref lo32;
+   rogue_ref hi32;
+} rogue_ref64;
+
 static inline bool rogue_ref_type_supported(enum rogue_ref_type type,
                                             uint64_t supported_types)
 {
@@ -1066,6 +1072,11 @@ static inline bool rogue_ref_is_const_reg(const rogue_ref *ref)
 static inline bool rogue_ref_is_ssa_reg(const rogue_ref *ref)
 {
    return rogue_ref_is_reg(ref) && ref->reg->class == ROGUE_REG_CLASS_SSA;
+}
+
+static inline bool rogue_ref_is_temp_reg(const rogue_ref *ref)
+{
+   return rogue_ref_is_reg(ref) && ref->reg->class == ROGUE_REG_CLASS_TEMP;
 }
 
 static inline bool rogue_ref_is_vtxout_reg(const rogue_ref *ref)
@@ -2529,6 +2540,10 @@ typedef struct rogue_shader {
    bool is_grouped; /** Whether the instructions are grouped. */
 
    const char *name; /** Shader name. */
+
+   rogue_ref64 inst_base_addr;
+   rogue_ref64 spill_staging_addr;
+   rogue_ref spill_staging_reg;
 } rogue_shader;
 
 static inline unsigned rogue_next_ssa(rogue_shader *shader)
@@ -2802,6 +2817,32 @@ static inline rogue_cursor rogue_cursor_before_instr(rogue_instr *instr)
    };
 }
 
+static inline rogue_instr *rogue_instr_prev_before_grouping(rogue_instr *instr)
+{
+   rogue_instr *first_in_group = instr;
+
+   rogue_instr *prev = rogue_instr_prev(instr);
+   while (prev && prev->group_next) {
+      first_in_group = prev;
+      prev = rogue_instr_prev(prev);
+   }
+
+   return first_in_group;
+}
+
+static inline rogue_cursor rogue_cursor_before_instr_group(rogue_instr *instr)
+{
+   rogue_instr *first_in_group = instr;
+
+   rogue_instr *prev = rogue_instr_prev(instr);
+   while (prev && prev->group_next) {
+      first_in_group = prev;
+      prev = rogue_instr_prev(prev);
+   }
+
+   return rogue_cursor_before_instr(first_in_group);
+}
+
 /**
  * \brief Returns a cursor set to after an instruction.
  *
@@ -2814,6 +2855,17 @@ static inline rogue_cursor rogue_cursor_after_instr(rogue_instr *instr)
       .block = false,
       .prev = &instr->link,
    };
+}
+
+/* TODO: tidy this up */
+static inline rogue_instr *rogue_instr_next_after_grouping(rogue_instr *instr)
+{
+   rogue_instr *last_in_group = instr;
+
+   while (last_in_group->group_next)
+      last_in_group = rogue_instr_next(last_in_group);
+
+   return last_in_group;
 }
 
 /* TODO: rename to ...after_instr_grouping. */
@@ -3478,12 +3530,6 @@ static inline bool rogue_can_replace_reg_use(rogue_reg_use *use,
    return false;
 }
 
-typedef struct rogue_ref64 {
-   rogue_ref ref64;
-   rogue_ref lo32;
-   rogue_ref hi32;
-} rogue_ref64;
-
 static struct rogue_ref64 rogue_ssa_ref64(rogue_shader *shader, unsigned index)
 {
    return (rogue_ref64){
@@ -3664,6 +3710,93 @@ static inline const rogue_reg *rogue_reg_from_use(const rogue_reg_use *use)
 
    assert(rogue_ref_is_reg(ref));
    return ref->reg;
+}
+
+static inline bool rogue_instr_in_group(const rogue_instr *instr)
+{
+   if (instr->group_next)
+      return true;
+
+   rogue_instr *prev = rogue_instr_prev(instr);
+   if (prev && prev->group_next)
+      return true;
+
+   return false;
+}
+
+static inline bool rogue_instr_refs_drc(const rogue_instr *instr)
+{
+   switch (instr->type) {
+   case ROGUE_INSTR_TYPE_ALU: {
+      const rogue_alu_instr *alu = rogue_instr_as_alu(instr);
+      const rogue_alu_op_info *info = &rogue_alu_op_infos[alu->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_src_types[s]))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_dst_types[d]))
+            return true;
+
+      break;
+   }
+
+   case ROGUE_INSTR_TYPE_BACKEND: {
+      const rogue_backend_instr *backend = rogue_instr_as_backend(instr);
+      const rogue_backend_op_info *info = &rogue_backend_op_infos[backend->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_src_types[s]))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_dst_types[d]))
+            return true;
+
+      break;
+   }
+
+   case ROGUE_INSTR_TYPE_CTRL: {
+      const rogue_ctrl_instr *ctrl = rogue_instr_as_ctrl(instr);
+      const rogue_ctrl_op_info *info = &rogue_ctrl_op_infos[ctrl->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_src_types[s]))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_dst_types[d]))
+            return true;
+
+      break;
+   }
+
+   case ROGUE_INSTR_TYPE_BITWISE: {
+      const rogue_bitwise_instr *bitwise = rogue_instr_as_bitwise(instr);
+      const rogue_bitwise_op_info *info = &rogue_bitwise_op_infos[bitwise->op];
+      for (unsigned s = 0; s < info->num_srcs; ++s)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_src_types[s]))
+            return true;
+
+      for (unsigned d = 0; d < info->num_dsts; ++d)
+         if (rogue_ref_type_supported(ROGUE_REF_TYPE_DRC,
+                                      info->supported_dst_types[d]))
+            return true;
+
+      break;
+   }
+
+   default:
+      unreachable("Unsupported instruction type.");
+      break;
+   }
+
+   return false;
 }
 
 /* Printing */
@@ -3938,6 +4071,11 @@ typedef struct rogue_common_build_data {
       unsigned shareds;
       /* TODO: coefficient update program support. */
    } preamble;
+
+   struct spill_state {
+      /* rogue_ref64 base_addr; */
+      unsigned dwords;
+   } spill_state;
 
    rogue_ubo_data ubo_data;
    rogue_compile_time_consts_data compile_time_consts_data;

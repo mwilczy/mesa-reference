@@ -56,13 +56,14 @@ static bool rogue_trim_regs(rogue_shader *shader)
    bool progress = false;
 
    rogue_reset_reg_usage(shader, ROGUE_REG_CLASS_SSA);
-   rogue_reset_reg_usage(shader, ROGUE_REG_CLASS_TEMP);
+   /* rogue_reset_reg_usage(shader, ROGUE_REG_CLASS_TEMP); */
 
    unsigned index[ROGUE_REG_CLASS_COUNT] = { 0 };
 
    rogue_foreach_regarray (regarray, shader) {
       enum rogue_reg_class class = regarray->regs[0]->class;
-      if (class != ROGUE_REG_CLASS_SSA && class != ROGUE_REG_CLASS_TEMP)
+      /* if (class != ROGUE_REG_CLASS_SSA && class != ROGUE_REG_CLASS_TEMP) */
+      if (class != ROGUE_REG_CLASS_SSA)
          continue;
 
       if (regarray->parent)
@@ -90,12 +91,14 @@ static bool rogue_trim_regs(rogue_shader *shader)
       progress |= rogue_reg_set(shader, reg, reg->class, index[reg->class]++);
    }
 
+   /*
    rogue_foreach_reg (reg, shader, ROGUE_REG_CLASS_TEMP) {
       if (reg->dirty)
          continue;
 
       progress |= rogue_reg_set(shader, reg, reg->class, index[reg->class]++);
    }
+   */
 
    return progress;
 }

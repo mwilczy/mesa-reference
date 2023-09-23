@@ -617,6 +617,14 @@ static VkResult pvr_pds_descriptor_program_create_and_upload(
       addr_literals++;
    }
 
+   if (sh_reg_layout->temp_spill_buffer.present) {
+      program.addr_literals[addr_literals] = (struct pvr_pds_addr_literal){
+         .type = PVR_PDS_ADDR_LITERAL_TEMP_SPILL_BUFFER,
+         .destination = sh_reg_layout->temp_spill_buffer.offset,
+      };
+      addr_literals++;
+   }
+
    if (sh_reg_layout->push_consts.present) {
       program.addr_literals[addr_literals] = (struct pvr_pds_addr_literal){
          .type = PVR_PDS_ADDR_LITERAL_PUSH_CONSTS,
@@ -1057,6 +1065,15 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
       next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
    }
 
+   /* Reserve space for the temp spilling base address. */
+   /* TODO: Make this conditional. */
+   reg_layout.temp_spill_buffer.present = true;
+
+   if (reg_layout.temp_spill_buffer.present) {
+      reg_layout.temp_spill_buffer.offset = next_free_sh_reg;
+      next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
+   }
+
    /* Reserve space for the push constants base device address. */
    reg_layout.push_consts.present =
       !!(layout->push_constants_shader_stages & BITFIELD_BIT(stage));
@@ -1320,6 +1337,8 @@ static VkResult pvr_compute_pipeline_compile(
    local_input_regs[2] = cs_data->local_id_regs[1];
 
    rogue_nir_build(ctx, true);
+
+   /* compute_pipeline->shader_state.spill_buffer_size = PVR_DW_TO_BYTES(ctx->common_data[stage].spill_state.dwords); */
 
    result = pvr_gpu_upload_usc(device,
                                util_dynarray_begin(&ctx->binary[stage]),
@@ -1623,6 +1642,8 @@ pvr_vertex_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
       varying1.f16_flat = vs_data->num_f16_flat_varyings;
       varying1.f16_npc = vs_data->num_f16_npc_varyings;
    }
+
+   /* vertex_state->spill_buffer_size = PVR_DW_TO_BYTES(common_data->spill_state.dwords); */
 }
 
 static void
@@ -1663,6 +1684,8 @@ pvr_fragment_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
     * programs so set it to `~0` to make sure that we set this up later on.
     */
    fragment_state->stage_state.pds_temps_count = ~0;
+
+   /* fragment_state->spill_buffer_size = PVR_DW_TO_BYTES(common_data->spill_state.dwords); */
 }
 
 static bool pvr_blend_factor_requires_consts(VkBlendFactor factor)
