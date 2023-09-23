@@ -54,7 +54,8 @@ static const struct spirv_to_nir_options spirv_options = {
    },
 
    .ubo_addr_format = nir_address_format_64bit_global,
-   .ssbo_addr_format = nir_address_format_64bit_global_32bit_offset,
+   /* .ssbo_addr_format = nir_address_format_64bit_global_32bit_offset, */
+   .ssbo_addr_format = nir_address_format_32bit_index_offset,
    /* TODO: for robust access:
     * .ssbo_addr_format = nir_address_format_64bit_bounded_global,
     */
@@ -493,6 +494,12 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
               nir_var_mem_ssbo,
               spirv_options.ssbo_addr_format);
    NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_mem_ssbo, NULL, NULL);
+
+   NIR_PASS_V(nir, nir_opt_sink, nir_move_load_ubo | nir_move_load_ssbo);
+   NIR_PASS_V(nir, nir_opt_move, nir_move_load_ubo | nir_move_load_ssbo);
+
+   NIR_PASS_V(nir, rogue_nir_lower_bos);
+   NIR_PASS_V(nir, nir_opt_dce);
 
    if (!nir->info.shared_memory_explicit_layout)
       NIR_PASS_V(nir,

@@ -131,8 +131,15 @@ static nir_def *lower_vk_io(nir_builder *b, nir_instr *instr, void *cb_data)
    unsigned bits = intr->def.bit_size;
    unsigned align = bits / 8;
 
-   assert((bits == 64 && comps == 1) || (bits == 32 && comps == 4));
-   bool is_ubo = (bits == 64);
+   /* assert((bits == 64 && comps == 1) || (bits == 32 && comps == 4)); */
+   /* bool is_ubo = (bits == 64); */
+
+   if (comps == 2) {
+      assert(bits == 32);
+      return nir_imm_ivec2(b, 0, 0);
+   }
+
+   bool is_ubo = true;
 
    /* Load the descriptor set table address for this set from memory. */
    nir_def *desc_addr;
@@ -370,4 +377,97 @@ PUBLIC
 bool rogue_nir_lower_scratch(nir_shader *shader)
 {
    return nir_shader_lower_instructions(shader, is_scratch, lower_scratch, NULL);
+}
+///
+
+/* TODO: Rename and move to another file. */
+
+static nir_def *lower_bo(nir_builder *b, nir_instr *instr, void *cb_data)
+{
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   bool is_load = intr->intrinsic != nir_intrinsic_store_ssbo;
+
+   nir_def *offset;
+   nir_def *value;
+
+   if (is_load) {
+      offset = intr->src[1].ssa;
+   } else {
+      value = intr->src[0].ssa;
+      offset = intr->src[2].ssa;
+   }
+
+   /* TODO: maybe just copy propagate first.. */
+   nir_src rsrc = intr->src[is_load ? 0 : 1];
+   unsigned num_components = nir_src_num_components(rsrc);
+   while (true) {
+      nir_alu_instr *alu = nir_src_as_alu_instr(rsrc);
+      if (alu && alu->op == nir_op_mov) {
+         for (unsigned i = 0; i < num_components; i++) {
+            if (alu->src[0].swizzle[i] != i)
+               abort();
+         }
+         rsrc = alu->src[0].src;
+      } else if (alu && nir_op_is_vec(alu->op)) {
+         for (unsigned i = 0; i < num_components; i++) {
+            if (alu->src[i].swizzle[0] != i || alu->src[i].src.ssa != alu->src[0].src.ssa)
+               abort();
+         }
+         rsrc = alu->src[0].src;
+      } else {
+         break;
+      }
+   }
+
+   nir_intrinsic_instr *load_vk_desc = nir_src_as_intrinsic(rsrc);
+   assert(load_vk_desc->intrinsic == nir_intrinsic_load_vulkan_descriptor);
+
+   nir_intrinsic_instr *vk_res_idx = nir_src_as_intrinsic(load_vk_desc->src[0]);
+   assert(vk_res_idx->intrinsic == nir_intrinsic_vulkan_resource_index);
+
+   nir_def *vk_res_idx_def = nir_vulkan_resource_index(b, 1, 64, vk_res_idx->src[0].ssa, .desc_set = nir_intrinsic_desc_set(vk_res_idx), .binding = nir_intrinsic_binding(vk_res_idx), .desc_type = nir_intrinsic_desc_type(vk_res_idx));
+
+   nir_def *load_vk_desc_def = nir_load_vulkan_descriptor(b, 1, 64, vk_res_idx_def, .desc_type = nir_intrinsic_desc_type(load_vk_desc));
+
+   nir_def *addr = nir_iadd(b, load_vk_desc_def, nir_u2u64(b, offset));
+
+   nir_def *def;
+   if (is_load) {
+      def = nir_build_load_global(b, intr->def.num_components, intr->def.bit_size, addr, .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
+   } else {
+      nir_build_store_global(b, value, addr, .write_mask = nir_intrinsic_write_mask(intr), .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
+      def = NIR_LOWER_INSTR_PROGRESS_REPLACE;
+   }
+
+   return def;
+}
+
+static bool is_bo(const nir_instr *instr, UNUSED const void *cb_data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   switch (intr->intrinsic) {
+   case nir_intrinsic_load_ubo:
+   case nir_intrinsic_load_ssbo:
+   case nir_intrinsic_store_ssbo:
+   /* TODO */
+#if 0
+   case nir_intrinsic_ssbo_atomic:
+   case nir_intrinsic_ssbo_atomic_swap:
+#endif
+      return true;
+
+   default:
+      break;
+   }
+
+   return false;
+}
+
+PUBLIC
+bool rogue_nir_lower_bos(nir_shader *shader)
+{
+   return nir_shader_lower_instructions(shader, is_bo, lower_bo, NULL);
 }
