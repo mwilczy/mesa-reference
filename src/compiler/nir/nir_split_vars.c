@@ -167,6 +167,30 @@ init_field_for_type(struct field *field, struct field *parent,
          field->var = nir_local_variable_create(state->impl, var_type, name);
       } else {
          field->var = nir_variable_create(state->shader, mode, var_type, name);
+         if (mode == nir_var_shader_in || mode == nir_var_shader_out) {
+            unsigned location = state->base_var->data.location;
+            assert(location >= VARYING_SLOT_VAR0 && location <= VARYING_SLOT_VAR31);
+            memcpy(&field->var->data, &state->base_var->data, sizeof(field->var->data));
+
+            /* TODO: Do this all in nir_lower_io_arrays_to_elements.c instead */
+            /* TODO: This should be done differently, taking into account the varyings used by both the vertex and frag shader (might have some unused in the frag that would clash with the vert ones)
+             * Just doing one varying per slot... hopefully they'll get packed afterwards
+             */
+            if (field->parent->current_index > 0) {
+               for (unsigned l = VARYING_SLOT_VAR0; l <= VARYING_SLOT_VAR31; ++l) {
+                  if (!nir_find_variable_with_location(state->shader, mode, l)) {
+                     location = l;
+                     break;
+                  }
+               }
+
+               assert(location != field->var->data.location);
+               field->var->data.location = location;
+            }
+
+            const struct glsl_struct_field *field_data = glsl_get_struct_field_data(field->parent->type, field->parent->current_index);
+            field->var->data.precision = field_data->precision;
+         }
       }
       field->var->data.ray_query = state->base_var->data.ray_query;
       field->var->constant_initializer = gather_constant_initializers(state->base_var->constant_initializer,

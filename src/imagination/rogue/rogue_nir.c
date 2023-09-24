@@ -173,6 +173,7 @@ static const nir_shader_compiler_options nir_options = {
    /* .has_fsub = true, */
    /* .has_isub = true, */
    .lower_fsat = true,
+   .lower_fceil = true,
    .lower_ldexp = true,
    .lower_interpolate_at = true,
    .support_8bit_alu = true,
@@ -322,6 +323,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    else if (nir->info.stage == MESA_SHADER_FRAGMENT)
       ctx->stage_data.fs.side_effects = rogue_nir_has_side_effects(nir);
 
+#if 0
    if (nir->info.stage == MESA_SHADER_COMPUTE)
       NIR_PASS_V(nir, rogue_nir_compute_instance_check);
 
@@ -340,6 +342,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 
    NIR_PASS_V(nir, nir_lower_variable_initializers, nir_var_shader_out);
    NIR_PASS_V(nir, nir_lower_variable_initializers, ~0);
+#endif
 
    if (stage == MESA_SHADER_VERTEX) {
       NIR_PASS_V(nir, nir_lower_clip_cull_distance_arrays);
@@ -351,6 +354,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 
    NIR_PASS_V(nir, nir_split_var_copies);
    NIR_PASS_V(nir, nir_split_per_member_structs);
+   /* NIR_PASS_V(nir, nir_split_struct_vars, nir_var_function_temp); */
 
 #if 0
    if (nir->info.stage == MESA_SHADER_FRAGMENT)
@@ -381,7 +385,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
               true,
               true);
 
-   NIR_PASS_V(nir, nir_lower_indirect_derefs, nir_var_function_temp, ~0);
+   /* NIR_PASS_V(nir, nir_lower_indirect_derefs, nir_var_function_temp, ~0); */
 
    NIR_PASS_V(nir, nir_split_var_copies);
    NIR_PASS_V(nir, nir_lower_global_vars_to_local);
@@ -390,7 +394,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    NIR_PASS_V(nir, nir_lower_var_copies);
 
    NIR_PASS_V(nir, nir_opt_constant_folding);
-   NIR_PASS_V(nir, nir_lower_system_values);
+   /* NIR_PASS_V(nir, nir_lower_system_values); */
 
    /* Generate preamble shader. */
    if (ROGUE_DEBUG(PREAMBLE))
@@ -492,14 +496,16 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 
    NIR_PASS_V(nir, rogue_nir_lower_vk_io, ctx);
 
+#if 0
    if (nir->info.stage == MESA_SHADER_COMPUTE)
       NIR_PASS_V(nir,
                  nir_lower_compute_system_values,
                  &(nir_lower_compute_system_values_options){
                     .lower_cs_local_id_to_index = true,
                  });
+#endif
 
-   NIR_PASS_V(nir, rogue_nir_lower_compute_intrinsics);
+   /* NIR_PASS_V(nir, rogue_nir_lower_compute_intrinsics); */
 
    NIR_PASS_V(nir, rogue_nir_lower_io, ctx, false);
 
@@ -544,7 +550,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 
    NIR_PASS_V(nir, nir_opt_idiv_const, 8);
    NIR_PASS_V(nir, nir_lower_idiv, &idiv_options);
-   NIR_PASS_V(nir, nir_lower_frexp);
+   /* NIR_PASS_V(nir, nir_lower_frexp); */
    NIR_PASS_V(nir, nir_lower_alu_to_scalar, NULL, NULL);
    NIR_PASS_V(nir, nir_lower_load_const_to_scalar);
 
@@ -894,8 +900,218 @@ rogue_shader *rogue_nir_compile(rogue_build_ctx *ctx, nir_shader *nir)
    return rogue_nir_to_rogue(ctx, nir);
 }
 
-static bool rogue_nir_preprocess_stage(nir_shader *nir)
+#define OPT(pass, ...)                               \
+   ({                                                \
+      bool _progress = false;                        \
+      NIR_PASS(_progress, nir, pass, ##__VA_ARGS__); \
+      progress |= _progress;                         \
+      _progress;                                     \
+   })
+
+static void _rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
 {
+   bool progress;
+   unsigned lower_flrp = (nir->options->lower_flrp16 ? 16 : 0) |
+                         (nir->options->lower_flrp32 ? 32 : 0) |
+                         (nir->options->lower_flrp64 ? 64 : 0);
+
+   do {
+      progress = false;
+
+      OPT(nir_split_array_vars, nir_var_function_temp);
+      OPT(nir_shrink_vec_array_vars, nir_var_function_temp);
+      OPT(nir_opt_deref);
+      if (OPT(nir_opt_memcpy))
+         OPT(nir_split_var_copies);
+      OPT(nir_lower_vars_to_ssa);
+      if (!nir->info.var_copies_lowered)
+         OPT(nir_opt_find_array_copies);
+
+      OPT(nir_opt_copy_prop_vars);
+      OPT(nir_opt_dead_write_vars);
+      OPT(nir_opt_combine_stores, nir_var_all);
+
+#if VEC_ALU
+      /* TODO: need to check where this should be called. */
+      OPT(nir_lower_alu_width, rogue_vectorize_filter, NULL);
+#else
+      OPT(nir_lower_alu_to_scalar, NULL, NULL);
+      /* OPT(nir_lower_load_const_to_scalar); */
+#endif
+
+      OPT(nir_copy_prop);
+
+      OPT(nir_lower_phis_to_scalar, false);
+
+      OPT(nir_copy_prop);
+      OPT(nir_opt_dce);
+      OPT(nir_opt_cse);
+      OPT(nir_opt_combine_stores, nir_var_all);
+
+      /* TODO tweak values, may need to be called once with value set to zero;
+       * see intel/brw */
+      if (!ROGUE_DEBUG(SKIP_CF_OPTS))
+         OPT(nir_opt_peephole_select, 64, false, true);
+
+      OPT(nir_opt_intrinsics);
+      OPT(nir_opt_idiv_const, 8);
+      /* OPT(rogue_nir_lower_atan2_img); /1* TODO: check where this should go *1/ */
+      OPT(rogue_nir_lower_fquantize2f16);
+      /* OPT(rogue_nir_algebraic); /1* TODO: should this go before nir_opt_algebraic? Also add _opt to the name. *1/ */
+      /* OPT(nir_opt_algebraic); */
+
+      /* TODO: check if needed */
+      OPT(nir_opt_reassociate_bfi);
+
+      OPT(nir_lower_constant_convert_alu_types);
+      OPT(nir_opt_constant_folding);
+
+      /* Only do this once. */
+      if (lower_flrp) {
+         if (OPT(nir_lower_flrp, lower_flrp, false)) {
+            OPT(nir_opt_constant_folding);
+         }
+         lower_flrp = 0;
+      }
+
+      OPT(nir_opt_dead_cf);
+      if (OPT(nir_opt_trivial_continues)) {
+         OPT(nir_copy_prop);
+         OPT(nir_opt_dce);
+      }
+
+      if (!ROGUE_DEBUG(SKIP_CF_OPTS))
+         OPT(nir_opt_if, nir_opt_if_optimize_phi_true_false);
+
+      OPT(nir_opt_conditional_discard);
+      /* OPT(rogue_nir_merge_discards); */
+
+#if 0
+      if (nir->info.stage == MESA_SHADER_FRAGMENT &&
+          (nir->info.fs.uses_discard || nir->info.fs.uses_demote)) {
+         OPT(nir_opt_move_discards_to_top);
+      }
+#endif
+
+      if (!ROGUE_DEBUG(SKIP_CF_OPTS) && nir->options->max_unroll_iterations)
+         OPT(nir_opt_loop_unroll);
+
+      OPT(nir_opt_remove_phis);
+      OPT(nir_opt_gcm, false);
+      OPT(nir_opt_undef);
+      OPT(nir_lower_undef_to_zero);
+      OPT(nir_lower_pack);
+   } while (progress);
+}
+
+static bool rogue_nir_preprocess_stage(rogue_build_ctx *ctx, nir_shader *nir)
+{
+   nir_validate_ssa_dominance(nir, "before rogue_nir_preprocess_stage");
+   nir_validate_shader(nir, "before rogue_nir_preprocess_stage");
+
+   if (ROGUE_DEBUG(NIR_PASSES)) {
+      fputs("before passes\n", stdout);
+      nir_print_shader(nir, stdout);
+   }
+
+   gl_shader_stage stage = nir->info.stage;
+   bool progress = false;
+
+   OPT(nir_scale_fdiv);
+
+   if (stage == MESA_SHADER_COMPUTE)
+      NIR_PASS_V(nir, rogue_nir_compute_instance_check);
+
+   /* Inlining. */
+   OPT(nir_lower_variable_initializers, nir_var_function_temp);
+   OPT(nir_lower_returns);
+   if (OPT(nir_inline_functions)) {
+      OPT(nir_opt_copy_prop_vars);
+      OPT(nir_copy_prop);
+   }
+   OPT(nir_opt_deref);
+   nir_remove_non_entrypoints(nir);
+
+   /* Make sure we lower constant initializers on output variables so that
+    * nir_remove_dead_variables below sees the corresponding stores
+    */
+   OPT(nir_lower_variable_initializers, nir_var_shader_out);
+
+   /* Now that we've deleted all but the main function, we can go ahead and
+    * lower the rest of the constant initializers.
+    */
+   OPT(nir_lower_variable_initializers, nir_var_all);
+
+   /* TODO: probably want to move this group of passes */
+   OPT(nir_lower_frexp);
+#if VEC_ALU
+   OPT(nir_lower_alu_width, rogue_vectorize_filter, NULL);
+#else
+   OPT(nir_lower_alu_to_scalar, NULL, NULL);
+#endif
+
+   /* TODO: any BRN workarounds, etc. */
+
+   /* TODO: lower tex */
+
+   const struct nir_lower_sysvals_to_varyings_options sysvals_to_varyings = {
+      .point_coord = true,
+      .frag_coord = true,
+   };
+   /* TODO: edit this to add support for others? */
+   OPT(nir_lower_sysvals_to_varyings, &sysvals_to_varyings);
+
+   OPT(nir_lower_global_vars_to_local);
+
+   OPT(nir_split_var_copies);
+   OPT(nir_split_per_member_structs);
+   OPT(nir_split_struct_vars, nir_var_function_temp);
+
+   _rogue_nir_opt_loop(ctx, nir);
+
+   /* Probably won't be better than doing it in RIR... */
+   /* OPT(nir_lower_bit_size, lower_bit_size_callback, NULL); */
+
+   OPT(nir_lower_var_copies);
+
+   /* OPT(nir_opt_large_constants, NULL, 32); */
+   OPT(nir_lower_load_const_to_scalar);
+
+   OPT(nir_lower_system_values);
+   nir_lower_compute_system_values_options lcsv_opts = {
+      .lower_cs_local_id_to_index = true,
+   };
+   OPT(nir_lower_compute_system_values, &lcsv_opts);
+
+   OPT(rogue_nir_lower_compute_intrinsics);
+
+   /* TODO */
+   /* OPT(nir_lower_subgroups, &subgroups_options); */
+
+   /* Lower indirect I/O. */
+   OPT(nir_lower_indirect_derefs, nir_var_shader_in | nir_var_shader_out, UINT32_MAX);
+
+   /* TODO: if NOT rogue debug scratch */
+#if 1
+   {
+      /* Lower indirect temporaries (so we don't use scratch).
+       * TODO: investigate using scratch, indexed temps?
+       */
+      OPT(nir_lower_indirect_derefs, nir_var_function_temp, UINT32_MAX);
+   }
+#endif
+
+   _rogue_nir_opt_loop(ctx, nir);
+
+   nir_validate_shader(nir, "after rogue_nir_preprocess_stage");
+
+   nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
+
+   if (ROGUE_DEBUG(NIR_PASSES)) {
+      fputs("after rogue_nir_preprocess_stage\n", stdout);
+      nir_print_shader(nir, stdout);
+   }
+
    return true;
 }
 
@@ -903,14 +1119,14 @@ PUBLIC
 bool rogue_nir_preprocess(rogue_build_ctx *ctx, bool compute)
 {
    if (compute)
-      return rogue_nir_preprocess_stage(ctx->nir[MESA_SHADER_COMPUTE]);
+      return rogue_nir_preprocess_stage(ctx, ctx->nir[MESA_SHADER_COMPUTE]);
 
    bool success = true;
    rogue_foreach_graphics_stage (stage) {
       if (!ctx->nir[stage])
          continue;
 
-      success &= rogue_nir_preprocess_stage(ctx->nir[stage]);
+      success &= rogue_nir_preprocess_stage(ctx, ctx->nir[stage]);
       if (!success)
          break;
    }
@@ -918,8 +1134,202 @@ bool rogue_nir_preprocess(rogue_build_ctx *ctx, bool compute)
    return success;
 }
 
-static bool rogue_nir_link_stages(nir_shader *producer, nir_shader *consumer)
+static bool rogue_nir_lower_indirect_derefs(nir_shader *nir)
 {
+   bool progress = false;
+#if 0
+   NIR_PASS(progress,
+            nir,
+            nir_lower_vars_to_scratch,
+            nir_var_function_temp,
+            256,
+            glsl_get_natural_size_align_bytes);
+   nir_variable_mode indirect_mask = nir_var_shader_out | nir_var_shader_in |
+                                     nir_var_function_temp;
+   NIR_PASS(progress, nir, nir_lower_indirect_derefs, indirect_mask, UINT32_MAX);
+#endif
+      NIR_PASS_V(nir, nir_lower_io_to_temporaries, nir_shader_get_entrypoint(nir), true, true);
+      OPT(nir_lower_indirect_derefs, nir_var_function_temp, UINT32_MAX);
+      OPT(nir_split_var_copies);
+      OPT(nir_lower_var_copies);
+   return progress;
+}
+
+static void rogue_nir_lower_io_to_scalar_early(nir_shader *nir,
+                                               nir_variable_mode mask)
+{
+   bool progress = false;
+   nir_lower_array_deref_of_vec_options ladofv_opts =
+      nir_lower_direct_array_deref_of_vec_load |
+      nir_lower_indirect_array_deref_of_vec_load |
+      nir_lower_direct_array_deref_of_vec_store |
+      nir_lower_indirect_array_deref_of_vec_store;
+   OPT(nir_lower_array_deref_of_vec, mask, ladofv_opts);
+   OPT(nir_lower_io_to_scalar_early, mask);
+   if (progress) {
+      /* Optimize the new vector code and then remove dead vars */
+      OPT(nir_copy_prop);
+      OPT(nir_opt_shrink_vectors);
+
+      if (mask & nir_var_shader_out) {
+         /* Optimize swizzled movs of load_const for nir_link_opt_varyings's
+          * constant propagation. */
+         OPT(nir_opt_constant_folding);
+
+         /* For nir_link_opt_varyings's duplicate input opt */
+         OPT(nir_opt_cse);
+      }
+
+      OPT(nir_opt_copy_prop_vars);
+
+      OPT(nir_opt_dce);
+      OPT(nir_remove_dead_variables,
+          nir_var_function_temp | nir_var_shader_in | nir_var_shader_out,
+          NULL);
+   }
+}
+
+static bool rogue_nir_link_stages(rogue_build_ctx *ctx,
+                                  nir_shader *producer,
+                                  nir_shader *consumer)
+{
+   nir_validate_shader(producer, "before rogue_nir_link_stages");
+   nir_validate_shader(consumer, "before rogue_nir_link_stages");
+
+   /* Tweaked passes to split structs. */
+   NIR_PASS_V(producer, nir_split_struct_vars, nir_var_shader_out);
+   NIR_PASS_V(consumer, nir_split_struct_vars, nir_var_shader_in);
+
+   /* NIR_PASS_V(producer, nir_lower_io_arrays_to_elements_no_indirects, true); */
+   /* NIR_PASS_V(consumer, nir_lower_io_arrays_to_elements_no_indirects, false); */
+
+   nir_lower_io_arrays_to_elements(producer, consumer);
+   nir_validate_shader(producer, "after nir_lower_io_arrays_to_elements");
+   nir_validate_shader(consumer, "after nir_lower_io_arrays_to_elements");
+
+   rogue_nir_lower_io_to_scalar_early(producer, nir_var_shader_out);
+   rogue_nir_lower_io_to_scalar_early(consumer, nir_var_shader_in);
+
+   _rogue_nir_opt_loop(ctx, producer);
+   _rogue_nir_opt_loop(ctx, consumer);
+
+
+   /* TODO NEXT: re-enable this, see if it creates a new variable for matrix vertex inputs. */ /* ******************** !!!!!! *********************** */
+#if 0
+   if (producer->info.stage == MESA_SHADER_VERTEX) {
+      NIR_PASS_V(producer, nir_lower_io_arrays_to_elements_no_indirects, false);
+      NIR_PASS(_, producer, nir_remove_dead_variables, nir_var_shader_in, NULL);
+
+      /* NIR_PASS(_, producer, nir_lower_io_to_vector, nir_var_shader_in); */
+      NIR_PASS(_, producer, nir_opt_combine_stores, nir_var_shader_in);
+   }
+#endif
+
+   if (nir_link_opt_varyings(producer, consumer)) {
+      nir_validate_shader(producer, "after nir_link_opt_varyings");
+      nir_validate_shader(consumer, "after nir_link_opt_varyings");
+
+      _rogue_nir_opt_loop(ctx, consumer);
+   }
+
+   NIR_PASS(_, producer, nir_remove_dead_variables, nir_var_shader_out, NULL);
+   NIR_PASS(_, consumer, nir_remove_dead_variables, nir_var_shader_in, NULL);
+
+   bool progress = nir_remove_unused_varyings(producer, consumer);
+   nir_compact_varyings(producer, consumer, true);
+   if (progress) {
+      progress = false;
+      NIR_PASS(progress, producer, nir_lower_global_vars_to_local);
+#if 1
+      if (true || progress) {
+         rogue_nir_lower_indirect_derefs(producer);
+         /* Remove dead writes, which can remove input loads */
+         NIR_PASS(_,
+                  producer,
+                  nir_remove_dead_variables,
+                  nir_var_shader_temp,
+                  NULL);
+         NIR_PASS(_, producer, nir_opt_dce);
+      }
+#endif
+
+      progress = false;
+      NIR_PASS(progress, consumer, nir_lower_global_vars_to_local);
+#if 1
+      if (true || progress)
+         rogue_nir_lower_indirect_derefs(consumer);
+#endif
+
+      _rogue_nir_opt_loop(ctx, producer);
+      _rogue_nir_opt_loop(ctx, consumer);
+   }
+
+#if 0
+   if (consumer->info.stage == MESA_SHADER_FRAGMENT)
+      nir_foreach_shader_in_variable (var, consumer)
+         if (var->data.interpolation == INTERP_MODE_NONE)
+            var->data.interpolation = INTERP_MODE_SMOOTH;
+#endif
+
+   NIR_PASS(_, producer, nir_remove_dead_variables, nir_var_shader_temp, NULL);
+   NIR_PASS(_, consumer, nir_remove_dead_variables, nir_var_shader_temp, NULL);
+
+   nir_validate_shader(producer, "after nir_compact_varyings");
+   nir_validate_shader(consumer, "after nir_compact_varyings");
+
+   NIR_PASS(_, producer, nir_lower_io_to_vector, nir_var_shader_out);
+   NIR_PASS(_, producer, nir_opt_combine_stores, nir_var_shader_out);
+   NIR_PASS(_, consumer, nir_lower_io_to_vector, nir_var_shader_in);
+
+   /* No arrayed fragment outputs. */
+   if (consumer->info.stage == MESA_SHADER_FRAGMENT) {
+      NIR_PASS_V(consumer, nir_lower_io_arrays_to_elements_no_indirects, true);
+      NIR_PASS(_, consumer, nir_remove_dead_variables, nir_var_shader_out, NULL);
+
+      NIR_PASS(_, consumer, nir_lower_io_to_vector, nir_var_shader_out);
+      NIR_PASS(_, consumer, nir_opt_combine_stores, nir_var_shader_out);
+   }
+
+   bool has_indirect_inputs =
+      (producer->options->support_indirect_inputs >> producer->info.stage) &
+      0x1;
+   bool has_indirect_outputs =
+      (producer->options->support_indirect_outputs >> producer->info.stage) &
+         0x1 &&
+      producer->xfb_info == NULL;
+
+   NIR_PASS_V(producer,
+              nir_lower_io_to_temporaries,
+              nir_shader_get_entrypoint(producer),
+              !has_indirect_outputs,
+              !has_indirect_inputs);
+
+   /* TODO: does the order matter? */
+#if 1
+   NIR_PASS(_, producer, nir_lower_global_vars_to_local);
+   NIR_PASS(_, producer, nir_split_var_copies);
+   NIR_PASS(_, producer, nir_lower_var_copies);
+#else
+   NIR_PASS(_, producer, nir_split_var_copies);
+   NIR_PASS(_, producer, nir_lower_var_copies);
+   NIR_PASS(_, producer, nir_lower_global_vars_to_local);
+#endif
+
+   /* TODO: what to do with this? */
+   /* nir_linked_io_var_info io_var_info = nir_assign_linked_io_var_locations(producer, consumer); */
+
+   nir_validate_shader(producer, "after rogue_nir_link_stages");
+   nir_validate_shader(consumer, "after rogue_nir_link_stages");
+
+   nir_shader_gather_info(producer, nir_shader_get_entrypoint(producer));
+   nir_shader_gather_info(consumer, nir_shader_get_entrypoint(consumer));
+
+   if (ROGUE_DEBUG(NIR_PASSES)) {
+      fputs("after rogue_nir_link_stages\n", stdout);
+      nir_print_shader(producer, stdout);
+      nir_print_shader(consumer, stdout);
+   }
+
    return true;
 }
 
@@ -941,7 +1351,7 @@ bool rogue_nir_link(rogue_build_ctx *ctx, bool compute)
          continue;
       }
 
-      success &= rogue_nir_link_stages(producer, consumer);
+      success &= rogue_nir_link_stages(ctx, producer, consumer);
       if (!success)
          break;
 
