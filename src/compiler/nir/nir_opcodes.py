@@ -1740,3 +1740,6 @@ opcode("udot_2x16_uadd_sat", 0, tint32, [0, 0, 0], [tuint32, tuint32, tint32],
 """)
 
 binop("copysign_img", tfloat, "", "bit_size == 64 ? copysign(src0, src1) : copysignf(src0, src1)")
+
+opcode(name="uadd64_32_img", output_size=1, output_type=tuint64, input_sizes=[1, 1], input_types=[tuint64, tuint32],
+      is_conversion=False, algebraic_properties=_2src_commutative, const_expr="dst.x = src0.x + (uint64_t)src1.x;", description = "")

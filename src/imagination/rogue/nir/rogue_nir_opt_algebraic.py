@@ -38,6 +38,8 @@ algebraic_late = [
    (('bitfield_insert', 'base', 'insert', 'offset', 0), 'base'),
    (('ubitfield_extract', 'value', 'offset', 0), 0),
    (('ibitfield_extract', 'value', 'offset', 0), 0),
+
+   (('iadd@64', a, '#offset(is_upper_half_zero)'), ('uadd64_32_img', a, ('u2u32', 'offset'))),
 ]
 
 # Split unpack ops.

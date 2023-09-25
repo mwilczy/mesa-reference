@@ -3767,6 +3767,28 @@ static void trans_nir_alu_vecN(rogue_builder *b, nir_alu_instr *alu, unsigned n)
    }
 }
 
+static void trans_nir_alu_uadd64_32_img(rogue_builder *b,
+                                        nir_alu_instr *alu,
+                                        bool is_signed)
+{
+   rogue_ref64 dst = nir_ssa_alu_dst64(b->shader, alu);
+
+   rogue_ref64 src0 = nir_ssa_alu_src64(b->shader, alu, 0);
+   rogue_ref src1 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, 32);
+
+   rogue_alu_instr *add64_32 = rogue_ADD64_32(b,
+                                              dst.lo32,
+                                              dst.hi32,
+                                              src0.lo32,
+                                              src0.hi32,
+                                              src1,
+                                              rogue_none());
+
+   if (is_signed)
+      rogue_set_alu_op_mod(add64_32, ROGUE_ALU_OP_MOD_S);
+}
+
+
 static void trans_nir_alu_iadd(rogue_builder *b, nir_alu_instr *alu, bool sub)
 {
    unsigned bit_size = alu->def.bit_size;
@@ -4842,6 +4864,9 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 
    case nir_op_vec16:
       return trans_nir_alu_vecN(b, alu, 16);
+
+   case nir_op_uadd64_32_img:
+      return trans_nir_alu_uadd64_32_img(b, alu, false);
 
    case nir_op_iadd:
       return trans_nir_alu_iadd(b, alu, false);
