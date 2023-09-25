@@ -30,6 +30,9 @@
 static bool
 dominates(const nir_instr *old_instr, const nir_instr *new_instr)
 {
+   if (old_instr->type != nir_instr_type_intrinsic)
+      return false;
+
    return nir_block_dominates(old_instr->block, new_instr->block);
 }
 

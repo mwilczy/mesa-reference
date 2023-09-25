@@ -377,6 +377,9 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    NIR_PASS_V(nir, nir_lower_global_vars_to_local);
    NIR_PASS_V(nir, nir_lower_vars_to_ssa);
 
+   /* TODO */
+   /* NIR_PASS_V(nir, nir_lower_locals_to_regs, 1); */
+
    NIR_PASS_V(nir, nir_opt_remove_phis);
 
    NIR_PASS_V(nir,
@@ -622,13 +625,9 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 	NIR_PASS_V(nir, nir_schedule, &schedule_options);
 #endif
 
-#if 0
-   nir_move_options move_all = nir_move_const_undef | nir_move_load_ubo |
-                               nir_move_load_input | nir_move_comparisons |
-                               nir_move_copies | nir_move_load_ssbo | nir_move_load_uniform;
-
-   NIR_PASS_V(nir, nir_opt_sink, move_all);
-   NIR_PASS_V(nir, nir_opt_move, move_all);
+#if 1
+   NIR_PASS_V(nir, nir_opt_sink, nir_move_const_undef | nir_move_copies);
+   NIR_PASS_V(nir, nir_opt_move, nir_move_const_undef | nir_move_copies);
 #endif
 
    /* Assign I/O locations. */
@@ -997,7 +996,7 @@ static void _rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
          OPT(nir_opt_loop_unroll);
 
       OPT(nir_opt_remove_phis);
-      OPT(nir_opt_gcm, false);
+      /* OPT(nir_opt_gcm, false); */
       OPT(nir_opt_undef);
       OPT(nir_lower_undef_to_zero);
       OPT(nir_lower_pack);
