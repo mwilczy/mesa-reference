@@ -1196,6 +1196,9 @@ static bool rogue_nir_link_stages(rogue_build_ctx *ctx,
    nir_validate_shader(producer, "before rogue_nir_link_stages");
    nir_validate_shader(consumer, "before rogue_nir_link_stages");
 
+   NIR_PASS_V(producer, nir_lower_io_arrays_to_elements_no_indirects, true);
+   NIR_PASS_V(consumer, nir_lower_io_arrays_to_elements_no_indirects, false);
+
    /* Tweaked passes to split structs. */
    NIR_PASS_V(producer, nir_split_struct_vars, nir_var_shader_out);
    NIR_PASS_V(consumer, nir_split_struct_vars, nir_var_shader_in);

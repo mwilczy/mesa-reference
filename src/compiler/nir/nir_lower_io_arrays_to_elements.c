@@ -110,8 +110,9 @@ lower_array(nir_builder *b, nir_intrinsic_instr *intr, nir_variable *var,
             struct hash_table *varyings)
 {
    b->cursor = nir_before_instr(&intr->instr);
+   nir_deref_instr *deref = nir_src_as_deref(intr->src[0]);
 
-   if (nir_deref_instr_is_known_out_of_bounds(nir_src_as_deref(intr->src[0]))) {
+   if (nir_deref_instr_is_known_out_of_bounds(deref)) {
       /* See Section 5.11 (Out-of-Bounds Accesses) of the GLSL 4.60 */
       if (intr->intrinsic != nir_intrinsic_store_deref) {
          nir_def *zero = nir_imm_zero(b, intr->def.num_components,
@@ -129,7 +130,7 @@ lower_array(nir_builder *b, nir_intrinsic_instr *intr, nir_variable *var,
    nir_def *array_index = NULL;
    unsigned elements_index = 0;
    unsigned xfb_offset = 0;
-   unsigned io_offset = get_io_offset(b, nir_src_as_deref(intr->src[0]),
+   unsigned io_offset = get_io_offset(b, deref,
                                       var, &elements_index, &xfb_offset,
                                       &array_index);
 
@@ -146,6 +147,11 @@ lower_array(nir_builder *b, nir_intrinsic_instr *intr, nir_variable *var,
       /* This pass also splits matrices so we need give them a new type. */
       if (glsl_type_is_matrix(type))
          type = glsl_get_column_type(type);
+
+      if (glsl_type_is_struct(type)) {
+         assert(deref->deref_type == nir_deref_type_struct);
+         type = glsl_get_struct_field(type, deref->strct.index);
+      }
 
       if (nir_is_arrayed_io(var, b->shader->info.stage)) {
          type = glsl_array_type(type, glsl_get_length(element->type),
@@ -311,12 +317,8 @@ lower_io_arrays_to_elements(nir_shader *shader, nir_variable_mode mask,
                type = glsl_get_array_element(type);
             }
 
-            /* Skip types we cannot split.
-             *
-             * TODO: Add support for struct splitting.
-             */
-            if ((!glsl_type_is_array(type) && !glsl_type_is_matrix(type)) ||
-                glsl_type_is_struct_or_ifc(glsl_without_array(type)))
+            /* Skip types we cannot split. */
+            if ((!glsl_type_is_array(type) && !glsl_type_is_matrix(type)))
                continue;
 
             /* Skip builtins */

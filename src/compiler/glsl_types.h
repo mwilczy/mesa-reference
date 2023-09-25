@@ -186,6 +186,9 @@ glsl_base_type_get_bit_size(const enum glsl_base_type base_type)
    case GLSL_TYPE_TEXTURE:
       return 64;
 
+   case GLSL_TYPE_STRUCT:
+      return 0;
+
    default:
       unreachable("unknown base type");
    }
