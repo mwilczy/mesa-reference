@@ -178,7 +178,13 @@ static const nir_shader_compiler_options nir_options = {
    .lower_interpolate_at = true,
    .support_8bit_alu = true,
    .support_16bit_alu = true,
+#if 0
+   .max_unroll_iterations = 1,
+#else
    .max_unroll_iterations = 16,
+   /* .force_indirect_unrolling_sampler = true, */
+   /* .force_indirect_unrolling = nir_var_all, */
+#endif
    .sort_varying_cb = rogue_sort_varying_cb,
    /* TODO: exclude the remaining native int64 ops we actually support. */
    .lower_int64_options = ~0 & ~nir_lower_iadd64 & ~nir_lower_iabs64 &
@@ -216,7 +222,7 @@ static void rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
       NIR_PASS(progress, nir, nir_opt_dead_cf);
       NIR_PASS(progress, nir, nir_opt_cse);
 
-      if (!ROGUE_DEBUG(SKIP_CF_OPTS))
+      /* if (!ROGUE_DEBUG(SKIP_CF_OPTS)) */
          NIR_PASS(progress, nir, nir_opt_peephole_select, 64, false, true);
 
       NIR_PASS(progress, nir, nir_lower_int64);
@@ -241,11 +247,7 @@ static void rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
       }
 
       if (!ROGUE_DEBUG(SKIP_CF_OPTS))
-         NIR_PASS(progress,
-                  nir,
-                  nir_opt_if,
-                  nir_opt_if_aggressive_last_continue |
-                     nir_opt_if_optimize_phi_true_false);
+         NIR_PASS(progress, nir, nir_opt_if, nir_opt_if_aggressive_last_continue | nir_opt_if_optimize_phi_true_false);
 
       NIR_PASS(progress, nir, nir_opt_dead_cf);
       NIR_PASS(progress, nir, nir_opt_conditional_discard);
@@ -296,6 +298,8 @@ static bool rogue_nir_has_side_effects(nir_shader *shader)
 
    return _has_side_effects;
 }
+
+static void _rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir);
 
 /**
  * \brief Applies optimizations and passes required to lower the NIR shader into
@@ -409,6 +413,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    if (ROGUE_DEBUG(PREAMBLE))
       NIR_PASS_V(nir, rogue_nir_opt_preamble, ctx);
 
+   _rogue_nir_opt_loop(ctx, nir);
+
    /* Replace references to I/O variables with intrinsics. */
    NIR_PASS_V(nir,
               nir_lower_io,
@@ -493,8 +499,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
               spirv_options.ssbo_addr_format);
    NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_mem_ssbo, NULL, NULL);
 
-   NIR_PASS_V(nir, nir_opt_sink, nir_move_load_ubo | nir_move_load_ssbo);
-   NIR_PASS_V(nir, nir_opt_move, nir_move_load_ubo | nir_move_load_ssbo);
+   NIR_PASS_V(nir, nir_opt_sink, nir_move_load_ubo | nir_move_load_ssbo | nir_move_load_input);
+   NIR_PASS_V(nir, nir_opt_move, nir_move_load_ubo | nir_move_load_ssbo | nir_move_load_input);
 
    bool robust_buffer_access = ctx->pipeline_layout->robust_buffer_access;
    NIR_PASS_V(nir, nir_lower_robust_access, &(nir_lower_robust_access_options) {
@@ -644,33 +650,18 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    /* Remove unused constant registers. */
    NIR_PASS_V(nir, nir_opt_dce);
 
-   /*
-   if (nir->info.stage == MESA_SHADER_FRAGMENT &&
-       (nir->info.fs.uses_discard || nir->info.fs.uses_demote)) {
-      NIR_PASS_V(nir, nir_opt_move_discards_to_top);
-   }
-   */
-
-   //
-
-   /* Move loads to just before they're needed. */
-   /* Disabled for now since we want to try and keep them vectorised and group
-    * them. */
-   /* TODO: Investigate this further. */
-   /* NIR_PASS_V(nir, nir_opt_move, nir_move_load_ubo | nir_move_load_input); */
-
    /* TODO: Clean up duplicates and eventually remove this. */
    /* TODO: if the swizzle is e.g. xxxx, this will work out of the box with
     * rpt=1! */
-   NIR_PASS_V(nir, rogue_nir_expand_swizzles_to_vec);
+   /* NIR_PASS_V(nir, rogue_nir_expand_swizzles_to_vec); */
+
+#if 1
+   /* NIR_PASS_V(nir, nir_opt_sink, nir_move_const_undef | nir_move_copies); */
+   NIR_PASS_V(nir, nir_opt_move, nir_move_const_undef | nir_move_copies);
+#endif
 
    /* Out of SSA pass. */
    NIR_PASS_V(nir, nir_convert_from_ssa, true);
-
-   /* We're not fusing any source mods in NIR, so calling this pass
-    * instead of nir_legacy_trivialize.
-    */
-   NIR_PASS_V(nir, nir_trivialize_registers);
 
    NIR_PASS_V(nir, nir_opt_dce);
 
@@ -684,9 +675,16 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 #endif
 
 #if 1
-   /* NIR_PASS_V(nir, nir_opt_sink, nir_move_const_undef | nir_move_copies); */
-   NIR_PASS_V(nir, nir_opt_move, nir_move_const_undef | nir_move_copies);
+   progress = false;
+   NIR_PASS(progress, nir, nir_opt_rematerialize_compares);
+   if (progress)
+      NIR_PASS_V(nir, nir_opt_dce);
 #endif
+
+   /* We're not fusing any source mods in NIR, so calling this pass
+    * instead of nir_legacy_trivialize.
+    */
+   NIR_PASS_V(nir, nir_trivialize_registers);
 
    /* Assign I/O locations. */
    nir_assign_io_var_locations(nir,
@@ -1008,7 +1006,7 @@ static void _rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
 
       OPT(nir_copy_prop);
 
-      OPT(nir_lower_phis_to_scalar, false);
+      OPT(nir_lower_phis_to_scalar, true);
 
       OPT(nir_copy_prop);
       OPT(nir_opt_dce);
@@ -1017,7 +1015,7 @@ static void _rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
 
       /* TODO tweak values, may need to be called once with value set to zero;
        * see intel/brw */
-      if (!ROGUE_DEBUG(SKIP_CF_OPTS))
+      /* if (!ROGUE_DEBUG(SKIP_CF_OPTS)) */
          OPT(nir_opt_peephole_select, 64, false, true);
 
       OPT(nir_opt_intrinsics);
@@ -1048,17 +1046,13 @@ static void _rogue_nir_opt_loop(struct rogue_build_ctx *ctx, nir_shader *nir)
       }
 
       if (!ROGUE_DEBUG(SKIP_CF_OPTS))
-         OPT(nir_opt_if, nir_opt_if_optimize_phi_true_false);
+         OPT(nir_opt_if, nir_opt_if_aggressive_last_continue | nir_opt_if_optimize_phi_true_false);
 
-      OPT(nir_opt_conditional_discard);
-      /* OPT(rogue_nir_merge_discards); */
-
-#if 0
       if (nir->info.stage == MESA_SHADER_FRAGMENT &&
           (nir->info.fs.uses_discard || nir->info.fs.uses_demote)) {
-         OPT(nir_opt_move_discards_to_top);
+         OPT(nir_opt_conditional_discard);
+         /* OPT(nir_opt_move_discards_to_top); */
       }
-#endif
 
       if (!ROGUE_DEBUG(SKIP_CF_OPTS) && nir->options->max_unroll_iterations)
          OPT(nir_opt_loop_unroll);
