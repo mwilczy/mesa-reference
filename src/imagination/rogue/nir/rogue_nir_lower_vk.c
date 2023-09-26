@@ -329,3 +329,45 @@ bool rogue_nir_lower_blend_consts(nir_shader *shader, rogue_build_ctx *ctx)
                                         lower_blend_const,
                                         ctx);
 }
+
+// TODO: Move into the right file!
+static nir_def *lower_scratch(nir_builder *b, nir_instr *instr, UNUSED void *cb_data)
+{
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   bool is_load = intr->intrinsic == nir_intrinsic_load_scratch;
+
+   unsigned num_components = is_load ? intr->def.num_components : nir_src_num_components(intr->src[0]);
+   /* assert(num_components == 1); */
+
+   unsigned bit_size = is_load ? intr->def.bit_size : nir_src_bit_size(intr->src[0]);
+   assert(bit_size == 32);
+
+   unsigned align = bit_size / 8;
+
+   nir_def *offset = intr->src[is_load ? 0 : 1].ssa;
+   nir_def *scratch_base = nir_load_scratch_base_ptr(b, 1, 64, .base = 1);
+   nir_def *addr = nir_iadd(b, scratch_base, nir_u2u64(b, offset));
+
+   if (is_load)
+      return nir_load_global(b, addr, align, num_components, bit_size);
+
+   nir_def *value = intr->src[0].ssa;
+   nir_store_global(b, addr, align, value, BITFIELD_MASK(num_components));
+
+   return NIR_LOWER_INSTR_PROGRESS_REPLACE;
+}
+
+static bool is_scratch(const nir_instr *instr, UNUSED const void *cb_data)
+{
+   if (instr->type != nir_instr_type_intrinsic)
+      return false;
+
+   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   return intr->intrinsic == nir_intrinsic_load_scratch || intr->intrinsic == nir_intrinsic_store_scratch;
+}
+
+PUBLIC
+bool rogue_nir_lower_scratch(nir_shader *shader)
+{
+   return nir_shader_lower_instructions(shader, is_scratch, lower_scratch, NULL);
+}

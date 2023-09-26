@@ -3893,6 +3893,19 @@ pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
       break;
    }
 
+   case PVR_PDS_ADDR_LITERAL_SCRATCH_BUFFER: {
+      struct pvr_suballoc_bo *scratch_bo;
+      result = pvr_cmd_buffer_upload_general(cmd_buffer,
+                                             NULL,
+                                             1024 * 512 * 4,
+                                             &scratch_bo);
+      if (result != VK_SUCCESS)
+         return result;
+
+      *addr_out = scratch_bo->dev_addr;
+      break;
+   }
+
    default:
       unreachable("Invalid add literal type.");
    }

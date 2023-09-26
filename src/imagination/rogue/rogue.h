@@ -4249,6 +4249,8 @@ bool rogue_nir_lower_compute_intrinsics(nir_shader *shader);
 bool rogue_nir_lower_tex(nir_shader *shader, rogue_build_ctx *ctx);
 #endif
 
+bool rogue_nir_lower_scratch(nir_shader *shader);
+
 bool rogue_nir_lower_smp(nir_shader *shader, rogue_build_ctx *ctx);
 
 bool rogue_nir_lower_images_to_tex(nir_shader *shader);

@@ -752,6 +752,8 @@ void pvr_uscgen_tq_frag(const struct pvr_device *device,
                                                   rogue_nir_options(),
                                                   "TQ (fragment)");
 
+   rogue_ctx->nir[MESA_SHADER_FRAGMENT] = b.shader;
+
    /* TODO: Unrestrict. */
    assert(layer_props->layer_floats != PVR_INT_COORD_SET_FLOATS_6);
    assert(layer_props->byte_unwind == 0);

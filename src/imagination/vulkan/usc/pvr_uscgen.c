@@ -669,6 +669,7 @@ void pvr_uscgen_load_op(struct pvr_device *device,
    nir_builder b = nir_builder_init_simple_shader(MESA_SHADER_FRAGMENT,
                                                   rogue_nir_options(),
                                                   "pvr_load_op");
+   rogue_ctx->nir[MESA_SHADER_FRAGMENT] = b.shader;
 
    /* fs_data->num_outputs = util_bitcount(rt_mask) + !!depth_to_reg; */
    fs_data->num_outputs = util_last_bit(rt_mask) + !!depth_to_reg; /* In case

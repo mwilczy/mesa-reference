@@ -602,6 +602,14 @@ struct pvr_sh_reg_layout {
       bool present;
       uint32_t offset;
    } num_workgroups;
+
+   /* If this is present, it will always take up 2 sh regs in size and contain
+    * the device address of the scratch buffer.
+    */
+   struct {
+      bool present;
+      uint32_t offset;
+   } scratch_buffer;
 };
 
 struct pvr_pipeline_layout {

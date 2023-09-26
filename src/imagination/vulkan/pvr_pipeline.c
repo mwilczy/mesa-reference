@@ -609,6 +609,14 @@ static VkResult pvr_pds_descriptor_program_create_and_upload(
       addr_literals++;
    }
 
+   if (sh_reg_layout->scratch_buffer.present) {
+      program.addr_literals[addr_literals] = (struct pvr_pds_addr_literal){
+         .type = PVR_PDS_ADDR_LITERAL_SCRATCH_BUFFER,
+         .destination = sh_reg_layout->scratch_buffer.offset,
+      };
+      addr_literals++;
+   }
+
    if (sh_reg_layout->push_consts.present) {
       program.addr_literals[addr_literals] = (struct pvr_pds_addr_literal){
          .type = PVR_PDS_ADDR_LITERAL_PUSH_CONSTS,
@@ -1037,6 +1045,15 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
 
    if (reg_layout.descriptor_set_addrs_table.present) {
       reg_layout.descriptor_set_addrs_table.offset = next_free_sh_reg;
+      next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
+   }
+
+   /* Reserve space for the scratch buffer base address. */
+   /* TODO: Make this conditional. */
+   reg_layout.scratch_buffer.present = true;
+
+   if (reg_layout.scratch_buffer.present) {
+      reg_layout.scratch_buffer.offset = next_free_sh_reg;
       next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
    }
 

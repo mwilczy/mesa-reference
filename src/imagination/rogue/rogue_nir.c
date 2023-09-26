@@ -62,6 +62,9 @@ static const struct spirv_to_nir_options spirv_options = {
    .phys_ssbo_addr_format = nir_address_format_64bit_global,
    .push_const_addr_format = nir_address_format_32bit_offset,
    .shared_addr_format = nir_address_format_32bit_offset,
+
+   .temp_addr_format = nir_address_format_32bit_offset,
+   /* .constant_addr_format = nir_address_format_64bit_global, */
 };
 
 typedef struct rogue_varying_order_info {
@@ -170,8 +173,8 @@ static const nir_shader_compiler_options nir_options = {
                             enable this. */
    .has_fused_comp_and_csel = true,
    /* TODO: Remove these and instead merge components in the backend instead. */
-   /* .has_fsub = true, */
-   /* .has_isub = true, */
+   .has_fsub = true,
+   .has_isub = true,
    .lower_fsat = true,
    .lower_fceil = true,
    .lower_ldexp = true,
@@ -322,6 +325,12 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
       ctx->stage_data.vs.side_effects = rogue_nir_has_side_effects(nir);
    else if (nir->info.stage == MESA_SHADER_FRAGMENT)
       ctx->stage_data.fs.side_effects = rogue_nir_has_side_effects(nir);
+
+#if 0
+   NIR_PASS_V(nir, nir_lower_vars_to_explicit_types, nir_var_function_temp, glsl_get_natural_size_align_bytes);
+   NIR_PASS_V(nir, nir_lower_explicit_io, nir_var_function_temp, spirv_options.temp_addr_format); /* TODO: need pass to DWORD addressing on scratch */
+   NIR_PASS_V(nir, nir_remove_dead_variables, nir_var_function_temp, NULL);
+#endif
 
 #if 0
    if (nir->info.stage == MESA_SHADER_COMPUTE)
@@ -496,6 +505,43 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
               nir_var_mem_shared,
               spirv_options.shared_addr_format);
    NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_mem_shared, NULL, NULL);
+
+#if 0
+   NIR_PASS_V(nir,
+              nir_lower_explicit_io,
+              /* nir_var_shader_temp | */ nir_var_function_temp,
+              spirv_options.temp_addr_format);
+   NIR_PASS_V(nir, nir_lower_io_to_scalar, /* nir_var_shader_temp | */ nir_var_function_temp, NULL, NULL);
+#endif
+
+#if 0
+   NIR_PASS_V(nir,
+              nir_lower_explicit_io,
+              nir_var_mem_constant,
+              spirv_options.constant_addr_format);
+   NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_mem_constant, NULL, NULL);
+#endif
+
+#if 1
+   if (!nir->info.internal) {
+      /* NIR_PASS_V(nir, nir_lower_vars_to_explicit_types, nir_var_function_temp, function_temp_type_info); */
+      NIR_PASS_V(nir, nir_lower_vars_to_explicit_types, nir_var_function_temp, glsl_get_natural_size_align_bytes);
+      /* NIR_PASS_V(nir, nir_lower_io_to_scalar, nir_var_function_temp, NULL, NULL); */
+      /* NIR_PASS_V(nir, nir_lower_explicit_io, nir_var_function_temp, spirv_options.temp_addr_format); /1* TODO: need pass to DWORD addressing on scratch *1/ */
+   NIR_PASS(progress,
+            nir,
+            nir_lower_vars_to_scratch,
+            nir_var_function_temp,
+            /* 256, */
+            16,
+            glsl_get_natural_size_align_bytes);
+      NIR_PASS_V(nir, nir_remove_dead_variables, nir_var_function_temp, NULL);
+
+      NIR_PASS_V(nir, rogue_nir_lower_scratch);
+   }
+#endif
+
+   NIR_PASS_V(nir, nir_lower_indirect_derefs, nir_var_function_temp, UINT32_MAX);
 
    NIR_PASS_V(nir, rogue_nir_lower_vk_io, ctx);
 
@@ -1091,7 +1137,7 @@ static bool rogue_nir_preprocess_stage(rogue_build_ctx *ctx, nir_shader *nir)
    OPT(nir_lower_indirect_derefs, nir_var_shader_in | nir_var_shader_out, UINT32_MAX);
 
    /* TODO: if NOT rogue debug scratch */
-#if 1
+#if 0
    {
       /* Lower indirect temporaries (so we don't use scratch).
        * TODO: investigate using scratch, indexed temps?
@@ -1136,19 +1182,22 @@ bool rogue_nir_preprocess(rogue_build_ctx *ctx, bool compute)
 static bool rogue_nir_lower_indirect_derefs(nir_shader *nir)
 {
    bool progress = false;
-#if 0
+   if (!nir->info.internal && false) {
+      NIR_PASS_V(nir, nir_lower_io_to_temporaries, nir_shader_get_entrypoint(nir), true, true);
    NIR_PASS(progress,
             nir,
             nir_lower_vars_to_scratch,
             nir_var_function_temp,
-            256,
+            /* 256, */
+            16,
             glsl_get_natural_size_align_bytes);
    nir_variable_mode indirect_mask = nir_var_shader_out | nir_var_shader_in |
                                      nir_var_function_temp;
    NIR_PASS(progress, nir, nir_lower_indirect_derefs, indirect_mask, UINT32_MAX);
-#endif
+   } else {
       NIR_PASS_V(nir, nir_lower_io_to_temporaries, nir_shader_get_entrypoint(nir), true, true);
       OPT(nir_lower_indirect_derefs, nir_var_function_temp, UINT32_MAX);
+   }
       OPT(nir_split_var_copies);
       OPT(nir_lower_var_copies);
    return progress;
