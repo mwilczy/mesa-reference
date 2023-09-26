@@ -469,6 +469,7 @@ static inline enum compare_func nir_cmp_func(nir_op op)
    case nir_op_flt32:
    case nir_op_ilt32:
    case nir_op_ult32:
+   case nir_op_slt:
       return COMPARE_FUNC_LESS;
 
    case nir_op_fcsel_gt:
@@ -480,16 +481,19 @@ static inline enum compare_func nir_cmp_func(nir_op op)
    case nir_op_fge32:
    case nir_op_ige32:
    case nir_op_uge32:
+   case nir_op_sge:
       return COMPARE_FUNC_GEQUAL;
 
    case nir_op_fcsel:
    case nir_op_b32csel:
    case nir_op_feq32:
    case nir_op_ieq32:
+   case nir_op_seq:
       return COMPARE_FUNC_EQUAL;
 
    case nir_op_fneu32:
    case nir_op_ine32:
+   case nir_op_sne:
       return COMPARE_FUNC_NOTEQUAL;
 
    default:
@@ -1481,6 +1485,7 @@ static void trans_nir_intrinsic_store_preamble(rogue_builder *b,
    rogue_alu_instr *mov = rogue_MOV(b, sh_reg, src);
    rogue_add_instr_comment(&mov->instr, "store_preamble");
 }
+
 static void trans_nir_intrinsic_load_fs_input_coeff_img(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
@@ -3968,6 +3973,22 @@ static void trans_nir_alu_cmp(rogue_builder *b, nir_alu_instr *alu)
    rogue_cmp(b, &dst, &src0, &src1, func, type);
 }
 
+static void trans_nir_alu_scmp(rogue_builder *b, nir_alu_instr *alu)
+{
+   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
+
+   unsigned bit_size = nir_src_bit_size(alu->src[0].src);
+
+   rogue_ref src0 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, bit_size);
+   rogue_ref src1 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, bit_size);
+
+   enum compare_func func = nir_cmp_func(alu->op);
+
+   /* rogue_alu_instr *scmp = */
+   rogue_scmp(b, &dst, &src0, &src1, func);
+   /* rogue_add_instr_comment(&scmp->instr, nirop); */
+}
+
 /* TODO: commonise handling certain alu functions with n arguments? */
 /* TODO: Masking out here is super inefficient. This is mainly for functions
  * that use ~0 in rogue_lower_pseudo_ops, find a better way! */
@@ -4903,6 +4924,12 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
    case nir_op_ult32:
    case nir_op_uge32:
       return trans_nir_alu_cmp(b, alu);
+
+   case nir_op_slt:
+   case nir_op_sge:
+   case nir_op_seq:
+   case nir_op_sne:
+      return trans_nir_alu_scmp(b, alu);
 
    case nir_op_iand:
       return trans_nir_alu_iand(b, alu);

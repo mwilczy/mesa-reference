@@ -117,7 +117,7 @@ rogue_lower_MINMAX(rogue_builder *b, rogue_alu_instr *alu, bool max)
    return true;
 }
 
-static inline bool rogue_lower_CMP(rogue_builder *b, rogue_alu_instr *alu)
+static inline bool rogue_lower_CMP(rogue_builder *b, rogue_alu_instr *alu, bool scmp)
 {
    rogue_alu_instr *mbyp0 =
       rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), alu->src[0].ref);
@@ -142,7 +142,7 @@ static inline bool rogue_lower_CMP(rogue_builder *b, rogue_alu_instr *alu)
               alu->dst[0].ref,
               rogue_none(),
               rogue_ref_io(ROGUE_IO_FTT),
-              rogue_ref_imm(~0),
+              scmp ? rogue_ref_imm_f(1.0f) : rogue_ref_imm(~0),
               rogue_ref_io(ROGUE_IO_FT2),
               rogue_none(),
               rogue_none());
@@ -831,7 +831,10 @@ static inline bool rogue_lower_alu_instr(rogue_builder *b, rogue_alu_instr *alu)
       return rogue_lower_MINMAX(b, alu, true);
 
    case ROGUE_ALU_OP_CMP:
-      return rogue_lower_CMP(b, alu);
+      return rogue_lower_CMP(b, alu, false);
+
+   case ROGUE_ALU_OP_SCMP:
+      return rogue_lower_CMP(b, alu, true);
 
    case ROGUE_ALU_OP_CSEL:
       return rogue_lower_CSEL(b, alu);

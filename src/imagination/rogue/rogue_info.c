@@ -1648,6 +1648,18 @@ const rogue_alu_op_info rogue_alu_op_infos[ROGUE_ALU_OP_COUNT] = {
          [1] = T(REG) | T(REGARRAY) | T(IMM),
       },
    },
+   [ROGUE_ALU_OP_SCMP] = { .str = "scmp", .num_dsts = 1, .num_srcs = 2,
+      .supported_op_mods = OM(E) | OM(G) | OM(GE) | OM(NE) | OM(L) | OM(LE) | OM(F32),
+      .supported_src_mods = {
+         [0] = SM(E0) | SM(E1) | SM(E2) | SM(E3) | SM(ABS) | SM(NEG),
+         [1] = SM(E0) | SM(E1) | SM(E2) | SM(E3) | SM(ABS) | SM(NEG),
+      },
+      .supported_dst_types = { [0] = T(REG) | T(REGARRAY), },
+      .supported_src_types = {
+         [0] = T(REG) | T(REGARRAY) | T(IMM),
+         [1] = T(REG) | T(REGARRAY) | T(IMM),
+      },
+   },
    [ROGUE_ALU_OP_SETPRED] = { .str = "setpred", .num_dsts = 1, .num_srcs = 1,
       .supported_op_mods = OM(INVERT),
       .supported_dst_types = { [0] = T(IO), },

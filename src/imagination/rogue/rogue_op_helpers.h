@@ -232,6 +232,28 @@ static rogue_alu_instr *rogue_cmp(rogue_builder *b,
    return cmp;
 }
 
+/* Conditionally sets the output to 1.0f or 0.0f depending on whether the comparison
+ * is true or false. */
+static rogue_alu_instr *rogue_scmp(rogue_builder *b,
+                                   rogue_ref *dst,
+                                   rogue_ref *src0,
+                                   rogue_ref *src1,
+                                   enum compare_func func)
+{
+   nir_alu_type type = nir_type_float32;
+
+   rogue_alu_instr *scmp = rogue_SCMP(b, *dst, *src0, *src1);
+   rogue_set_alu_op_mod(scmp, cmp_func_to_rogue(func, false));
+   rogue_set_alu_op_mod(scmp, nir_type_to_rogue_type(type));
+
+   if (nir_alu_type_get_type_size(type) < 32) {
+      rogue_set_alu_src_mod(scmp, 0, ROGUE_ALU_SRC_MOD_E0);
+      rogue_set_alu_src_mod(scmp, 1, ROGUE_ALU_SRC_MOD_E0);
+   }
+
+   return scmp;
+}
+
 static rogue_alu_instr *rogue_csel(rogue_builder *b,
                                    rogue_ref *dst,
                                    rogue_ref *src_cmp,

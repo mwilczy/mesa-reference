@@ -1526,7 +1526,8 @@ enum rogue_alu_op {
    ROGUE_ALU_OP_MIN,
    ROGUE_ALU_OP_MAX,
 
-   ROGUE_ALU_OP_CMP, /** Compare. */
+   ROGUE_ALU_OP_CMP, /** Compare (returning true/false). */
+   ROGUE_ALU_OP_SCMP, /** Compare (returning 1.0f/0.0f). */
    ROGUE_ALU_OP_CSEL, /** Conditional select. */
 
    ROGUE_ALU_OP_SETPRED, /** Set predicate register. */
