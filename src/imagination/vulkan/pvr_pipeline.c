@@ -53,6 +53,7 @@
 #include "vk_graphics_state.h"
 #include "vk_log.h"
 #include "vk_object.h"
+#include "vk_pipeline_cache.h"
 #include "vk_render_pass.h"
 #include "vk_util.h"
 
@@ -1118,7 +1119,7 @@ static uint32_t pvr_compute_pipeline_alloc_shareds(
 /* Compiles and uploads shaders and PDS programs. */
 static VkResult pvr_compute_pipeline_compile(
    struct pvr_device *const device,
-   struct pvr_pipeline_cache *pipeline_cache,
+   struct vk_pipeline_cache *cache,
    const VkComputePipelineCreateInfo *pCreateInfo,
    const VkAllocationCallbacks *const allocator,
    struct pvr_compute_pipeline *const compute_pipeline)
@@ -1286,7 +1287,7 @@ err_free_build_context:
 
 static VkResult
 pvr_compute_pipeline_init(struct pvr_device *device,
-                          struct pvr_pipeline_cache *pipeline_cache,
+                          struct vk_pipeline_cache *cache,
                           const VkComputePipelineCreateInfo *pCreateInfo,
                           const VkAllocationCallbacks *allocator,
                           struct pvr_compute_pipeline *compute_pipeline)
@@ -1301,7 +1302,7 @@ pvr_compute_pipeline_init(struct pvr_device *device,
       pvr_pipeline_layout_from_handle(pCreateInfo->layout);
 
    result = pvr_compute_pipeline_compile(device,
-                                         pipeline_cache,
+                                         cache,
                                          pCreateInfo,
                                          allocator,
                                          compute_pipeline);
@@ -1315,7 +1316,7 @@ pvr_compute_pipeline_init(struct pvr_device *device,
 
 static VkResult
 pvr_compute_pipeline_create(struct pvr_device *device,
-                            struct pvr_pipeline_cache *pipeline_cache,
+                            struct vk_pipeline_cache *cache,
                             const VkComputePipelineCreateInfo *pCreateInfo,
                             const VkAllocationCallbacks *allocator,
                             VkPipeline *const pipeline_out)
@@ -1333,7 +1334,7 @@ pvr_compute_pipeline_create(struct pvr_device *device,
 
    /* Compiles and uploads shaders and PDS programs. */
    result = pvr_compute_pipeline_init(device,
-                                      pipeline_cache,
+                                      cache,
                                       pCreateInfo,
                                       allocator,
                                       compute_pipeline);
@@ -1381,14 +1382,14 @@ pvr_CreateComputePipelines(VkDevice _device,
                            const VkAllocationCallbacks *pAllocator,
                            VkPipeline *pPipelines)
 {
-   PVR_FROM_HANDLE(pvr_pipeline_cache, pipeline_cache, pipelineCache);
+   VK_FROM_HANDLE(vk_pipeline_cache, cache, pipelineCache);
    PVR_FROM_HANDLE(pvr_device, device, _device);
    VkResult result = VK_SUCCESS;
 
    for (uint32_t i = 0; i < createInfoCount; i++) {
       const VkResult local_result =
          pvr_compute_pipeline_create(device,
-                                     pipeline_cache,
+                                     cache,
                                      &pCreateInfos[i],
                                      pAllocator,
                                      &pPipelines[i]);
@@ -2499,7 +2500,7 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
 /* Compiles and uploads shaders and PDS programs. */
 static VkResult
 pvr_graphics_pipeline_compile(struct pvr_device *const device,
-                              struct pvr_pipeline_cache *pipeline_cache,
+                              struct vk_pipeline_cache *cache,
                               const VkGraphicsPipelineCreateInfo *pCreateInfo,
                               const VkAllocationCallbacks *const allocator,
                               struct pvr_graphics_pipeline *const gfx_pipeline,
@@ -2817,7 +2818,7 @@ pvr_create_renderpass_state(const VkGraphicsPipelineCreateInfo *const info)
 
 static VkResult
 pvr_graphics_pipeline_init(struct pvr_device *device,
-                           struct pvr_pipeline_cache *pipeline_cache,
+                           struct vk_pipeline_cache *cache,
                            const VkGraphicsPipelineCreateInfo *pCreateInfo,
                            const VkAllocationCallbacks *allocator,
                            struct pvr_graphics_pipeline *gfx_pipeline)
@@ -2889,7 +2890,7 @@ pvr_graphics_pipeline_init(struct pvr_device *device,
 
    /* Compiles and uploads shaders and PDS programs. */
    result = pvr_graphics_pipeline_compile(device,
-                                          pipeline_cache,
+                                          cache,
                                           pCreateInfo,
                                           allocator,
                                           gfx_pipeline,
@@ -2908,7 +2909,7 @@ err_pipeline_finish:
 /* If allocator == NULL, the internal one will be used. */
 static VkResult
 pvr_graphics_pipeline_create(struct pvr_device *device,
-                             struct pvr_pipeline_cache *pipeline_cache,
+                             struct vk_pipeline_cache *cache,
                              const VkGraphicsPipelineCreateInfo *pCreateInfo,
                              const VkAllocationCallbacks *allocator,
                              VkPipeline *const pipeline_out)
@@ -2926,7 +2927,7 @@ pvr_graphics_pipeline_create(struct pvr_device *device,
 
    /* Compiles and uploads shaders and PDS programs too. */
    result = pvr_graphics_pipeline_init(device,
-                                       pipeline_cache,
+                                       cache,
                                        pCreateInfo,
                                        allocator,
                                        gfx_pipeline);
@@ -2948,14 +2949,14 @@ pvr_CreateGraphicsPipelines(VkDevice _device,
                             const VkAllocationCallbacks *pAllocator,
                             VkPipeline *pPipelines)
 {
-   PVR_FROM_HANDLE(pvr_pipeline_cache, pipeline_cache, pipelineCache);
+   VK_FROM_HANDLE(vk_pipeline_cache, cache, pipelineCache);
    PVR_FROM_HANDLE(pvr_device, device, _device);
    VkResult result = VK_SUCCESS;
 
    for (uint32_t i = 0; i < createInfoCount; i++) {
       const VkResult local_result =
          pvr_graphics_pipeline_create(device,
-                                      pipeline_cache,
+                                      cache,
                                       &pCreateInfos[i],
                                       pAllocator,
                                       &pPipelines[i]);
