@@ -237,6 +237,7 @@ static inline bool rogue_lower_SETPRED(rogue_builder *b,
    return true;
 }
 
+#if 0
 static inline bool rogue_lower_GETPRED(rogue_builder *b,
                                        rogue_alu_instr *getpred)
 {
@@ -250,6 +251,40 @@ static inline bool rogue_lower_GETPRED(rogue_builder *b,
                                               rogue_ref_io(ROGUE_IO_P0));
 
    rogue_merge_instr_comment(&add64_32->instr, &getpred->instr, "getpred");
+   rogue_instr_delete(&getpred->instr);
+
+   return true;
+}
+#endif
+
+static inline bool rogue_lower_GETPRED(rogue_builder *b,
+                                       rogue_alu_instr *getpred)
+{
+   assert(rogue_ref_is_io_p0(&getpred->src[0].ref));
+   rogue_alu_instr *add64_32 = rogue_ADD64_32(b,
+                                              rogue_ref_io(ROGUE_IO_FT0),
+                                              rogue_none(),
+                                              rogue_ref_imm(0),
+                                              rogue_ref_imm(0),
+                                              rogue_ref_imm(0),
+                                              rogue_ref_io(ROGUE_IO_P0));
+   rogue_set_instr_group_next(&add64_32->instr, true);
+
+   rogue_alu_instr *mbyp1 = rogue_MBYP1(b, rogue_ref_io(ROGUE_IO_FT1), rogue_ref_imm(~0));
+   rogue_set_instr_group_next(&mbyp1->instr, true);
+
+   rogue_alu_instr *pck_const0 =
+      rogue_PCK_CONST0(b, rogue_ref_io(ROGUE_IO_FT2));
+   rogue_set_instr_group_next(&pck_const0->instr, true);
+
+   rogue_alu_instr *tst1 = rogue_TST1(b, rogue_ref_io(ROGUE_IO_FTT), rogue_none(), rogue_ref_io(ROGUE_IO_FT0));
+   rogue_set_alu_op_mod(tst1, ROGUE_ALU_OP_MOD_Z);
+   rogue_set_alu_op_mod(tst1, ROGUE_ALU_OP_MOD_U32);
+   rogue_set_instr_group_next(&tst1->instr, true);
+
+   rogue_alu_instr *movc = rogue_MOVC(b, getpred->dst[0].ref, rogue_none(), rogue_ref_io(ROGUE_IO_FTT), rogue_ref_io(ROGUE_IO_FT2), rogue_ref_io(ROGUE_IO_FT1), rogue_none(), rogue_none());
+
+   rogue_merge_instr_comment(&movc->instr, &getpred->instr, "getpred");
    rogue_instr_delete(&getpred->instr);
 
    return true;
