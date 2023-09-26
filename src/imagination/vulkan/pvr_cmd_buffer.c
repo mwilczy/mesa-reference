@@ -1444,6 +1444,9 @@ static VkResult pvr_sub_cmd_gfx_job_init(const struct pvr_device_info *dev_info,
    } else {
       struct pvr_emit_state emit_state = { 0 };
 
+      for (unsigned u = 0; u < ARRAY_SIZE(emit_state.tile_buffer_id); ++u)
+         emit_state.tile_buffer_id[u] = ~0;
+
       pvr_setup_emit_state(dev_info, hw_render, render_pass_info, &emit_state);
 
       memcpy(job->pbe_reg_words,
