@@ -57,6 +57,10 @@ typedef struct {
    /* If set, will use load_blend_const_color_{r,g,b,a}_float instead of
     * load_blend_const_color_rgba */
    bool scalar_blend_const;
+
+   /* If set, inverted snorm blend factors will NOT be clamped. This
+    * does not apply to blend consts, which will always be clamped */
+   bool skip_blend_factor_snorm_clamp;
 } nir_lower_blend_options;
 
 void nir_lower_blend(nir_shader *shader,

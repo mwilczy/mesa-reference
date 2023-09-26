@@ -220,7 +220,8 @@ nir_blend_factor(
    nir_def *src, nir_def *src1, nir_def *dst, nir_def *bconst,
    unsigned chan,
    enum pipe_blendfactor factor,
-   enum pipe_format format)
+   enum pipe_format format,
+   bool skip_blend_factor_snorm_clamp)
 {
    nir_def *f =
       nir_blend_factor_value(b, src, src1, dst, bconst, chan,
@@ -229,7 +230,7 @@ nir_blend_factor(
    if (util_blendfactor_is_inverted(factor))
       f = nir_fadd_imm(b, nir_fneg(b, f), 1.0);
 
-   if (should_clamp_factor(factor, util_format_is_snorm(format)))
+   if (should_clamp_factor(factor, !skip_blend_factor_snorm_clamp && util_format_is_snorm(format)))
       f = nir_fsat_to_format(b, f, format);
 
    return nir_fmul(b, raw_scalar, f);
@@ -454,12 +455,14 @@ nir_blend(
          psrc = nir_blend_factor(
             b, psrc,
             src, src1, dst, bconst, c,
-            chan.src_factor, format);
+            chan.src_factor, format,
+            options->skip_blend_factor_snorm_clamp);
 
          pdst = nir_blend_factor(
             b, pdst,
             src, src1, dst, bconst, c,
-            chan.dst_factor, format);
+            chan.dst_factor, format,
+            options->skip_blend_factor_snorm_clamp);
       }
 
       channels[c] = nir_blend_func(b, chan.func, psrc, pdst);

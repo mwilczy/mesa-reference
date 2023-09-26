@@ -364,6 +364,7 @@ static void rogue_lower_blend(nir_shader *shader, rogue_build_ctx *ctx)
       .scalar_blend_const = false,
       .logicop_enable = cb->logic_op_enable,
       .logicop_func = vk_logic_op_to_pipe(cb->logic_op),
+      .skip_blend_factor_snorm_clamp = true,
    };
 
    memset(opts.format, 0, sizeof(*opts.format));
