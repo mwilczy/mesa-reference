@@ -672,7 +672,7 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
 #endif
 
 #if 1
-   NIR_PASS_V(nir, nir_opt_sink, nir_move_const_undef | nir_move_copies);
+   /* NIR_PASS_V(nir, nir_opt_sink, nir_move_const_undef | nir_move_copies); */
    NIR_PASS_V(nir, nir_opt_move, nir_move_const_undef | nir_move_copies);
 #endif
 
