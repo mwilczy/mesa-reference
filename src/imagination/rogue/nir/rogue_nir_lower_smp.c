@@ -459,11 +459,12 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       }
    }
 
-   assert(!(lod_replace && lod_bias));
+   assert(!!ddx == !!ddy);
+   assert(!(lod_replace && lod_bias && ddx));
 
    if (is_gather) {
       /* TODO: Actually need to manually set lod_replace to imm 0? */
-      assert(!lod_replace && !lod_bias);
+      assert(!lod_replace && !lod_bias && !ddx);
       /* lod_replace = nir_imm_int(b, 0); */
 
       flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_DATA);
@@ -535,7 +536,8 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
          /* TODO: nir_f2u32_rte? */
          array_idx = nir_convert_alu_types(b, 32, array_idx, .src_type = nir_type_float32, .dest_type = nir_type_uint32, .rounding_mode = nir_rounding_mode_rtne);
 
-         lod_bias = nir_imm_int(b, 0);
+         if (!lod_replace && !lod_bias && !ddx)
+            lod_bias = nir_imm_int(b, 0);
       }
 
       coords = nir_trim_vector(b, coords, tex->coord_components - 1);
@@ -574,9 +576,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    } else if (lod_bias) {
       data[data_comps++] = lod_bias;
       flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_LOD_BIAS);
-   }
-
-   if (ddx) {
+   } else if (ddx) {
       assert(ddy);
       assert(ddx->num_components == ddy->num_components);
       assert(ddx->num_components == coords->num_components);
