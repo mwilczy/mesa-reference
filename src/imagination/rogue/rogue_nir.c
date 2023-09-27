@@ -536,7 +536,8 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
             nir_lower_vars_to_scratch,
             nir_var_function_temp,
             /* 256, */
-            16,
+            /* 16, */
+            4,
             glsl_get_natural_size_align_bytes);
       NIR_PASS_V(nir, nir_remove_dead_variables, nir_var_function_temp, NULL);
 
@@ -867,6 +868,8 @@ static void rogue_collect_early_cs_build_data(rogue_build_ctx *ctx,
 static void rogue_collect_early_build_data(rogue_build_ctx *ctx,
                                            nir_shader *nir)
 {
+   ctx->common_data[nir->info.stage].scratch_size = nir->scratch_size;
+
    switch (nir->info.stage) {
    case MESA_SHADER_VERTEX:
       return rogue_collect_early_vs_build_data(ctx, nir);

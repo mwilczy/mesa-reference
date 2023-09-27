@@ -1030,6 +1030,7 @@ static uint32_t
 pvr_pipeline_alloc_shareds(const struct pvr_device *device,
                            const struct pvr_pipeline_layout *layout,
                            enum pvr_stage_allocation stage,
+                           bool uses_scratch,
                            struct pvr_sh_reg_layout *const sh_reg_layout_out)
 {
    ASSERTED const uint64_t reserved_shared_size =
@@ -1058,7 +1059,7 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
 
    /* Reserve space for the scratch buffer base address. */
    /* TODO: Make this conditional. */
-   reg_layout.scratch_buffer.present = true;
+   reg_layout.scratch_buffer.present = uses_scratch;
 
    if (reg_layout.scratch_buffer.present) {
       reg_layout.scratch_buffer.offset = next_free_sh_reg;
@@ -1205,6 +1206,7 @@ static uint32_t pvr_compute_pipeline_alloc_shareds(
    next_free_sh_reg = pvr_pipeline_alloc_shareds(device,
                                                  layout,
                                                  PVR_STAGE_ALLOCATION_COMPUTE,
+                                                 compute_pipeline->shader_state.scratch_size > 0,
                                                  &reg_layout);
 
    reg_layout.num_workgroups.present =
@@ -1300,6 +1302,8 @@ static VkResult pvr_compute_pipeline_compile(
    compute_pipeline->shader_state.uses_num_workgroups =
       cs_data->has.num_work_groups;
    compute_pipeline->shader_state.work_size = cs_data->work_size;
+
+   compute_pipeline->shader_state.scratch_size = common_data->scratch_size;
 
    reg_count = pvr_compute_pipeline_alloc_shareds(device,
                                                   compute_pipeline,
@@ -1600,6 +1604,8 @@ pvr_vertex_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
    vertex_state->stage_state.has_side_effects = vs_data->side_effects;
    vertex_state->stage_state.empty_program = false;
 
+   vertex_state->stage_state.scratch_size = common_data->scratch_size;
+
    /* This ends up unused since we'll use the temp_usage for the PDS program we
     * end up selecting, and the descriptor PDS program doesn't use any temps.
     * Let's set it to ~0 in case it ever gets used.
@@ -1665,6 +1671,8 @@ pvr_fragment_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
    fragment_state->stage_state.uses_barrier = fs_data->has.barrier;
    fragment_state->stage_state.has_side_effects = fs_data->side_effects;
    fragment_state->stage_state.empty_program = false;
+
+   fragment_state->stage_state.scratch_size = common_data->scratch_size;
 
    fragment_state->needs_iterated_depth = fs_data->iterator_args.iterates_depth;
 
@@ -1772,6 +1780,7 @@ static uint32_t pvr_graphics_pipeline_alloc_shareds(
    const struct pvr_graphics_pipeline *gfx_pipeline,
    enum pvr_stage_allocation stage,
    unsigned preamble_shareds,
+   bool uses_scratch,
    struct pvr_sh_reg_layout *const sh_reg_layout_out)
 {
    ASSERTED const uint64_t reserved_shared_size =
@@ -1784,7 +1793,7 @@ static uint32_t pvr_graphics_pipeline_alloc_shareds(
    uint32_t next_free_sh_reg = 0;
 
    next_free_sh_reg =
-      pvr_pipeline_alloc_shareds(device, layout, stage, &reg_layout);
+      pvr_pipeline_alloc_shareds(device, layout, stage, uses_scratch, &reg_layout);
 
    reg_layout.blend_consts.present =
       (stage == PVR_STAGE_ALLOCATION_FRAGMENT &&
@@ -2807,6 +2816,7 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
          gfx_pipeline,
          pvr_stage,
          ctx->common_data[stage].preamble.shareds,
+         ctx->common_data[stage].scratch_size > 0,
          &layout->sh_reg_layout_per_stage[pvr_stage]);
    }
 

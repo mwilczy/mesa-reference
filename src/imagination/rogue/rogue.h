@@ -4077,6 +4077,8 @@ typedef struct rogue_common_build_data {
       unsigned dwords;
    } spill_state;
 
+   unsigned scratch_size;
+
    rogue_ubo_data ubo_data;
    rogue_compile_time_consts_data compile_time_consts_data;
 } rogue_common_build_data;

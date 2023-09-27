@@ -876,6 +876,8 @@ struct pvr_pipeline_stage_state {
 
    /* True if this shader is simply a nop.end. */
    bool empty_program;
+
+   uint32_t scratch_size;
 };
 
 struct pvr_compute_shader_state {
@@ -891,6 +893,8 @@ struct pvr_compute_shader_state {
    uint32_t input_register_count;
    uint32_t work_size;
    uint32_t coefficient_register_count;
+
+   uint32_t scratch_size;
 };
 
 struct pvr_vertex_shader_state {

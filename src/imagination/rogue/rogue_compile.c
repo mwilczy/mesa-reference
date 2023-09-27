@@ -1521,25 +1521,25 @@ static void trans_nir_intrinsic_load_scratch_base_ptr(rogue_builder *b, nir_intr
    unsigned base = nir_intrinsic_base(intr);
    assert(base == 1);
 
-   rogue_ref64 dst = nir_ssa_intr_dst64(b->shader, intr);
+   rogue_ref64 dst = nir_ssa_intr_dst64(shader, intr);
 
    const struct pvr_pipeline_layout *pipeline_layout = shader->ctx->pipeline_layout;
    enum pvr_stage_allocation pvr_stage = mesa_stage_to_pvr(shader->stage);
    assert(pipeline_layout->sh_reg_layout_per_stage[pvr_stage].scratch_buffer.present);
 
    unsigned base_addr_offset = pipeline_layout->sh_reg_layout_per_stage[pvr_stage].scratch_buffer.offset;
-   rogue_ref64 base_addr = rogue_shared_ref64(b->shader, base_addr_offset);
+   rogue_ref64 base_addr = rogue_shared_ref64(shader, base_addr_offset);
 
    rogue_ref local_addr_inst = rogue_ref_reg(rogue_special_reg(shader, ROGUE_SPECIAL_REG_LOCAL_ADDR_INST_NUM));
 
-   rogue_ref block_size = rogue_ref_reg(rogue_ssa_reg(b->shader, rogue_next_ssa(b->shader)));
+   rogue_ref block_size = rogue_ref_reg(rogue_ssa_reg(shader, rogue_next_ssa(shader)));
 
    /* Store block size. */
    rogue_BYP0B(b,
                rogue_ref_io(ROGUE_IO_FT0),
                block_size,
                rogue_ref_io(ROGUE_IO_S0),
-               rogue_ref_val(1024 * 4));
+               rogue_ref_val(shader->ctx->common_data[shader->stage].scratch_size));
 
    /* Store per-instance base address */
    rogue_MADD64(b,
@@ -5507,7 +5507,7 @@ static rogue_shader *nir_to_rogue(rogue_build_ctx *ctx,
    rogue_builder b;
    rogue_builder_init(&b, shader);
 
-   assert(nir->scratch_size < (1024 * 4));
+   /* assert(nir->scratch_size < (1024 * 4)); */
 
    /* Go through SSA used by NIR and "reserve" them so that sub-arrays won't be
     * declared before the parent arrays. */
