@@ -235,7 +235,7 @@ struct pfo_state {
    nir_instr *first_store;
 
    /* Condition accumulator for multiple discards. */
-   nir_def *discard_cond_accum;
+   nir_def *discard_cond_reg;
 
    /* Src for depth feedback (undef if unused). */
    nir_def *depth_feedback_src;
@@ -806,6 +806,7 @@ static bool is_discard(const nir_instr *instr)
       case nir_intrinsic_store_output:
          if (nir_intrinsic_io_semantics(intr).location == FRAG_RESULT_SAMPLE_MASK)
             break;
+         FALLTHROUGH;
 
       default:
          return false;
@@ -826,17 +827,22 @@ lower_discard(struct nir_builder *b, nir_instr *instr, void *data)
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
    struct pfo_state *state = data;
 
+   if (!state->discard_cond_reg) {
+      state->discard_cond_reg = nir_decl_reg(b, 1, 32, 0);
+      b->cursor = nir_after_instr(state->discard_cond_reg->parent_instr);
+      nir_store_reg(b, nir_imm_int(b, 0), state->discard_cond_reg);
+   }
+
    b->cursor = nir_after_instr(instr);
 
+   nir_def *cond;
    switch (intr->intrinsic) {
    case nir_intrinsic_discard:
-      state->discard_cond_accum =
-         nir_ior(b, state->discard_cond_accum, nir_imm_true(b));
+      cond = nir_imm_true(b);
       break;
 
    case nir_intrinsic_discard_if:
-      state->discard_cond_accum =
-         nir_ior(b, state->discard_cond_accum, intr->src[0].ssa);
+      cond = intr->src[0].ssa;
       break;
 
    case nir_intrinsic_store_output: /* FRAG_RESULT_SAMPLE_MASK */ {
@@ -845,13 +851,20 @@ lower_discard(struct nir_builder *b, nir_instr *instr, void *data)
       smp_msk = nir_iand(b, smp_msk, intr->src[0].ssa);
       smp_msk = nir_iand(b, smp_msk, nir_load_savmsk_vm_img(b)); /* TODO NEXT: do this properly... */
 
-      state->discard_cond_accum = nir_ior(b, nir_ieq_imm(b, smp_msk, 0), state->discard_cond_accum);
+      cond = nir_ieq_imm(b, smp_msk, 0);
       break;
    }
 
    default:
       unreachable();
    }
+
+   nir_store_reg(b, nir_b2i32(b, nir_ior(b, nir_i2b(b, nir_load_reg(b, state->discard_cond_reg)), cond)), state->discard_cond_reg);
+
+   /* If we're inside a loop, break out of the loop. */
+   /* TODO: Nested loops? What if not directly in the loop? Etc. */
+   if (intr->intrinsic == nir_intrinsic_discard && instr->block->cf_node.parent->type == nir_cf_node_loop)
+      nir_jump(b, nir_jump_break);
 
    nir_instr_remove(instr);
    return true;
@@ -882,7 +895,7 @@ static bool lower_isp_fb(nir_builder *b, struct pfo_state *state)
          nir_impl_last_block(nir_shader_get_entrypoint(b->shader)));
 
    nir_isp_feedback_img(b,
-                        state->discard_cond_accum,
+                        state->discard_cond_reg ? nir_i2b(b, nir_load_reg(b, state->discard_cond_reg)) : nir_imm_false(b),
                         state->depth_feedback_src);
 
    /* TODO: Change where lower undef pass is used such that this check can happen outside of this pass. */
@@ -985,8 +998,8 @@ bool rogue_nir_pfo(nir_shader *shader, rogue_build_ctx *ctx)
 
    struct pfo_state state = {
       .fs_data = &ctx->stage_data.fs,
-      .discard_cond_accum = nir_imm_false(&b),
-      .depth_feedback_src = nir_undef(&b, 1, 32),
+      .discard_cond_reg = NULL,
+      .depth_feedback_src = nir_undef(&b, 1, 32), /* TODO: might need to do NULL/use a nir_reg here as well. */
    };
 
    /* Lower depth feedback, inserting it if required. */

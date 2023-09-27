@@ -133,9 +133,7 @@ static void rogue_per_instance_loop(nir_builder *b,
       nir_def *loop_cond = nir_uge(b, phi_iter_ssa, iter_check);
       nir_if *loop_break_if = nir_push_if(b, loop_cond);
       {
-         nir_jump_instr *loop_break =
-            nir_jump_instr_create(shader, nir_jump_break);
-         nir_builder_instr_insert(b, &loop_break->instr);
+         nir_jump(b, nir_jump_break);
       }
       loop_break_if->control = nir_selection_control_dont_flatten;
       nir_pop_if(b, loop_break_if);
