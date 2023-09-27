@@ -147,11 +147,12 @@ rogue_extend_loop_reg_lifetimes(rogue_shader *shader,
       ++l;
    }
 
-   /* If an ssa reg stops being used in the middle of a loop, mark it as used
-    * until the end of the loop. */
+   /* If an ssa reg starts before a loop and stops being used in the middle of a loop,
+    * mark it as used until the end of the loop. */
    for (unsigned u = 0; u < num_ssa_regs; ++u) {
       for (l = 0; l < shader->loops; ++l) {
-         if ((ssa_live_range[u].end >= loop_live_range[l].start) &&
+         if ((ssa_live_range[u].start <= loop_live_range[l].start) &&
+             (ssa_live_range[u].end >= loop_live_range[l].start) &&
              (ssa_live_range[u].end <= loop_live_range[l].end)) {
             ssa_live_range[u].end = loop_live_range[l].end;
          }
