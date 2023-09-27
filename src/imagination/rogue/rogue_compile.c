@@ -2540,7 +2540,6 @@ static void trans_nir_intrinsic_convert_alu_types(rogue_builder *b,
       /* Float src_bits < dst_bits. */
       if (CONV(float, 16, 1, float, 32, 1, undef, false)) {
          rogue_alu_instr *upck_f16f16 = rogue_UPCK_F16F16(b, dst, src);
-         rogue_set_alu_op_mod(upck_f16f16, ROGUE_ALU_OP_MOD_ROUNDZERO);
          rogue_set_alu_src_mod(upck_f16f16, 0, ROGUE_ALU_SRC_MOD_E0);
          instr = &upck_f16f16->instr;
          break;
