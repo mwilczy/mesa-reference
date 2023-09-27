@@ -754,11 +754,13 @@ static void validate_block(rogue_validation_state *state,
    /* TODO: Validate block properties. */
    state->ctx.block = block;
 
+   /*
    if (list_is_empty(&block->instrs)) {
       validate_log(state, "Block is empty.");
       state->ctx.block = NULL;
       return;
    }
+   */
 
    unsigned block_ends = 0;
    struct list_head *block_end = NULL;
