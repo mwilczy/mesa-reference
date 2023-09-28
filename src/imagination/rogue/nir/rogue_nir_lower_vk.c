@@ -386,40 +386,51 @@ static nir_def *lower_bo(nir_builder *b, nir_instr *instr, void *cb_data)
 {
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
    bool is_load = intr->intrinsic != nir_intrinsic_store_ssbo;
+   bool is_atomic = intr->intrinsic == nir_intrinsic_ssbo_atomic || intr->intrinsic== nir_intrinsic_ssbo_atomic_swap;
+   bool is_atomic_swap = intr->intrinsic== nir_intrinsic_ssbo_atomic_swap;
 
-   nir_def *offset;
    nir_def *value;
+   nir_def *offset;
+   nir_def *swap;
+   nir_src index;
 
-   if (is_load) {
+   if (is_atomic) {
+      index = intr->src[0];
+      offset = intr->src[1].ssa;
+      value = intr->src[2].ssa;
+      if (is_atomic_swap)
+         swap = intr->src[3].ssa;
+   } else if (is_load) {
+      index = intr->src[0];
       offset = intr->src[1].ssa;
    } else {
       value = intr->src[0].ssa;
+      index = intr->src[1];
       offset = intr->src[2].ssa;
    }
 
    /* TODO: maybe just copy propagate first.. */
-   nir_src rsrc = intr->src[is_load ? 0 : 1];
-   unsigned num_components = nir_src_num_components(rsrc);
+   unsigned num_components = nir_src_num_components(index);
    while (true) {
-      nir_alu_instr *alu = nir_src_as_alu_instr(rsrc);
+      nir_alu_instr *alu = nir_src_as_alu_instr(index);
       if (alu && alu->op == nir_op_mov) {
          for (unsigned i = 0; i < num_components; i++) {
             if (alu->src[0].swizzle[i] != i)
                abort();
          }
-         rsrc = alu->src[0].src;
+         index = alu->src[0].src;
       } else if (alu && nir_op_is_vec(alu->op)) {
          for (unsigned i = 0; i < num_components; i++) {
             if (alu->src[i].swizzle[0] != i || alu->src[i].src.ssa != alu->src[0].src.ssa)
                abort();
          }
-         rsrc = alu->src[0].src;
+         index = alu->src[0].src;
       } else {
          break;
       }
    }
 
-   nir_intrinsic_instr *load_vk_desc = nir_src_as_intrinsic(rsrc);
+   nir_intrinsic_instr *load_vk_desc = nir_src_as_intrinsic(index);
    assert(load_vk_desc->intrinsic == nir_intrinsic_load_vulkan_descriptor);
 
    nir_intrinsic_instr *vk_res_idx = nir_src_as_intrinsic(load_vk_desc->src[0]);
@@ -432,7 +443,13 @@ static nir_def *lower_bo(nir_builder *b, nir_instr *instr, void *cb_data)
    nir_def *addr = nir_iadd(b, load_vk_desc_def, nir_u2u64(b, offset));
 
    nir_def *def;
-   if (is_load) {
+   if (is_atomic) {
+      if (is_atomic_swap) {
+         def = nir_global_atomic_swap(b, intr->def.bit_size, addr, value, swap, .atomic_op = nir_intrinsic_atomic_op(intr));
+      } else {
+         def = nir_global_atomic(b, intr->def.bit_size, addr, value, .atomic_op = nir_intrinsic_atomic_op(intr));
+      }
+   } else if (is_load) {
       def = nir_build_load_global(b, intr->def.num_components, intr->def.bit_size, addr, .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
    } else {
       nir_build_store_global(b, value, addr, .write_mask = nir_intrinsic_write_mask(intr), .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
@@ -452,11 +469,8 @@ static bool is_bo(const nir_instr *instr, UNUSED const void *cb_data)
    case nir_intrinsic_load_ubo:
    case nir_intrinsic_load_ssbo:
    case nir_intrinsic_store_ssbo:
-   /* TODO */
-#if 0
    case nir_intrinsic_ssbo_atomic:
    case nir_intrinsic_ssbo_atomic_swap:
-#endif
       return true;
 
    default:
