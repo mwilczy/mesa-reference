@@ -302,15 +302,9 @@ get_first_non_void_channel(const struct util_format_description *fmt_desc)
    unreachable();
 }
 
-static bool chan_is_float(unsigned chan,
-                          const struct util_format_description *fmt_desc)
+static inline bool fmt_is_float(const struct util_format_description *fmt_desc)
 {
-   const struct util_format_channel_description *chan_desc =
-      (fmt_desc->channel[chan].type == UTIL_FORMAT_TYPE_VOID)
-         ? get_first_non_void_channel(fmt_desc)
-         : &fmt_desc->channel[chan];
-
-   return !chan_desc->pure_integer;
+   return !get_first_non_void_channel(fmt_desc)->pure_integer;
 }
 
 nir_def *get_unspec_chan(nir_builder *b,
@@ -322,8 +316,8 @@ nir_def *get_unspec_chan(nir_builder *b,
       return nir_imm_int(b, 0);
 
    if (chan == PIPE_SWIZZLE_1)
-      return chan_is_float(chan, fmt_desc) ? nir_imm_floatN_t(b, 1.0f, bit_size)
-                                           : nir_imm_intN_t(b, 1, bit_size);
+      return fmt_is_float(fmt_desc) ? nir_imm_floatN_t(b, 1.0f, bit_size)
+                                    : nir_imm_intN_t(b, 1, bit_size);
 
    unreachable("Invalid unspecified channel.");
 }
