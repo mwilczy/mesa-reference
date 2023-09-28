@@ -531,8 +531,6 @@ static bool rogue_regalloc_try(rogue_shader *shader)
       /* Internal shaders can't spill. */
       assert(!is_internal);
 
-      struct spill_state *spill_state =
-         &shader->ctx->common_data[shader->stage].spill_state;
       float *spill_cost =
          ralloc_array_size(ra_regs, sizeof(float), num_ssa_regs);
 
@@ -569,8 +567,8 @@ static bool rogue_regalloc_try(rogue_shader *shader)
       assert(spill_reg_idx != ~0 && "Failed to get best spill node.");
       rogue_reg *reg = rogue_ssa_reg(shader, spill_reg_idx);
 
-      assert(spill_state->dwords < 1024);
-      unsigned spill_index = spill_state->dwords++;
+      unsigned *spill_regs = &shader->ctx->common_data[shader->stage].spill_regs;
+      unsigned spill_index = (*spill_regs)++;
       rogue_spill_reg(shader, reg, spill_index);
 
       util_sparse_array_finish(&ra_class_info);

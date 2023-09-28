@@ -4075,11 +4075,7 @@ typedef struct rogue_common_build_data {
       /* TODO: coefficient update program support. */
    } preamble;
 
-   struct spill_state {
-      /* rogue_ref64 base_addr; */
-      unsigned dwords;
-   } spill_state;
-
+   unsigned spill_regs;
    unsigned scratch_size;
 
    rogue_ubo_data ubo_data;

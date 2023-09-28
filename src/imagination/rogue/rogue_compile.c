@@ -5561,17 +5561,18 @@ static rogue_shader *nir_to_rogue(rogue_build_ctx *ctx,
       rogue_ref addr_hi =
          rogue_ref_reg(rogue_shared_reg(shader, inst_base_addr_offset + 1));
 
+      unsigned block_size_offset =
+         pipeline_layout->sh_reg_layout_per_stage[pvr_stage]
+            .temp_spill_buffer.block_size_offset;
+      rogue_ref block_size = rogue_ref_reg(rogue_shared_reg(shader, block_size_offset));
+
       rogue_ref local_addr_inst = rogue_ref_reg(
          rogue_special_reg(shader, ROGUE_SPECIAL_REG_LOCAL_ADDR_INST_NUM));
 
       rogue_push_block(&b);
 
       /* Store block size. */
-      rogue_BYP0B(&b,
-                  rogue_ref_io(ROGUE_IO_FT0),
-                  shader->inst_base_addr.lo32,
-                  rogue_ref_io(ROGUE_IO_S0),
-                  rogue_ref_val(1024 * 4));
+      rogue_MBYP0(&b, shader->inst_base_addr.lo32, block_size);
 
       /* Store per-instance base address */
       rogue_MADD64(&b,

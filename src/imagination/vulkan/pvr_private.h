@@ -878,6 +878,7 @@ struct pvr_pipeline_stage_state {
    bool empty_program;
 
    uint32_t scratch_size;
+   uint32_t spill_size;
 };
 
 struct pvr_compute_shader_state {
@@ -895,6 +896,7 @@ struct pvr_compute_shader_state {
    uint32_t coefficient_register_count;
 
    uint32_t scratch_size;
+   uint32_t spill_size;
 };
 
 struct pvr_vertex_shader_state {

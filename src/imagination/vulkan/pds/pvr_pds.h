@@ -103,6 +103,7 @@ enum pvr_pds_addr_literal_type {
    PVR_PDS_ADDR_LITERAL_NUM_WORKGROUPS,
    PVR_PDS_ADDR_LITERAL_SCRATCH_BUFFER,
    PVR_PDS_ADDR_LITERAL_TEMP_SPILL_BUFFER,
+   PVR_PDS_ADDR_LITERAL_TEMP_SPILL_BUFFER_BSO,
 };
 
 /*****************************************************************************

@@ -3840,6 +3840,7 @@ pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
                          enum pvr_stage_allocation stage,
                          const pvr_dev_addr_t *const num_workgroups_buff_addr,
                          unsigned scratch_size,
+                         unsigned spill_size,
                          pvr_dev_addr_t *addr_out)
 {
    VkResult result;
@@ -3911,7 +3912,7 @@ pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
       struct pvr_suballoc_bo *temp_spill_bo;
       result = pvr_cmd_buffer_upload_general(cmd_buffer,
                                              NULL,
-                                             1024 * 512 * 4,
+                                             spill_size * 512,
                                              &temp_spill_bo);
       if (result != VK_SUCCESS)
          return result;
@@ -3919,6 +3920,12 @@ pvr_process_addr_literal(struct pvr_cmd_buffer *cmd_buffer,
       *addr_out = temp_spill_bo->dev_addr;
       break;
    }
+
+   case PVR_PDS_ADDR_LITERAL_TEMP_SPILL_BUFFER_BSO: {
+      *addr_out = (pvr_dev_addr_t){ .addr = spill_size };
+      break;
+   }
+
 
    default:
       unreachable("Invalid add literal type.");
@@ -3933,6 +3940,7 @@ static VkResult pvr_setup_descriptor_mappings(
    const struct pvr_stage_allocation_descriptor_state *descriptor_state,
    const pvr_dev_addr_t *const num_workgroups_buff_addr,
    unsigned scratch_size,
+   unsigned spill_size,
    uint32_t *const descriptor_data_offset_out)
 {
    const struct pvr_pds_info *const pds_info = &descriptor_state->pds_info;
@@ -4072,6 +4080,7 @@ static VkResult pvr_setup_descriptor_mappings(
                                               stage,
                                               num_workgroups_buff_addr,
                                               scratch_size,
+                                              spill_size,
                                               &dev_addr);
             if (result != VK_SUCCESS)
                return result;
@@ -4591,6 +4600,7 @@ static void pvr_cmd_dispatch(
          &compute_pipeline->descriptor_state,
          &descriptor_data_offset_out,
          compute_pipeline->shader_state.scratch_size,
+         compute_pipeline->shader_state.spill_size,
          &state->pds_compute_descriptor_data_offset);
       if (result != VK_SUCCESS)
          return;
@@ -4604,6 +4614,7 @@ static void pvr_cmd_dispatch(
          &compute_pipeline->descriptor_state,
          NULL,
          compute_pipeline->shader_state.scratch_size,
+         compute_pipeline->shader_state.spill_size,
          &state->pds_compute_descriptor_data_offset);
       if (result != VK_SUCCESS)
          return;
@@ -6318,6 +6329,7 @@ static VkResult pvr_validate_draw_state(struct pvr_cmd_buffer *cmd_buffer)
          &state->gfx_pipeline->shader_state.fragment.descriptor_state,
          NULL,
          fragment_state->scratch_size,
+         fragment_state->spill_size,
          &state->pds_fragment_descriptor_data_offset);
       if (result != VK_SUCCESS) {
          mesa_loge("Could not setup fragment descriptor mappings.");
@@ -6334,6 +6346,7 @@ static VkResult pvr_validate_draw_state(struct pvr_cmd_buffer *cmd_buffer)
          &state->gfx_pipeline->shader_state.vertex.descriptor_state,
          NULL,
          vertex_state->scratch_size,
+         vertex_state->spill_size,
          &pds_vertex_descriptor_data_offset);
       if (result != VK_SUCCESS) {
          mesa_loge("Could not setup vertex descriptor mappings.");

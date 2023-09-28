@@ -623,6 +623,12 @@ static VkResult pvr_pds_descriptor_program_create_and_upload(
          .destination = sh_reg_layout->temp_spill_buffer.offset,
       };
       addr_literals++;
+
+      program.addr_literals[addr_literals] = (struct pvr_pds_addr_literal){
+         .type = PVR_PDS_ADDR_LITERAL_TEMP_SPILL_BUFFER_BSO,
+         .destination = sh_reg_layout->temp_spill_buffer.block_size_offset,
+      };
+      addr_literals++;
    }
 
    if (sh_reg_layout->push_consts.present) {
@@ -1031,6 +1037,7 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
                            const struct pvr_pipeline_layout *layout,
                            enum pvr_stage_allocation stage,
                            bool uses_scratch,
+                           bool uses_spilling,
                            struct pvr_sh_reg_layout *const sh_reg_layout_out)
 {
    ASSERTED const uint64_t reserved_shared_size =
@@ -1068,10 +1075,13 @@ pvr_pipeline_alloc_shareds(const struct pvr_device *device,
 
    /* Reserve space for the temp spilling base address. */
    /* TODO: Make this conditional. */
-   reg_layout.temp_spill_buffer.present = true;
+   reg_layout.temp_spill_buffer.present = uses_spilling;
 
    if (reg_layout.temp_spill_buffer.present) {
       reg_layout.temp_spill_buffer.offset = next_free_sh_reg;
+      next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
+
+      reg_layout.temp_spill_buffer.block_size_offset = next_free_sh_reg;
       next_free_sh_reg += PVR_DEV_ADDR_SIZE_IN_SH_REGS;
    }
 
@@ -1207,6 +1217,7 @@ static uint32_t pvr_compute_pipeline_alloc_shareds(
                                                  layout,
                                                  PVR_STAGE_ALLOCATION_COMPUTE,
                                                  compute_pipeline->shader_state.scratch_size > 0,
+                                                 true, /* Always assume true for now since we don't know the spill size yet */
                                                  &reg_layout);
 
    reg_layout.num_workgroups.present =
@@ -1341,6 +1352,13 @@ static VkResult pvr_compute_pipeline_compile(
    local_input_regs[2] = cs_data->local_id_regs[1];
 
    rogue_nir_build(ctx, true);
+
+   /* Force buffer to be > 0 even if unused as PDS doesn't like gaps. */
+   compute_pipeline->shader_state.spill_size = common_data->spill_regs ? common_data->spill_regs * 4 : 4;
+#if 0
+   sh_reg_layout->temp_spill_buffer.present = common_data->spill_regs > 0;
+#endif
+
 
    /* compute_pipeline->shader_state.spill_buffer_size = PVR_DW_TO_BYTES(ctx->common_data[stage].spill_state.dwords); */
 
@@ -1605,6 +1623,8 @@ pvr_vertex_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
    vertex_state->stage_state.empty_program = false;
 
    vertex_state->stage_state.scratch_size = common_data->scratch_size;
+   /* Force buffer to be > 0 even if unused as PDS doesn't like gaps. */
+   vertex_state->stage_state.spill_size = common_data->spill_regs ? common_data->spill_regs * 4 : 4;
 
    /* This ends up unused since we'll use the temp_usage for the PDS program we
     * end up selecting, and the descriptor PDS program doesn't use any temps.
@@ -1673,6 +1693,8 @@ pvr_fragment_state_init(struct pvr_graphics_pipeline *gfx_pipeline,
    fragment_state->stage_state.empty_program = false;
 
    fragment_state->stage_state.scratch_size = common_data->scratch_size;
+   /* Force buffer to be > 0 even if unused as PDS doesn't like gaps. */
+   fragment_state->stage_state.spill_size = common_data->spill_regs ? common_data->spill_regs * 4 : 4;
 
    fragment_state->needs_iterated_depth = fs_data->iterator_args.iterates_depth;
 
@@ -1781,6 +1803,7 @@ static uint32_t pvr_graphics_pipeline_alloc_shareds(
    enum pvr_stage_allocation stage,
    unsigned preamble_shareds,
    bool uses_scratch,
+   bool uses_spilling,
    struct pvr_sh_reg_layout *const sh_reg_layout_out)
 {
    ASSERTED const uint64_t reserved_shared_size =
@@ -1793,7 +1816,7 @@ static uint32_t pvr_graphics_pipeline_alloc_shareds(
    uint32_t next_free_sh_reg = 0;
 
    next_free_sh_reg =
-      pvr_pipeline_alloc_shareds(device, layout, stage, uses_scratch, &reg_layout);
+      pvr_pipeline_alloc_shareds(device, layout, stage, uses_scratch, uses_spilling, &reg_layout);
 
    reg_layout.blend_consts.present =
       (stage == PVR_STAGE_ALLOCATION_FRAGMENT &&
@@ -2817,10 +2840,21 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
          pvr_stage,
          ctx->common_data[stage].preamble.shareds,
          ctx->common_data[stage].scratch_size > 0,
+         true, /* Always assume true for now since we don't know the spill size yet */
          &layout->sh_reg_layout_per_stage[pvr_stage]);
    }
 
    rogue_nir_build(ctx, false);
+
+#if 0
+   for (enum pvr_stage_allocation pvr_stage =
+           PVR_STAGE_ALLOCATION_VERTEX_GEOMETRY;
+        pvr_stage < PVR_STAGE_ALLOCATION_COMPUTE;
+        pvr_stage++) {
+      gl_shader_stage stage = pvr_stage_to_mesa(pvr_stage);
+      layout->sh_reg_layout_per_stage[pvr_stage].temp_spill_buffer.present = ctx->common_data[stage].spill_regs > 0;
+   }
+#endif
 
    pvr_vertex_state_init(gfx_pipeline,
                          &ctx->common_data[MESA_SHADER_VERTEX],

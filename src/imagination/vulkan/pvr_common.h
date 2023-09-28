@@ -613,10 +613,12 @@ struct pvr_sh_reg_layout {
 
    /* If this is present, it will always take up 2 sh regs in size and contain
     * the device address of the temp spill buffer.
+    * The block_size_offset is a single sh reg containing the block size.
     */
    struct {
       bool present;
       uint32_t offset;
+      uint32_t block_size_offset;
    } temp_spill_buffer;
 };
 
