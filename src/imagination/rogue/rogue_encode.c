@@ -1076,11 +1076,30 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
 {
    switch (backend->op) {
    case ROGUE_BACKEND_OP_FITR_PIXEL:
+   case ROGUE_BACKEND_OP_FITR_SAMPLE:
+   case ROGUE_BACKEND_OP_FITR_CENTROID:
       instr_encoding->backend.op = BACKENDOP_FITR;
       instr_encoding->backend.fitr.p = 0;
       instr_encoding->backend.fitr.drc =
          rogue_ref_get_drc_index(&backend->src[0].ref);
-      instr_encoding->backend.fitr.mode = FITR_MODE_PIXEL;
+
+      switch (backend->op) {
+      case ROGUE_BACKEND_OP_FITR_PIXEL:
+         instr_encoding->backend.fitr.mode = FITR_MODE_PIXEL;
+         break;
+
+      case ROGUE_BACKEND_OP_FITR_SAMPLE:
+         instr_encoding->backend.fitr.mode = FITR_MODE_SAMPLE;
+         break;
+
+      case ROGUE_BACKEND_OP_FITR_CENTROID:
+         instr_encoding->backend.fitr.mode = FITR_MODE_CENTROID;
+         break;
+
+      default:
+         unreachable();
+      }
+
       instr_encoding->backend.fitr.sat =
          rogue_backend_op_mod_is_set(backend, OM(SAT));
       instr_encoding->backend.fitr.count =
@@ -1088,11 +1107,30 @@ static void rogue_encode_backend_instr(const rogue_backend_instr *backend,
       break;
 
    case ROGUE_BACKEND_OP_FITRP_PIXEL:
+   case ROGUE_BACKEND_OP_FITRP_SAMPLE:
+   case ROGUE_BACKEND_OP_FITRP_CENTROID:
       instr_encoding->backend.op = BACKENDOP_FITR;
       instr_encoding->backend.fitr.p = 1;
       instr_encoding->backend.fitr.drc =
          rogue_ref_get_drc_index(&backend->src[0].ref);
-      instr_encoding->backend.fitr.mode = FITR_MODE_PIXEL;
+
+      switch (backend->op) {
+      case ROGUE_BACKEND_OP_FITRP_PIXEL:
+         instr_encoding->backend.fitr.mode = FITR_MODE_PIXEL;
+         break;
+
+      case ROGUE_BACKEND_OP_FITRP_SAMPLE:
+         instr_encoding->backend.fitr.mode = FITR_MODE_SAMPLE;
+         break;
+
+      case ROGUE_BACKEND_OP_FITRP_CENTROID:
+         instr_encoding->backend.fitr.mode = FITR_MODE_CENTROID;
+         break;
+
+      default:
+         unreachable();
+      }
+
       instr_encoding->backend.fitr.sat =
          rogue_backend_op_mod_is_set(backend, OM(SAT));
       instr_encoding->backend.fitr.count =

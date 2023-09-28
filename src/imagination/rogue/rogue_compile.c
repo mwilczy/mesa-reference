@@ -1600,6 +1600,12 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
                                                      io_semantics.location,
                                                      component);
 
+   nir_variable *var = nir_find_variable_with_location(b->shader->nir, nir_var_shader_in, io_semantics.location);
+   assert(var);
+   bool sample = var->data.sample;
+   bool centroid = var->data.centroid;
+   assert(!(sample && centroid));
+
    switch (mode) {
    case INTERP_MODE_NONE:
    case INTERP_MODE_SMOOTH: {
@@ -1613,13 +1619,14 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
       rogue_regarray *wcoeffs =
          rogue_coeff_regarray(b->shader, ROGUE_COEFF_ALIGN, wcoeff_index);
 
-      rogue_backend_instr *fitrp =
-         rogue_FITRP_PIXEL(b,
-                           dst,
-                           rogue_ref_drc(0),
-                           rogue_ref_regarray(coeffs),
-                           rogue_ref_regarray(wcoeffs),
-                           rogue_ref_val(load_size));
+      rogue_backend_instr *fitrp;
+      if (sample) {
+         fitrp = rogue_FITRP_SAMPLE(b, dst, rogue_ref_drc(0), rogue_ref_regarray(coeffs), rogue_ref_regarray(wcoeffs), rogue_ref_val(load_size));
+      } else if (centroid) {
+         fitrp = rogue_FITRP_CENTROID(b, dst, rogue_ref_drc(0), rogue_ref_regarray(coeffs), rogue_ref_regarray(wcoeffs), rogue_ref_val(load_size));
+      } else {
+         fitrp = rogue_FITRP_PIXEL(b, dst, rogue_ref_drc(0), rogue_ref_regarray(coeffs), rogue_ref_regarray(wcoeffs), rogue_ref_val(load_size));
+      }
       rogue_add_instr_comment(&fitrp->instr, "load_input_fs_smooth");
       break;
    }
@@ -1630,11 +1637,14 @@ static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
                               ROGUE_COEFF_ALIGN * load_size,
                               coeff_index);
 
-      rogue_backend_instr *fitr = rogue_FITR_PIXEL(b,
-                                                   dst,
-                                                   rogue_ref_drc(0),
-                                                   rogue_ref_regarray(coeffs),
-                                                   rogue_ref_val(load_size));
+      rogue_backend_instr *fitr;
+      if (sample) {
+         fitr = rogue_FITR_SAMPLE(b, dst, rogue_ref_drc(0), rogue_ref_regarray(coeffs), rogue_ref_val(load_size));
+      } else if (centroid) {
+         fitr = rogue_FITR_CENTROID(b, dst, rogue_ref_drc(0), rogue_ref_regarray(coeffs), rogue_ref_val(load_size));
+      } else {
+         fitr = rogue_FITR_PIXEL(b, dst, rogue_ref_drc(0), rogue_ref_regarray(coeffs), rogue_ref_val(load_size));
+      }
       rogue_add_instr_comment(&fitr->instr, "load_input_fs_npc");
       break;
    }

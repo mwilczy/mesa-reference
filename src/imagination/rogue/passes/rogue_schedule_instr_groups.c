@@ -958,7 +958,11 @@ static void rogue_calc_backend_instrs_size(rogue_instr_group *group,
 {
    switch (backend->op) {
    case ROGUE_BACKEND_OP_FITR_PIXEL:
+   case ROGUE_BACKEND_OP_FITR_SAMPLE:
+   case ROGUE_BACKEND_OP_FITR_CENTROID:
    case ROGUE_BACKEND_OP_FITRP_PIXEL:
+   case ROGUE_BACKEND_OP_FITRP_SAMPLE:
+   case ROGUE_BACKEND_OP_FITRP_CENTROID:
       group->size.instrs[phase] = 2;
       break;
 
