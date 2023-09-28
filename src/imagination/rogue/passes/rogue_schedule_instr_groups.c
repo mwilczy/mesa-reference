@@ -1072,6 +1072,11 @@ static void rogue_calc_ctrl_instrs_size(rogue_instr_group *group,
       group->size.instrs[phase] = 5;
       break;
 
+   case ROGUE_CTRL_OP_LAPC:
+   case ROGUE_CTRL_OP_SAVL:
+      group->size.instrs[phase] = 0;
+      break;
+
    case ROGUE_CTRL_OP_CNDST:
    case ROGUE_CTRL_OP_CNDEF:
    case ROGUE_CTRL_OP_CNDEND:

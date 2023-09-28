@@ -266,6 +266,14 @@ static void rogue_encode_instr_group_header(rogue_instr_group *group,
          h.ctrlop = CTRLOP_BA;
          break;
 
+      case ROGUE_CTRL_OP_LAPC:
+         h.ctrlop = CTRLOP_LAPC;
+         break;
+
+      case ROGUE_CTRL_OP_SAVL:
+         h.ctrlop = CTRLOP_SAVL;
+         break;
+
       case ROGUE_CTRL_OP_CNDST:
       case ROGUE_CTRL_OP_CNDEF:
       case ROGUE_CTRL_OP_CNDEND:

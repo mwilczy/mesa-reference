@@ -1683,6 +1683,9 @@ enum rogue_ctrl_op {
    ROGUE_CTRL_OP_BR, /* Branch: relative (to block). */
    ROGUE_CTRL_OP_BA, /* Branch: absolute (to address). */
 
+   ROGUE_CTRL_OP_LAPC, /* Branch: Link register to program counter (return). */
+   ROGUE_CTRL_OP_SAVL, /* Branch: Save link register. */
+
    ROGUE_CTRL_OP_CNDST, /** Conditional start. */
    ROGUE_CTRL_OP_CNDEF, /** Conditional elif. */
    ROGUE_CTRL_OP_CNDEND, /** Conditional end. */
