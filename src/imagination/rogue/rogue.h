@@ -1253,6 +1253,8 @@ static inline uint64_t rogue_reg_supported_io_srcs(rogue_ref *ref)
       reg_class = ref->regarray->regs[0]->class;
    else if (rogue_ref_is_reg(ref))
       reg_class = ref->reg->class;
+   else if (rogue_ref_is_reg_indexed(ref))
+      reg_class = ROGUE_REG_CLASS_IDX0 + ref->idx;
    else
       unreachable("Reference is not a reg or regarray.");
 
@@ -1268,10 +1270,6 @@ static inline uint64_t rogue_reg_supported_io_srcs(rogue_ref *ref)
            idx <= ROGUE_SPECIAL_REG_CONSTS_2_END))
          reg_class = ROGUE_REG_CLASS_CONST;
    }
-
-   /* Special case - indexed registers. */
-   if (rogue_ref_is_reg_indexed(ref))
-      reg_class = ROGUE_REG_CLASS_IDX0 + ref->idx;
 
    return rogue_reg_class_infos[reg_class].supported_io_srcs;
 }
