@@ -909,7 +909,7 @@ pvr_spm_init_bgobj_state(struct pvr_device *device,
    assert(spm_load_program_idx < ARRAY_SIZE(spm_load_collection));
    info = spm_load_collection[spm_load_program_idx].info;
 
-   consts_buffer_size = info->const_shared_regs * sizeof(uint32_t);
+   consts_buffer_size = PVR_DW_TO_BYTES(info->const_shared_regs);
 
    result = pvr_bo_alloc(device,
                          device->heaps.general_heap,
