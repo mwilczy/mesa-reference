@@ -496,6 +496,12 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    NIR_PASS_V(nir, nir_opt_sink, nir_move_load_ubo | nir_move_load_ssbo);
    NIR_PASS_V(nir, nir_opt_move, nir_move_load_ubo | nir_move_load_ssbo);
 
+   bool robust_buffer_access = ctx->pipeline_layout->robust_buffer_access;
+   NIR_PASS_V(nir, nir_lower_robust_access, &(nir_lower_robust_access_options) {
+         .lower_ubo = robust_buffer_access,
+         .lower_ssbo = robust_buffer_access,
+         });
+
    NIR_PASS_V(nir, rogue_nir_lower_bos);
    NIR_PASS_V(nir, nir_opt_dce);
 
