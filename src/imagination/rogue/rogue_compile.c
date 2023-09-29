@@ -2770,7 +2770,7 @@ static rogue_instr *shared_atomic_alu(rogue_builder *b,
       assert(type == nir_type_uint32 || type == nir_type_float32);
 
       rogue_alu_instr *mbyp0 =
-         rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), *data_swap);
+         rogue_MBYP0(b, rogue_ref_io(ROGUE_IO_FT0), *data);
       rogue_set_instr_group_next(&mbyp0->instr, true);
       rogue_set_instr_atom(&mbyp0->instr, true);
 
@@ -2791,7 +2791,7 @@ static rogue_instr *shared_atomic_alu(rogue_builder *b,
                         *coeff,
                         *dst,
                         rogue_ref_io(ROGUE_IO_FTT),
-                        *data,
+                        *data_swap,
                         rogue_ref_io(ROGUE_IO_FT1),
                         rogue_ref_io(ROGUE_IO_FT1),
                         rogue_ref_io(ROGUE_IO_FT1));
@@ -2813,15 +2813,14 @@ static rogue_instr *shared_atomic_bitwise(rogue_builder *b,
                                           rogue_ref *coeff,
                                           rogue_ref *data)
 {
-   /* Copy existing value to destination (and/via FT3). */
-   rogue_bitwise_instr *byp0c = rogue_BYP0C(b, *dst, *coeff);
-   rogue_set_instr_group_next(&byp0c->instr, true);
-   rogue_set_instr_atom(&byp0c->instr, true);
-
    /* Setup I/O feedthrough for bitwise op. */
-   rogue_instr *byp0s =
-      &rogue_BYP0S(b, rogue_ref_io(ROGUE_IO_FT2), *data)->instr;
-   rogue_set_instr_group_next(byp0s, true);
+   rogue_bitwise_instr *byp0s = rogue_BYP0S(b, rogue_ref_io(ROGUE_IO_FT2), *coeff);
+   rogue_set_instr_group_next(&byp0s->instr, true);
+   rogue_set_instr_atom(&byp0s->instr, true);
+
+   /* Copy existing value to destination (and/via FT3). */
+   rogue_bitwise_instr *byp0c = rogue_BYP0C(b, *dst, rogue_ref_io(ROGUE_IO_FT2));
+   rogue_set_instr_group_next(&byp0c->instr, true);
    rogue_set_instr_atom(&byp0c->instr, true);
 
    rogue_bitwise_instr *atom;
@@ -2834,7 +2833,7 @@ static rogue_instr *shared_atomic_bitwise(rogue_builder *b,
                        rogue_none(),
                        rogue_ref_io(ROGUE_IO_FT2),
                        rogue_none(),
-                       *coeff);
+                       *data);
       break;
 
    case nir_atomic_op_ior:
@@ -2844,7 +2843,7 @@ static rogue_instr *shared_atomic_bitwise(rogue_builder *b,
                       rogue_none(),
                       rogue_ref_io(ROGUE_IO_FT2),
                       rogue_none(),
-                      *coeff);
+                      *data);
       break;
 
    case nir_atomic_op_ixor:
@@ -2854,7 +2853,7 @@ static rogue_instr *shared_atomic_bitwise(rogue_builder *b,
                        rogue_none(),
                        rogue_ref_io(ROGUE_IO_FT2),
                        rogue_none(),
-                       *coeff);
+                       *data);
       break;
 
    default:
