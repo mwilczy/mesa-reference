@@ -803,6 +803,10 @@ static void rogue_collect_early_fs_build_data(rogue_build_ctx *ctx,
    fs_data->early_fragment_tests = info->fs.early_fragment_tests;
    fs_data->depth_layout = info->fs.depth_layout;
 
+   /* TODO: probably should be done somewhere else? */
+   if (fs_data->rasterization_samples > VK_SAMPLE_COUNT_1_BIT)
+      nir->info.fs.uses_sample_shading = true;
+
    assert(!info->uses_control_barrier && !info->uses_memory_barrier);
 }
 
