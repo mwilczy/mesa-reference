@@ -2018,13 +2018,14 @@ intrinsic("isp_feedback_img", src_comp=[1, 1], bit_sizes=[0, 0], indices=[], fla
 # - sample state base
 # - shared lod base
 # - chans (implied by vec elems of dst)
+# - range - number of data dwords
 
 # smp(coords) (texture state base, sample state base)
 # TODO: make the coords argument a pointer to a scratch array.
 index("unsigned", "tex_state_base_img")
 index("unsigned", "smp_state_base_img")
 index("unsigned", "info_base_img")
-intrinsic("smp_img", src_comp=[16], dest_comp=0, bit_sizes=[32], indices=[TEX_STATE_BASE_IMG, SMP_STATE_BASE_IMG, IMAGE_DIM, FLAGS], flags=[])
+intrinsic("smp_img", src_comp=[-1], dest_comp=0, bit_sizes=[32], indices=[TEX_STATE_BASE_IMG, SMP_STATE_BASE_IMG, IMAGE_DIM, FLAGS, RANGE], flags=[])
 
 # TODO: rename image to tex?
 

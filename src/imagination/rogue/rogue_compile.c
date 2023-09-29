@@ -3124,7 +3124,9 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
    rogue_ref tex_state = rogue_ref_regarray(rogue_shared_regarray(b->shader, PVR_IMAGE_DESCRIPTOR_SIZE, tex_state_base));
    rogue_ref smp_state = rogue_ref_regarray(rogue_shared_regarray(b->shader, PVR_SAMPLER_DESCRIPTOR_SIZE, smp_state_base));
 
-   rogue_ref data = intr_src(b->shader, intr, 0, &(unsigned){ NIR_MAX_VEC_COMPONENTS }, ROGUE_REG_SIZE_BITS);
+   assert(nir_src_bit_size(intr->src[0]) == 32);
+   assert(nir_src_num_components(intr->src[0]) == 16);
+   rogue_ref data = rogue_ref_regarray(rogue_ssa_vec_regarray(b->shader, nir_intrinsic_range(intr), intr->src[0].ssa->index, 0));
 
    rogue_ref drc = rogue_ref_drc(0);
 
@@ -3217,6 +3219,18 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
 
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_WRT))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_WRT);
+
+   if (ROGUE_DEBUG(CACHE)) {
+      /* TODO: it's not access, add a flag for coherent/volatile */
+      if (nir_intrinsic_access(intr) & ACCESS_COHERENT) {
+         rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_NORMAL);
+      } else {
+         if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_WRT))
+            rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_WRITETHROUGH);
+         else
+            rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_BYPASS);
+      }
+   }
 }
 
 static void
@@ -3930,6 +3944,28 @@ static void trans_nir_alu_mov(rogue_builder *b, nir_alu_instr *alu)
 static void trans_nir_alu_vecN(rogue_builder *b, nir_alu_instr *alu, unsigned n)
 {
    unsigned dst_index = alu->def.index;
+
+   /* Special case: smp instruction. */
+   do {
+      if (n != 16)
+         break;
+
+      if (!list_is_singular(&alu->def.uses))
+         break;
+
+      nir_src *src = list_first_entry(&alu->def.uses, nir_src, use_link);
+      nir_instr *parent = src->parent_instr;
+
+      if (parent->type != nir_instr_type_intrinsic)
+         break;
+
+      nir_intrinsic_instr *intr = nir_instr_as_intrinsic(parent);
+      if (intr->intrinsic != nir_intrinsic_smp_img)
+         break;
+
+      n = nir_intrinsic_range(intr);
+      assert(n);
+   } while (false);
 
    rogue_ssa_vec_regarray(b->shader, n, dst_index, 0);
 
@@ -5236,7 +5272,28 @@ static bool ssa_def_cb(nir_def *ssa, void *state)
          rogue_ssa_vec_regarray(shader, 2, ssa->index, 0);
       }
    } else {
-      rogue_ssa_vec_regarray(shader, ssa->num_components, ssa->index, 0);
+      unsigned n = ssa->num_components;
+      do {
+         if (n != 16)
+            break;
+
+         if (!list_is_singular(&ssa->uses))
+            break;
+
+         nir_src *src = list_first_entry(&ssa->uses, nir_src, use_link);
+         nir_instr *parent = src->parent_instr;
+
+         if (parent->type != nir_instr_type_intrinsic)
+            break;
+
+         nir_intrinsic_instr *intr = nir_instr_as_intrinsic(parent);
+         if (intr->intrinsic != nir_intrinsic_smp_img)
+            break;
+
+         n = nir_intrinsic_range(intr);
+         assert(n);
+      } while (false);
+      rogue_ssa_vec_regarray(shader, n, ssa->index, 0);
    }
 
    /* Keep track of the last SSA index so we can use more. */

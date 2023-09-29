@@ -684,7 +684,6 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    }
 
    assert(data_comps <= NIR_MAX_VEC_COMPONENTS);
-
    nir_def *data_vec = nir_vec(b, data, ARRAY_SIZE(data));
 
    /* TODO: Only set this if texture/sampler type is **fixed**!
@@ -693,7 +692,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    if (nir_alu_type_get_base_type(tex->dest_type) == nir_type_float)
       flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_FCNORM);
 
-   nir_def *sample = nir_smp_img(b, (smp_info || is_gather) ? 16 : chans, data_vec, .tex_state_base_img = tex_base, .smp_state_base_img = smp_base, .image_dim = sampler_dim, .flags = flags);
+   nir_def *sample = nir_smp_img(b, (smp_info || is_gather) ? 16 : chans, data_vec, .tex_state_base_img = tex_base, .smp_state_base_img = smp_base, .image_dim = sampler_dim, .flags = flags, .range = data_comps);
 
    if (smp_info) {
       assert(!tex->is_shadow);
