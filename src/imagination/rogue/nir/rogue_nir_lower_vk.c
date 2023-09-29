@@ -128,30 +128,24 @@ static nir_def *lower_vk_io(nir_builder *b, nir_instr *instr, void *cb_data)
    desc_offset = PVR_DW_TO_BYTES(desc_offset);
 
    unsigned comps = intr->def.num_components;
+   assert(comps == 2);
    unsigned bits = intr->def.bit_size;
+
+   /* Drop original one. */
+   if (bits == 32)
+      return nir_imm_ivec2(b, 0, 0);
+
+   assert(bits == 64);
    unsigned align = bits / 8;
 
-   /* assert((bits == 64 && comps == 1) || (bits == 32 && comps == 4)); */
-   /* bool is_ubo = (bits == 64); */
-
-   if (comps == 2) {
-      assert(bits == 32);
-      return nir_imm_ivec2(b, 0, 0);
-   }
-
-   bool is_ubo = true;
 
    /* Load the descriptor set table address for this set from memory. */
-   nir_def *desc_addr;
-   if (is_ubo) {
-      desc_addr =
-         nir_load_global_constant(b,
-                                  nir_iadd_imm(b, tbl_addr, desc_offset),
-                                  align,
-                                  comps,
-                                  bits);
-   } else {
-      assert(bits / 32 == desc_size_info.secondary);
+   nir_def *desc_addr = nir_load_global_constant(b, nir_iadd_imm(b, tbl_addr, desc_offset), align, 1, bits);
+
+   /* Calculate the address where the descriptor size is stored. */
+   nir_def *size_addr;
+   if (desc_size_info.secondary > 0) {
+      assert(desc_size_info.secondary == 1);
 
       unsigned desc_size_offset = descriptor_is_dynamic(binding_layout->type)
                                      ? (set_layout->total_size_in_dwords +
@@ -162,35 +156,12 @@ static nir_def *lower_vk_io(nir_builder *b, nir_instr *instr, void *cb_data)
       desc_size_offset += desc_elem * desc_size_info.secondary;
       desc_size_offset = PVR_DW_TO_BYTES(desc_size_offset);
 
-      desc_addr =
-         nir_load_global_constant(b,
-                                  nir_iadd_imm(b, tbl_addr, desc_offset),
-                                  align,
-                                  2,
-                                  bits);
-
-      nir_def *desc_size =
-         nir_load_global_constant(b,
-                                  nir_iadd_imm(b, tbl_addr, desc_size_offset),
-                                  align,
-                                  1,
-                                  bits);
-
-      /* TODO: When re-doing descriptor (sets), we can store the buffer base
-       * address, offset, and size, and load all three. */
-      unsigned offset = 0;
-      nir_def *desc_offset = nir_imm_int(b, offset);
-
-      nir_def *components[4] = {
-         nir_channel(b, desc_addr, 0),
-         nir_channel(b, desc_addr, 1),
-         desc_size,
-         desc_offset,
-      };
-      desc_addr = nir_vec(b, components, ARRAY_SIZE(components));
+      size_addr = nir_iadd_imm(b, tbl_addr, desc_size_offset);
+   } else {
+      size_addr = nir_undef(b, 1, bits);
    }
 
-   return desc_addr;
+   return nir_vec2(b, desc_addr, size_addr);
 }
 
 static bool is_vk_io(const nir_instr *instr, UNUSED const void *cb_data)
@@ -385,7 +356,9 @@ bool rogue_nir_lower_scratch(nir_shader *shader)
 static nir_def *lower_bo(nir_builder *b, nir_instr *instr, void *cb_data)
 {
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+   bool is_size_query = intr->intrinsic == nir_intrinsic_get_ubo_size || intr->intrinsic== nir_intrinsic_get_ssbo_size;
    bool is_load = intr->intrinsic != nir_intrinsic_store_ssbo;
+   bool is_ubo = intr->intrinsic == nir_intrinsic_load_ubo;
    bool is_atomic = intr->intrinsic == nir_intrinsic_ssbo_atomic || intr->intrinsic== nir_intrinsic_ssbo_atomic_swap;
    bool is_atomic_swap = intr->intrinsic== nir_intrinsic_ssbo_atomic_swap;
 
@@ -394,7 +367,9 @@ static nir_def *lower_bo(nir_builder *b, nir_instr *instr, void *cb_data)
    nir_def *swap;
    nir_src index;
 
-   if (is_atomic) {
+   if (is_size_query) {
+      index = intr->src[0];
+   } else if (is_atomic) {
       index = intr->src[0];
       offset = intr->src[1].ssa;
       value = intr->src[2].ssa;
@@ -437,22 +412,29 @@ static nir_def *lower_bo(nir_builder *b, nir_instr *instr, void *cb_data)
    assert(vk_res_idx->intrinsic == nir_intrinsic_vulkan_resource_index);
 
    nir_def *vk_res_idx_def = nir_vulkan_resource_index(b, 1, 64, vk_res_idx->src[0].ssa, .desc_set = nir_intrinsic_desc_set(vk_res_idx), .binding = nir_intrinsic_binding(vk_res_idx), .desc_type = nir_intrinsic_desc_type(vk_res_idx));
+   nir_def *load_vk_desc_def = nir_load_vulkan_descriptor(b, 2, 64, vk_res_idx_def, .desc_type = nir_intrinsic_desc_type(load_vk_desc));
 
-   nir_def *load_vk_desc_def = nir_load_vulkan_descriptor(b, 1, 64, vk_res_idx_def, .desc_type = nir_intrinsic_desc_type(load_vk_desc));
+   if (is_size_query) {
+      nir_def *desc_size_addr = nir_channel(b, load_vk_desc_def, 1);
+      return nir_load_global_constant(b, desc_size_addr, 4, 1, 32);
+   }
 
-   nir_def *addr = nir_iadd(b, load_vk_desc_def, nir_u2u64(b, offset));
+   nir_def *desc_addr = nir_iadd(b, nir_channel(b, load_vk_desc_def, 0), nir_u2u64(b, offset));
 
    nir_def *def;
    if (is_atomic) {
       if (is_atomic_swap) {
-         def = nir_global_atomic_swap(b, intr->def.bit_size, addr, value, swap, .atomic_op = nir_intrinsic_atomic_op(intr));
+         def = nir_global_atomic_swap(b, intr->def.bit_size, desc_addr, value, swap, .atomic_op = nir_intrinsic_atomic_op(intr));
       } else {
-         def = nir_global_atomic(b, intr->def.bit_size, addr, value, .atomic_op = nir_intrinsic_atomic_op(intr));
+         def = nir_global_atomic(b, intr->def.bit_size, desc_addr, value, .atomic_op = nir_intrinsic_atomic_op(intr));
       }
    } else if (is_load) {
-      def = nir_build_load_global(b, intr->def.num_components, intr->def.bit_size, addr, .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
+      if (is_ubo)
+         def = nir_build_load_global_constant(b, intr->def.num_components, intr->def.bit_size, desc_addr, .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
+      else
+         def = nir_build_load_global(b, intr->def.num_components, intr->def.bit_size, desc_addr, .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
    } else {
-      nir_build_store_global(b, value, addr, .write_mask = nir_intrinsic_write_mask(intr), .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
+      nir_build_store_global(b, value, desc_addr, .write_mask = nir_intrinsic_write_mask(intr), .access = nir_intrinsic_access(intr), .align_mul = nir_intrinsic_align_mul(intr), .align_offset = nir_intrinsic_align_offset(intr));
       def = NIR_LOWER_INSTR_PROGRESS_REPLACE;
    }
 
@@ -468,6 +450,8 @@ static bool is_bo(const nir_instr *instr, UNUSED const void *cb_data)
    switch (intr->intrinsic) {
    case nir_intrinsic_load_ubo:
    case nir_intrinsic_load_ssbo:
+   case nir_intrinsic_get_ubo_size:
+   case nir_intrinsic_get_ssbo_size:
    case nir_intrinsic_store_ssbo:
    case nir_intrinsic_ssbo_atomic:
    case nir_intrinsic_ssbo_atomic_swap:

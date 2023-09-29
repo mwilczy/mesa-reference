@@ -53,12 +53,8 @@ static const struct spirv_to_nir_options spirv_options = {
       /* .float32_atomic_min_max = true, */
    },
 
-   .ubo_addr_format = nir_address_format_64bit_global,
-   /* .ssbo_addr_format = nir_address_format_64bit_global_32bit_offset, */
+   .ubo_addr_format = nir_address_format_32bit_index_offset,
    .ssbo_addr_format = nir_address_format_32bit_index_offset,
-   /* TODO: for robust access:
-    * .ssbo_addr_format = nir_address_format_64bit_bounded_global,
-    */
 
    .phys_ssbo_addr_format = nir_address_format_64bit_global,
    .push_const_addr_format = nir_address_format_32bit_offset,
