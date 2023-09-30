@@ -590,8 +590,10 @@ VkResult pvr_CreateRenderPass2(VkDevice _device,
          struct pvr_render_subpass *subpass = &pass->subpasses[dep->dstSubpass];
 
          subpass->dep_list[subpass->dep_count] = dep->srcSubpass;
-         if (pvr_subpass_has_msaa_input_attachment(subpass, pCreateInfo))
+         if (pvr_subpass_has_msaa_input_attachment(subpass, pCreateInfo) ||
+             !(dep->dependencyFlags & VK_DEPENDENCY_BY_REGION_BIT)) {
             subpass->flush_on_dep[subpass->dep_count] = true;
+         }
 
          subpass->dep_count++;
       }
