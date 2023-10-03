@@ -1032,6 +1032,18 @@ const rogue_bitwise_op_info rogue_bitwise_op_infos[ROGUE_BITWISE_OP_COUNT] = {
          [0] = T(REG) | T(REGARRAY) | T(IO),
       },
    },
+   [ROGUE_BITWISE_OP_CPS] = { .str = "cps", .num_dsts = 1, .num_srcs = 3,
+      .phase = PH(2_SHIFT2),
+      .io = { .dst_set[0] = IO(FT5), .src_set[0] = IO(P0), .src_set[1] = IO(FT4), .src_set[2] = IO(S4), },
+      .supported_dst_types = {
+         [0] = T(REG) | T(REGARRAY) | T(IO),
+      },
+      .supported_src_types = {
+         [0] = T(IO),
+         [1] = T(REG) | T(REGARRAY) | T(IO) | T(IMM),
+         [2] = T(REG) | T(REGARRAY) | T(IO) | T(IMM),
+      },
+   },
    [ROGUE_BITWISE_OP_TZ] = { .str = "tz", .num_dsts = 1, .num_srcs = 1,
       .phase = PH(2_TEST),
       .io = { .dst_set[0] = IO(P0), .src_set[0] = IO(FT3) | IO(FT5) },

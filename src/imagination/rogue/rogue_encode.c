@@ -1629,6 +1629,10 @@ static void rogue_encode_bitwise_instr(const rogue_bitwise_instr *bitwise,
          unreachable("Missing sign-bit position modifier.");
       break;
 
+   case ROGUE_BITWISE_OP_CPS:
+      instr_encoding->bitwise.ph2.shft = SHFT2_CPS;
+      break;
+
    case ROGUE_BITWISE_OP_TZ:
    case ROGUE_BITWISE_OP_TNZ:
       instr_encoding->bitwise.ph2.top =
