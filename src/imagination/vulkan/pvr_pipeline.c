@@ -2779,6 +2779,9 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
                                       hw_subpass,
                                       state);
 
+   /* TODO: move into pvr_graphics_pipeline_assign_fs_io */
+   ctx->stage_data.fs.dynamic_blend_consts = pvr_graphics_pipeline_requires_dynamic_blend_consts(gfx_pipeline);
+
    /* TODO: Fix this by having multiple variants of iterator PDS programs for
     * VK_EXT_extended_dynamic_state */
    ctx->stage_data.fs.iterator_args.triangle_fan =

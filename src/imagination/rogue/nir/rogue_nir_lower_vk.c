@@ -284,17 +284,14 @@ static nir_def *
 lower_blend_const(nir_builder *b, nir_instr *instr, void *cb_data)
 {
    const rogue_build_ctx *ctx = cb_data;
-
-   const struct pvr_pipeline_layout *pipeline_layout = ctx->pipeline_layout;
-   const struct pvr_sh_reg_layout *sh_reg_layout =
-      &pipeline_layout->sh_reg_layout_per_stage[PVR_STAGE_ALLOCATION_FRAGMENT];
+   const struct rogue_fs_build_data *fs_data = &ctx->stage_data.fs;
 
    b->cursor = nir_before_instr(instr);
 
-   if (!sh_reg_layout->blend_consts.present)
-      return lower_static_blend_const(b, ctx);
+   if (fs_data->dynamic_blend_consts)
+      return lower_dynamic_blend_const(b);
 
-   return lower_dynamic_blend_const(b);
+   return lower_static_blend_const(b, ctx);
 }
 
 PUBLIC

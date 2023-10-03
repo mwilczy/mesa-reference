@@ -4197,6 +4197,7 @@ typedef struct rogue_build_data {
       enum gl_frag_depth_layout depth_layout;
 
       const struct vk_color_blend_state *cb_state;
+      bool dynamic_blend_consts;
 
       /* If >=0 then copy the depth into this pixel output for all fragment
        * programs in the subpass.
