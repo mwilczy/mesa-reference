@@ -1814,6 +1814,8 @@ static VkResult pvr_device_init_default_sampler_state(struct pvr_device *device)
       sampler.dadjust = PVRX(TEXSTATE_DADJUST_ZERO_UINT);
       sampler.magfilter = PVRX(TEXSTATE_FILTER_POINT);
       sampler.minfilter = PVRX(TEXSTATE_FILTER_POINT);
+      sampler.maxlod = PVRX(TEXSTATE_CLAMP_MAX);
+
       sampler.anisoctl = PVRX(TEXSTATE_ANISOCTL_DISABLED);
    }
 
