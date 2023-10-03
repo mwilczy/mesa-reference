@@ -569,31 +569,24 @@ static bool rogue_regalloc_try(rogue_shader *shader)
       /* Internal shaders can't spill. */
       assert(!is_internal);
 
+      /* Initialise to zero (only nodes with spill cost > 0 are considered for spilling). */
       float *spill_cost =
-         ralloc_array_size(ra_regs, sizeof(float), num_ssa_regs);
+         rzalloc_array_size(ra_regs, sizeof(float), num_ssa_regs);
 
       /* TODO: Move hard-coded init stuff to here, i.e. don't insert the
        * spilling setup code unless we actually need to spill.
        */
 
       /* Calculate spill costs. */
-#if 1
-      for (unsigned u = 0; u < num_ssa_regs; ++u) {
-         spill_cost[u] = INFINITY;
-      }
-#endif
-
       rogue_foreach_reg (reg, shader, ROGUE_REG_CLASS_SSA) {
          unsigned i = reg->index;
 
-         if (!rogue_reg_can_spill(reg)) {
-            spill_cost[i] = INFINITY;
+         if (!rogue_reg_can_spill(reg))
             continue;
-         }
 
          unsigned uses = list_length(&reg->uses);
          /* TODO: more info to help choose which one to spill. */
-         spill_cost[i] = (float)uses * 10.0f;
+         spill_cost[i] = (float)uses;
       }
 
       /* Set spill costs. */

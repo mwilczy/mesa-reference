@@ -1387,7 +1387,7 @@ static void trans_nir_intrinsic_decl_reg(rogue_builder *b,
    assert(nir_intrinsic_bit_size(intr) <= 32);
 
    /* Just "reserve" the temp for now. */
-   rogue_temp_reg(b->shader, intr->def.index);
+   /* rogue_temp_reg(b->shader, intr->def.index); */
 }
 
 static void trans_nir_intrinsic_store_reg(rogue_builder *b,
@@ -1398,13 +1398,26 @@ static void trans_nir_intrinsic_store_reg(rogue_builder *b,
    assert(!nir_intrinsic_legacy_fsat(intr));
 
    nir_intrinsic_instr *reg_decl = nir_src_as_intrinsic(intr->src[1]);
+   unsigned index = reg_decl->def.index;
+
+   rogue_shader *shader = b->shader;
+   rogue_BYP0B(b, rogue_ref_io(ROGUE_IO_FT0), shader->spill_staging_addr.lo32, rogue_ref_io(ROGUE_IO_S0), rogue_ref_val(index));
+   rogue_MADD64(b, shader->spill_staging_addr.lo32, shader->spill_staging_addr.hi32, rogue_ref_reg(rogue_const_reg(shader, 4)), shader->spill_staging_addr.lo32, shader->inst_base_addr.lo32, shader->inst_base_addr.hi32, rogue_none());
+
+#if 0
    rogue_ref dst =
       rogue_ref_reg(rogue_temp_reg(b->shader, reg_decl->def.index));
+#endif
 
    rogue_ref src =
       intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
 
+#if 0
    rogue_MOV(b, dst, src);
+#endif
+
+   rogue_MOV(b, shader->spill_staging_reg, src);
+   rogue_ST(b, shader->spill_staging_reg, rogue_ref_val(2), rogue_ref_drc(0), rogue_ref_val(1), shader->spill_staging_addr.ref64, rogue_none());
 }
 
 static void trans_nir_intrinsic_load_reg(rogue_builder *b,
@@ -1415,12 +1428,23 @@ static void trans_nir_intrinsic_load_reg(rogue_builder *b,
    assert(!nir_intrinsic_legacy_fneg(intr));
 
    nir_intrinsic_instr *reg_decl = nir_src_as_intrinsic(intr->src[0]);
+   unsigned index = reg_decl->def.index;
+
+   rogue_shader *shader = b->shader;
+   rogue_BYP0B(b, rogue_ref_io(ROGUE_IO_FT0), shader->spill_staging_addr.lo32, rogue_ref_io(ROGUE_IO_S0), rogue_ref_val(index));
+   rogue_MADD64(b, shader->spill_staging_addr.lo32, shader->spill_staging_addr.hi32, rogue_ref_reg(rogue_const_reg(shader, 4)), shader->spill_staging_addr.lo32, shader->inst_base_addr.lo32, shader->inst_base_addr.hi32, rogue_none());
+
    rogue_ref dst =
       intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+#if 0
    rogue_ref src =
       rogue_ref_reg(rogue_temp_reg(b->shader, reg_decl->def.index));
 
    rogue_MOV(b, dst, src);
+#endif
+
+   rogue_LD(b, dst, rogue_ref_drc(0), rogue_ref_val(1), shader->spill_staging_addr.ref64);
 }
 
 static void trans_nir_intrinsic_load_preamble(rogue_builder *b,
@@ -5704,7 +5728,8 @@ static rogue_shader *nir_to_rogue(rogue_build_ctx *ctx,
          } else if (instr->type == nir_instr_type_intrinsic) {
             nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
             if (intr->intrinsic == nir_intrinsic_decl_reg) {
-               rogue_temp_reg(shader, intr->def.index);
+               /* rogue_temp_reg(shader, intr->def.index); */
+               ++shader->ctx->common_data[shader->stage].spill_regs;
             }
          }
          nir_foreach_def(instr, ssa_def_cb, shader);
