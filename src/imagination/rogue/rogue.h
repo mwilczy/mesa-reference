@@ -3576,6 +3576,7 @@ static struct rogue_ref64 rogue_temp_ref64(rogue_shader *shader, unsigned index)
 static struct rogue_ref64 rogue_shared_ref64(rogue_shader *shader,
                                              unsigned index)
 {
+   assert(index < 256);
    return (rogue_ref64){
       .ref64 = rogue_ref_regarray(rogue_shared_regarray(shader, 2, index)),
       .lo32 = rogue_ref_regarray(rogue_shared_regarray(shader, 1, index)),
