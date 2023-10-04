@@ -48,7 +48,7 @@ bool rogue_nir_compute_instance_check(nir_shader *shader)
 
    /* Check we haven't already done this. */
    nir_foreach_function (function, shader) {
-      if (!function->name || !strcmp(function->name, ROGUE_INST_CHK_FUNC_NAME))
+      if (function->name && !strcmp(function->name, ROGUE_INST_CHK_FUNC_NAME))
          return false;
    }
 
