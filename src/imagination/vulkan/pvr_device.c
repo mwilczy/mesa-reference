@@ -391,10 +391,17 @@ static bool pvr_physical_device_get_properties(
 
    const uint32_t max_render_size = rogue_get_render_size_max(dev_info);
 
+#if 0
    const uint32_t max_sample_bits = ((max_multisample << 1) - 1);
+#else
+   const uint32_t max_sample_bits = VK_SAMPLE_COUNT_1_BIT|VK_SAMPLE_COUNT_4_BIT;
+#endif
 
+#if 0
    const uint32_t max_user_vertex_components =
       ((uvs_banks <= 8U) && (uvs_pba_entries == 160U)) ? 64U : 128U;
+#endif
+   const uint32_t max_user_vertex_components = 64U;
 
    /* The workgroup invocations are limited by the case where we have a compute
     * barrier - each slot has a fixed number of invocations, the whole workgroup
@@ -417,8 +424,12 @@ static bool pvr_physical_device_get_properties(
    const uint32_t max_instances_per_pds_task =
       PVR_GET_FEATURE_VALUE(dev_info, max_instances_per_pds_task, 32U);
 
+#if 0
    const uint32_t max_compute_work_group_invocations =
       (usc_slots * max_instances_per_pds_task >= 512U) ? 512U : 384U;
+#else
+   const uint32_t max_compute_work_group_invocations = 128;
+#endif
 
    bool ret;
 
@@ -517,7 +528,8 @@ static bool pvr_physical_device_get_properties(
       .mipmapPrecisionBits = 8U,
 
       .maxDrawIndexedIndexValue = UINT32_MAX,
-      .maxDrawIndirectCount = 2U * 1024U * 1024U * 1024U,
+      /* .maxDrawIndirectCount = 2U * 1024U * 1024U * 1024U, */
+      .maxDrawIndirectCount = 65535,
       .maxSamplerLodBias = 16.0f,
       .maxSamplerAnisotropy = 1.0f,
       .maxViewports = PVR_MAX_VIEWPORTS,
@@ -543,13 +555,15 @@ static bool pvr_physical_device_get_properties(
 
       .maxFramebufferWidth = max_render_size,
       .maxFramebufferHeight = max_render_size,
-      .maxFramebufferLayers = PVR_MAX_FRAMEBUFFER_LAYERS,
+      /* .maxFramebufferLayers = PVR_MAX_FRAMEBUFFER_LAYERS, */
+      .maxFramebufferLayers = 256,
 
       .framebufferColorSampleCounts = max_sample_bits,
       .framebufferDepthSampleCounts = max_sample_bits,
       .framebufferStencilSampleCounts = max_sample_bits,
       .framebufferNoAttachmentsSampleCounts = max_sample_bits,
-      .maxColorAttachments = PVR_MAX_COLOR_ATTACHMENTS,
+      /* .maxColorAttachments = PVR_MAX_COLOR_ATTACHMENTS, */
+      .maxColorAttachments = 4,
       .sampledImageColorSampleCounts = max_sample_bits,
       .sampledImageIntegerSampleCounts = max_sample_bits,
       .sampledImageDepthSampleCounts = max_sample_bits,
@@ -569,7 +583,8 @@ static bool pvr_physical_device_get_properties(
       .lineWidthRange[1] = PVR_LINE_WIDTH_RANGE_MAX,
       .lineWidthGranularity = PVR_LINE_WIDTH_GRANULARITY,
       .strictLines = false,
-      .standardSampleLocations = true,
+      /* .standardSampleLocations = true, */
+      .standardSampleLocations = false,
       .optimalBufferCopyOffsetAlignment = 4U,
       .optimalBufferCopyRowPitchAlignment = 4U,
       .nonCoherentAtomSize = 1U,
