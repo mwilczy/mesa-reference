@@ -103,6 +103,10 @@ static bool is_input_attachment(const nir_instr *instr, UNUSED const void *cb_da
    /* TODO: PVR_RENDERPASS_HWSETUP_INPUT_ACCESS_ONCHIP_ZREPLICATE */
    /* assert(type == PVR_RENDERPASS_HWSETUP_INPUT_ACCESS_ONCHIP); */
 
+   bool is_stencil = util_format_has_stencil(util_format_description(state->fs_data->inputs[i].format)) && (glsl_get_sampler_result_type(image_var->type) != GLSL_TYPE_FLOAT);
+   if (is_stencil)
+      return false;
+
    return true;
 }
 

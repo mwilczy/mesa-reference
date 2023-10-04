@@ -4228,6 +4228,7 @@ typedef struct rogue_build_data {
       struct {
          enum pvr_renderpass_hwsetup_input_access type;
          uint32_t on_chip_rt;
+         enum pipe_format format;
       } * inputs;
 
       struct {

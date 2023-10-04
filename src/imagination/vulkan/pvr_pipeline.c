@@ -2658,6 +2658,8 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
             &hw_subpass->setup.mrt_resources[mrt_idx];
          VkFormat vk_format = pass->attachments[idx].vk_format;
 
+         fs_data->inputs[u].format = vk_format_to_pipe_format(vk_format);
+
          if (fs_data->inputs[u].type ==
              PVR_RENDERPASS_HWSETUP_INPUT_ACCESS_ONCHIP_ZREPLICATE)
             vk_format = VK_FORMAT_R32_SFLOAT;
