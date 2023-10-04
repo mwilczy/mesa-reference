@@ -630,6 +630,9 @@ pvr_spm_init_eot_state(struct pvr_device *device,
    uint32_t usc_temp_count;
    VkResult result;
 
+   for (unsigned u = 0; u < ARRAY_SIZE(emit_state.tile_buffer_id); ++u)
+      emit_state.tile_buffer_id[u] = ~0;
+
    pvr_dev_addr_t next_scratch_buffer_addr =
       framebuffer->scratch_buffer->bo->vma->dev_addr;
    uint64_t mem_stored;
