@@ -1762,7 +1762,10 @@ pvr_pds_compute_shader(struct pvr_pds_compute_shader_program *restrict program,
    uint32_t doutw = 0;
 
    uint32_t barrier_ctrl_word = 0;
+   uint32_t barrier_ctrl_word1 = 0;
    uint32_t barrier_ctrl_word2 = 0;
+   uint32_t barrier_ctrl_word3 = 0;
+   /* uint32_t barrier_ctrl_word2 = 0; */
 
    /* Even though there are 3 IDs for local and global we only need max one
     * DOUTW for local, and two for global.
@@ -1830,10 +1833,15 @@ pvr_pds_compute_shader(struct pvr_pds_compute_shader_program *restrict program,
 
    if (program->barrier_coefficient != PVR_PDS_COMPUTE_INPUT_REG_UNUSED) {
       barrier_ctrl_word = pvr_pds_get_constants(&next_constant, 1, &data_size);
+      barrier_ctrl_word1 = pvr_pds_get_constants(&next_constant, 1, &data_size);
+      barrier_ctrl_word2 = pvr_pds_get_constants(&next_constant, 1, &data_size);
+      barrier_ctrl_word3 = pvr_pds_get_constants(&next_constant, 1, &data_size);
+#if 0
       if (PVR_HAS_QUIRK(dev_info, 51210)) {
          barrier_ctrl_word2 =
             pvr_pds_get_constants(&next_constant, 1, &data_size);
       }
+#endif
    }
 
    if (program->work_group_input_regs[0] != PVR_PDS_COMPUTE_INPUT_REG_UNUSED ||
@@ -1892,6 +1900,7 @@ pvr_pds_compute_shader(struct pvr_pds_compute_shader_program *restrict program,
       }
 
       if (program->barrier_coefficient != PVR_PDS_COMPUTE_INPUT_REG_UNUSED) {
+#if 0
          if (PVR_HAS_QUIRK(dev_info, 51210)) {
             /* Write the constant for the coefficient register write. */
             doutw = pvr_pds_encode_doutw_src1(
@@ -1902,9 +1911,34 @@ pvr_pds_compute_shader(struct pvr_pds_compute_shader_program *restrict program,
                dev_info);
             pvr_pds_write_constant32(buffer, barrier_ctrl_word2, doutw);
          }
+#endif
          /* Write the constant for the coefficient register write. */
          doutw = pvr_pds_encode_doutw_src1(
             program->barrier_coefficient,
+            PVR_PDS_DOUTW_LOWER64,
+            PVR_ROGUE_PDSINST_DOUT_FIELDS_DOUTW_SRC1_DEST_COMMON_STORE,
+            true,
+            dev_info);
+         pvr_pds_write_constant32(buffer, barrier_ctrl_word, doutw);
+
+         doutw = pvr_pds_encode_doutw_src1(
+            program->barrier_coefficient + 2,
+            PVR_PDS_DOUTW_LOWER64,
+            PVR_ROGUE_PDSINST_DOUT_FIELDS_DOUTW_SRC1_DEST_COMMON_STORE,
+            true,
+            dev_info);
+         pvr_pds_write_constant32(buffer, barrier_ctrl_word1, doutw);
+
+         doutw = pvr_pds_encode_doutw_src1(
+            program->barrier_coefficient + 4,
+            PVR_PDS_DOUTW_LOWER64,
+            PVR_ROGUE_PDSINST_DOUT_FIELDS_DOUTW_SRC1_DEST_COMMON_STORE,
+            true,
+            dev_info);
+         pvr_pds_write_constant32(buffer, barrier_ctrl_word2, doutw);
+
+         doutw = pvr_pds_encode_doutw_src1(
+            program->barrier_coefficient + 6,
             PVR_PDS_DOUTW_LOWER64,
             PVR_ROGUE_PDSINST_DOUT_FIELDS_DOUTW_SRC1_DEST_COMMON_STORE,
             true,
@@ -1922,7 +1956,7 @@ pvr_pds_compute_shader(struct pvr_pds_compute_shader_program *restrict program,
             doutw |= PVR_ROGUE_PDSINST_DOUT_FIELDS_DOUTW_SRC1_LAST_EN;
          }
 
-         pvr_pds_write_constant32(buffer, barrier_ctrl_word, doutw);
+         pvr_pds_write_constant32(buffer, barrier_ctrl_word3, doutw);
       }
 
       /* If we want work-group id X, see if we also want work-group id Y. */
@@ -2108,6 +2142,7 @@ pvr_pds_compute_shader(struct pvr_pds_compute_shader_program *restrict program,
 
       /* Do we need to initialize the barrier coefficient? */
       if (program->barrier_coefficient != PVR_PDS_COMPUTE_INPUT_REG_UNUSED) {
+#if 0
          if (PVR_HAS_QUIRK(dev_info, 51210)) {
             /* Initialize the second barrier coefficient registers to zero.
              */
@@ -2116,10 +2151,23 @@ pvr_pds_compute_shader(struct pvr_pds_compute_shader_program *restrict program,
                                           barrier_ctrl_word2, /* SRC1 */
                                           zero_constant64 >> 1)); /* SRC0 */
          }
+#endif
          /* Initialize the coefficient register to zero. */
          APPEND(pvr_pds_encode_doutw64(0, /* cc */
                                        0, /* END */
                                        barrier_ctrl_word, /* SRC1 */
+                                       zero_constant64 >> 1)); /* SRC0 */
+         APPEND(pvr_pds_encode_doutw64(0, /* cc */
+                                       0, /* END */
+                                       barrier_ctrl_word1, /* SRC1 */
+                                       zero_constant64 >> 1)); /* SRC0 */
+         APPEND(pvr_pds_encode_doutw64(0, /* cc */
+                                       0, /* END */
+                                       barrier_ctrl_word2, /* SRC1 */
+                                       zero_constant64 >> 1)); /* SRC0 */
+         APPEND(pvr_pds_encode_doutw64(0, /* cc */
+                                       0, /* END */
+                                       barrier_ctrl_word3, /* SRC1 */
                                        zero_constant64 >> 1)); /* SRC0 */
       }
 

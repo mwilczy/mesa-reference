@@ -1995,9 +1995,10 @@ intrinsic("shared_atomic_img",  src_comp=[1, 1], dest_comp=1, indices=[ATOMIC_OP
 intrinsic("shared_atomic_swap_img",  src_comp=[1, 1, 1], dest_comp=1, indices=[ATOMIC_OP], bit_sizes=[32])
 
 # barrier_counter = [ flags ] ? barrier_counter + { value } : { value }
-intrinsic("barrier_counter_set_img", src_comp=[1], indices=[FLAGS], bit_sizes=[32])
+# base: for multiple counters
+intrinsic("barrier_counter_set_img", src_comp=[1], indices=[FLAGS, BASE], bit_sizes=[32])
 # barrier_counter == { value }
-intrinsic("barrier_counter_cmp_img", src_comp=[1], dest_comp=1, bit_sizes=[32])
+intrinsic("barrier_counter_cmp_img", src_comp=[1], dest_comp=1, indices=[BASE], bit_sizes=[32])
 
 # Hardware that doesn't have load_front_face has this instead.
 intrinsic("load_face_orientation_img", dest_comp=1, bit_sizes=[32])

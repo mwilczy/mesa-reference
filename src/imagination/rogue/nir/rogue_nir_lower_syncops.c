@@ -426,6 +426,10 @@ lower_barrier(struct nir_builder *b, nir_instr *instr, void *data)
    if (wg_size <= RGX_INSTANCES_PER_SLOT)
       return NIR_LOWER_INSTR_PROGRESS_REPLACE;
 
+   unsigned *_barrier = data;
+   unsigned barrier = (*_barrier)++;
+   assert(barrier < 8);
+
    unsigned num_slots = DIV_ROUND_UP(wg_size, RGX_INSTANCES_PER_SLOT);
    nir_def *slot_count = nir_imm_int(b, num_slots);
 
@@ -438,7 +442,7 @@ lower_barrier(struct nir_builder *b, nir_instr *instr, void *data)
 
    nir_if *nif_is_inst_0 = nir_push_if(b, is_inst_0);
    {
-      nir_barrier_counter_set_img(b, nir_imm_int(b, 1), .flags = true);
+      nir_barrier_counter_set_img(b, nir_imm_int(b, 1), .flags = true, .base = barrier);
    }
    nir_pop_if(b, nif_is_inst_0);
 
@@ -446,14 +450,14 @@ lower_barrier(struct nir_builder *b, nir_instr *instr, void *data)
    nir_fence_img(b, .fence_op_img = ROGUE_FENCE_OP_LOCAL);
    nir_fence_img(b, .fence_op_img = ROGUE_FENCE_OP_BRANCH);
 
-   nir_def *all_slots_done = nir_barrier_counter_cmp_img(b, slot_count);
+   nir_def *all_slots_done = nir_barrier_counter_cmp_img(b, slot_count, .base = barrier);
    nir_if *nif_all_slots_done = nir_push_if(b, all_slots_done);
    {
       inst_num = nir_load_instance_num_img(b);
       is_inst_0 = nir_ieq(b, inst_num, nir_imm_int(b, 0));
       nir_if *nif_is_inst_0 = nir_push_if(b, is_inst_0);
       {
-         nir_barrier_counter_set_img(b, nir_imm_int(b, 0));
+         nir_barrier_counter_set_img(b, nir_imm_int(b, 0), .base = barrier);
       }
       nir_pop_if(b, nif_is_inst_0);
 
@@ -484,7 +488,7 @@ lower_barrier(struct nir_builder *b, nir_instr *instr, void *data)
          nir_nop(b);
 
          /* Loop test. */
-         nir_def *loop_cond = nir_barrier_counter_cmp_img(b, nir_imm_int(b, 0));
+         nir_def *loop_cond = nir_barrier_counter_cmp_img(b, nir_imm_int(b, 0), .base = barrier);
          nir_if *loop_break_if = nir_push_if(b, loop_cond);
          {
             nir_jump(b, nir_jump_break);
@@ -514,5 +518,6 @@ lower_barrier(struct nir_builder *b, nir_instr *instr, void *data)
 PUBLIC
 bool rogue_nir_lower_barriers(nir_shader *shader)
 {
-   return nir_shader_lower_instructions(shader, is_barrier, lower_barrier, NULL);
+   unsigned barrier = 0;
+   return nir_shader_lower_instructions(shader, is_barrier, lower_barrier, &barrier);
 }

@@ -1120,10 +1120,12 @@ pvr_compute_pipeline_alloc_coeffs(struct rogue_cs_build_data *cs_data)
 {
    uint32_t next_free_reg = 0;
 
-   if (cs_data->has.barrier)
-      cs_data->barrier_reg = next_free_reg++;
-   else
+   if (cs_data->has.barrier) {
+      cs_data->barrier_reg = next_free_reg;
+      next_free_reg += 8;
+   } else {
       cs_data->barrier_reg = ROGUE_REG_UNUSED;
+   }
 
    /* Workgroup ID regs need to be 128-bit (4-byte) aligned. */
    next_free_reg = ALIGN_POT(next_free_reg, 4);

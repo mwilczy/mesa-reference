@@ -3351,6 +3351,7 @@ trans_nir_intrinsic_fence_img(rogue_builder *b, nir_intrinsic_instr *intr)
    case ROGUE_FENCE_OP_LOCAL:
       return rogue_fence_local(b);
 
+#if 0
    case ROGUE_FENCE_OP_LOCAL_BARRIER_COUNTER: {
       const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
       unsigned barrier_reg_idx = cs_data->barrier_reg;
@@ -3359,6 +3360,7 @@ trans_nir_intrinsic_fence_img(rogue_builder *b, nir_intrinsic_instr *intr)
 
       return rogue_fence_local_ref(b, barrier_reg);
    }
+#endif
 
    case ROGUE_FENCE_OP_GLOBAL:
    case ROGUE_FENCE_OP_IMAGE:
@@ -3375,6 +3377,7 @@ trans_nir_intrinsic_barrier_counter_set_img(rogue_builder *b, nir_intrinsic_inst
    const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
    unsigned barrier_reg_idx = cs_data->barrier_reg;
    assert(barrier_reg_idx != ROGUE_REG_UNUSED);
+   barrier_reg_idx += nir_intrinsic_base(intr);
    rogue_ref barrier_reg = rogue_ref_reg(rogue_coeff_reg(b->shader, barrier_reg_idx));
 
    rogue_ref src = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
@@ -3393,6 +3396,7 @@ trans_nir_intrinsic_barrier_counter_cmp_img(rogue_builder *b, nir_intrinsic_inst
    const struct rogue_cs_build_data *cs_data = &b->shader->ctx->stage_data.cs;
    unsigned barrier_reg_idx = cs_data->barrier_reg;
    assert(barrier_reg_idx != ROGUE_REG_UNUSED);
+   barrier_reg_idx += nir_intrinsic_base(intr);
    rogue_ref barrier_reg = rogue_ref_reg(rogue_coeff_reg(b->shader, barrier_reg_idx));
 
    rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
