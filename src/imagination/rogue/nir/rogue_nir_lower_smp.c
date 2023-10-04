@@ -374,6 +374,15 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
          assert(!coords);
          coords = tex->src[u].src.ssa;
          if (nir_tex_instr_src_type(tex, u) != nir_type_float) {
+            /* Special-case, override buffers to be 2D. */
+            /* TODO: Probably want a separate pass to lower buffer views. */
+            /* TODO: Double check whether this is correct or whether it will match too many things. */
+            if (sampler_dim == GLSL_SAMPLER_DIM_BUF) {
+               sampler_dim = GLSL_SAMPLER_DIM_2D;
+               /* TODO: use a common define for 8192, currently it's in pvr_private.h */
+               coords = nir_vec2(b, nir_umod_imm(b, coords, 8192), nir_udiv_imm(b, coords, 8192));
+               tex->coord_components = 2;
+            }
             int_coords = coords;
             coords = chase_float_src(b, coords, false);
             flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_NNCOORDS);
