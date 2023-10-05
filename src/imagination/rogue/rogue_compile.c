@@ -4459,7 +4459,8 @@ static void trans_nir_if(rogue_builder *b, nir_if *nif)
     * NEXT: modify trans_nir_cf_nodes to pass back how many instructions
     * have been translated, and set this based on that?
     */
-   bool br_skip = (nif->control == nir_selection_control_dont_flatten);
+   /* bool br_skip = (nif->control == nir_selection_control_dont_flatten); */
+   bool br_skip = true;
    if (br_skip) {
       /* Backup cursor position. */
       rogue_cursor cursor = b->cursor;
