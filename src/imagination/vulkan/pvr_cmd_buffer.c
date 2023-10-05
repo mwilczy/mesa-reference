@@ -4395,7 +4395,7 @@ void pvr_compute_update_kernel_private(
                         pipeline->workgroup_size.depth;
    uint32_t coeff_regs;
 
-   if (work_size > ROGUE_MAX_INSTANCES_PER_TASK) {
+   if (work_size > ROGUE_MAX_INSTANCES_PER_TASK && false) {
       /* Enforce a single workgroup per cluster through allocation starvation.
        */
       coeff_regs = dev_runtime_info->cdm_max_local_mem_size_regs;
@@ -4477,7 +4477,7 @@ static void pvr_compute_update_kernel(
    uint32_t work_size = shader_state->work_size;
    uint32_t coeff_regs;
 
-   if (work_size > ROGUE_MAX_INSTANCES_PER_TASK) {
+   if (work_size > ROGUE_MAX_INSTANCES_PER_TASK && false) {
       /* Enforce a single workgroup per cluster through allocation starvation.
        */
       coeff_regs = dev_runtime_info->cdm_max_local_mem_size_regs;
@@ -4504,7 +4504,7 @@ static void pvr_compute_update_kernel(
    info.local_size[2] = 1U;
 
    info.max_instances =
-      pvr_compute_flat_slot_size(pdevice, coeff_regs, false, work_size);
+      pvr_compute_flat_slot_size(pdevice, coeff_regs, shader_state->uses_barrier, work_size);
 
    pvr_compute_generate_control_stream(csb, sub_cmd, &info);
 }
