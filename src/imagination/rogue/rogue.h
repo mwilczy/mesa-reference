@@ -2768,6 +2768,9 @@ bool rogue_regarray_rewrite(rogue_shader *shader,
                             enum rogue_reg_class class,
                             unsigned base_index);
 
+/* temporary.. */
+rogue_reg *rogue_reg_cached(rogue_shader *shader, enum rogue_reg_class class, uint32_t index);
+
 /** Cursor for Rogue instructions/groups and basic blocks. */
 typedef struct rogue_cursor {
    bool block;
@@ -4291,6 +4294,8 @@ typedef struct rogue_build_data {
        * layout(local_size_x = X, local_size_y = Y, local_size_z = Z).
        */
       uint32_t work_size;
+
+      unsigned vtxin_regs;
    } cs;
 } rogue_build_data;
 

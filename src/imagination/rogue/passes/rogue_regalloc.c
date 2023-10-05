@@ -106,7 +106,8 @@ static inline void rogue_ra_setup_class(struct ra_regs *ra_regs,
                                         unsigned stride,
                                         enum rogue_reg_class hw_class,
                                         unsigned num_hw_prealloced,
-                                        unsigned num_hw)
+                                        unsigned num_hw,
+                                        unsigned num_hw_vtxin)
 {
    struct ra_class *ra_class = ra_alloc_contig_reg_class(ra_regs, stride);
    unsigned class_index = ra_class_index(ra_class);
@@ -117,8 +118,12 @@ static inline void rogue_ra_setup_class(struct ra_regs *ra_regs,
    class_info->class_index = class_index;
    class_info->hw_class = hw_class;
 
-   for (unsigned t = num_hw_prealloced; t < num_hw - (stride - 1); ++t)
+   for (unsigned t = num_hw_prealloced; t < (num_hw + num_hw_prealloced) - (stride - 1); ++t)
       ra_class_add_reg(ra_class, t);
+
+   if (num_hw_vtxin)
+      for (unsigned t = (num_hw + num_hw_prealloced); t < ((num_hw + num_hw_prealloced) + num_hw_vtxin) - (stride - 1); ++t)
+         ra_class_add_reg(ra_class, t);
 }
 
 /* TODO: Track successors/predecessors and do this properly when
@@ -396,20 +401,26 @@ static bool rogue_regalloc_try(rogue_shader *shader)
    /* TODO: assert that this is not negative! */
    unsigned num_hw_temps = rogue_reg_class_infos[ROGUE_REG_CLASS_TEMP].num;
 
-   if (shader->stage == MESA_SHADER_COMPUTE)
-      num_hw_temps = calc_max_wg_temps(num_hw_temps, shader->ctx->stage_data.cs.work_size, shader->ctx->stage_data.cs.has.barrier);
+   unsigned num_vtxin_regs = 0;
+   unsigned vtxin_regs_offset = ~0;
+   if (shader->stage == MESA_SHADER_COMPUTE) {
+      struct rogue_cs_build_data *cs_data = &shader->ctx->stage_data.cs;
+      num_hw_temps = calc_max_wg_temps(num_hw_temps, cs_data->work_size, cs_data->has.barrier);
+
+#if 1
+      /* Supplement temps with vertex input regs, skipping used ones. */
+      /* TODO: we can actually re-use used ones, but keeping things simple for now. */
+      vtxin_regs_offset = rogue_count_used_regs(shader, ROGUE_REG_CLASS_VTXIN);
+      num_vtxin_regs = cs_data->vtxin_regs - vtxin_regs_offset;
+      assert(!(num_vtxin_regs & 0x80000000));
+#endif
+   }
 
    num_hw_temps -= num_temps_prealloced;
 
    assert(!(num_hw_temps & 0x80000000));
 
-#if 1
-   const char *env_temps = getenv("TEMPS");
-   if (env_temps)
-      num_hw_temps = atoi(env_temps) - num_temps_prealloced;
-#endif
-
-   struct ra_regs *ra_regs = ra_alloc_reg_set(shader, num_hw_temps, true);
+   struct ra_regs *ra_regs = ra_alloc_reg_set(shader, num_hw_temps + num_temps_prealloced + num_vtxin_regs, false);
 
    /* TODO: Consider tracking this in the shader itself, i.e. one list for child
     * regarrays, one for parents. Or, since children are already in a list in
@@ -463,7 +474,8 @@ static bool rogue_regalloc_try(rogue_shader *shader)
                            stride,
                            ROGUE_REG_CLASS_TEMP,
                            num_temps_prealloced,
-                           num_hw_temps);
+                           num_hw_temps,
+                           num_vtxin_regs);
       if (stride == 1)
          single_regs = true;
    }
@@ -475,7 +487,8 @@ static bool rogue_regalloc_try(rogue_shader *shader)
                            1,
                            ROGUE_REG_CLASS_TEMP,
                            num_temps_prealloced,
-                           num_hw_temps);
+                           num_hw_temps,
+                           num_vtxin_regs);
    }
 
    rogue_ra_class_info *single_class_info =
@@ -631,6 +644,13 @@ static bool rogue_regalloc_try(rogue_shader *shader)
          assert(class_info->stride == size);
          enum rogue_reg_class new_class = class_info->hw_class;
 
+         assert((hw_base_index + size - 1) < (num_hw_temps + num_temps_prealloced) || hw_base_index >= (num_hw_temps + num_temps_prealloced));
+         if (hw_base_index >= (num_hw_temps + num_temps_prealloced)) {
+            assert(vtxin_regs_offset != ~0);
+            hw_base_index = hw_base_index - (num_hw_temps + num_temps_prealloced) + vtxin_regs_offset;
+            new_class = ROGUE_REG_CLASS_VTXIN;
+         }
+
          rogue_print_regarray(fp, regarray);
          fputs(" -> ", fp);
          rogue_print_regarray_raw(fp, new_class, hw_base_index, size);
@@ -644,6 +664,12 @@ static bool rogue_regalloc_try(rogue_shader *shader)
 
          unsigned hw_index = ra_get_node_reg(ra_graph, reg->index);
          enum rogue_reg_class new_class = single_class_info->hw_class;
+
+         if (hw_index >= (num_hw_temps + num_temps_prealloced)) {
+            assert(vtxin_regs_offset != ~0);
+            hw_index = hw_index - (num_hw_temps + num_temps_prealloced) + vtxin_regs_offset;
+            new_class = ROGUE_REG_CLASS_VTXIN;
+         }
 
          rogue_print_reg(fp, reg, ROGUE_IDX_NONE);
          fputs(" -> ", fp);
@@ -666,6 +692,13 @@ static bool rogue_regalloc_try(rogue_shader *shader)
          util_sparse_array_get(&ra_class_info, stride);
       assert(class_info->stride == stride);
       enum rogue_reg_class new_class = class_info->hw_class;
+
+      assert((hw_base_index + stride - 1) < (num_hw_temps + num_temps_prealloced) || hw_base_index >= (num_hw_temps + num_temps_prealloced));
+      if (hw_base_index >= (num_hw_temps + num_temps_prealloced)) {
+         assert(vtxin_regs_offset != ~0);
+         hw_base_index = hw_base_index - (num_hw_temps + num_temps_prealloced) + vtxin_regs_offset;
+         new_class = ROGUE_REG_CLASS_VTXIN;
+      }
 
       bool used = false;
       for (unsigned r = 0; r < stride; ++r) {
@@ -698,13 +731,20 @@ static bool rogue_regalloc_try(rogue_shader *shader)
       unsigned hw_index = ra_get_node_reg(ra_graph, reg->index);
       enum rogue_reg_class new_class = single_class_info->hw_class;
 
+      if (hw_index >= (num_hw_temps + num_temps_prealloced)) {
+         assert(vtxin_regs_offset != ~0);
+         hw_index = hw_index - (num_hw_temps + num_temps_prealloced) + vtxin_regs_offset;
+         new_class = ROGUE_REG_CLASS_VTXIN;
+      }
+
       /* First time using new register, modify in place. */
       if (!rogue_reg_is_used(shader, new_class, hw_index)) {
          rogue_reg_rewrite(shader, reg, new_class, hw_index);
       } else {
          /* Register has already been used, replace references and delete. */
          assert(list_is_singular(&reg->writes)); /* SSA reg. */
-         rogue_reg *new_reg = rogue_temp_reg(shader, hw_index);
+         /* rogue_reg *new_reg = rogue_temp_reg(shader, hw_index); */
+         rogue_reg *new_reg = rogue_reg_cached(shader, new_class, hw_index);
          rogue_reg_replace(reg, new_reg);
       }
    }

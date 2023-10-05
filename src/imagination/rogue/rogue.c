@@ -334,9 +334,8 @@ static inline rogue_reg *rogue_reg_cached_common(rogue_shader *shader,
    return *reg_cached;
 }
 
-static inline rogue_reg *rogue_reg_cached(rogue_shader *shader,
-                                          enum rogue_reg_class class,
-                                          uint32_t index)
+PUBLIC
+rogue_reg *rogue_reg_cached(rogue_shader *shader, enum rogue_reg_class class, uint32_t index)
 {
    return rogue_reg_cached_common(shader, class, index, 0, false);
 }

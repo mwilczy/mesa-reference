@@ -1327,7 +1327,11 @@ static VkResult pvr_compute_pipeline_compile(
    compute_pipeline->shader_state.coefficient_register_count = reg_count;
 
    reg_count = pvr_compute_pipeline_alloc_vtx_ins(cs_data);
+   /* Safe estimate is 12. Absolute minimum would be 8, slightly less safe estimate would be 24. */
+   reg_count = 12;
+   /* reg_count = 24; */
    compute_pipeline->shader_state.input_register_count = reg_count;
+   cs_data->vtxin_regs = ALIGN_POT(reg_count, 4); /* Allocated in blocks of 4. */
 
    /* We make sure that the compiler's unused reg value is compatible with
     * the pds api.
