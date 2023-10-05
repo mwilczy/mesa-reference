@@ -4083,7 +4083,7 @@ static VkResult pvr_setup_descriptor_mappings(
 
             PVR_WRITE(dword_buffer,
                       zero_literal_value,
-                      desc_set_entry->const_offset,
+                      literal->const_offset,
                       pds_info->data_size_in_dwords);
 
             entries += sizeof(*literal);
