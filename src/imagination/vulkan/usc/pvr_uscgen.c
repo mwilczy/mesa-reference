@@ -474,11 +474,12 @@ static void pvr_uscgen_load_op_loads(rogue_builder *b,
    }
 }
 
-static void pvr_uscgen_load_op_loads_nir(nir_builder *b,
+static bool pvr_uscgen_load_op_loads_nir(nir_builder *b,
                                          struct pvr_uscgen_load_op_context *ctx,
                                          struct rogue_build_ctx *rogue_ctx)
 {
    struct rogue_fs_build_data *fs_data = &rogue_ctx->stage_data.fs;
+   bool has_onchip_stores = false;
 
    const struct usc_mrt_setup *mrt_setup =
       ctx->load_op->clears_loads_state.mrt_setup;
@@ -503,6 +504,7 @@ static void pvr_uscgen_load_op_loads_nir(nir_builder *b,
       VkFormat vk_format = pvr_uscgen_format_for_accum(
          ctx->load_op->clears_loads_state.dest_vk_format[rt_idx]);
       struct usc_mrt_resource *mrt_resource = &mrt_setup->mrt_resources[rt_idx];
+      has_onchip_stores |= mrt_resource->type == USC_MRT_RESOURCE_TYPE_OUTPUT_REG;
       nir_tex_instr *tex;
 
       const struct util_format_description *fmt_desc =
@@ -553,14 +555,17 @@ static void pvr_uscgen_load_op_loads_nir(nir_builder *b,
       b->shader->info.outputs_written |=
          BITFIELD64_BIT(FRAG_RESULT_DATA0 + rt_idx);
    }
+
+   return has_onchip_stores;
 }
 
-static void
+static bool
 pvr_uscgen_load_op_clears_nir(nir_builder *b,
                               struct pvr_uscgen_load_op_context *ctx,
                               struct rogue_build_ctx *rogue_ctx)
 {
    struct rogue_fs_build_data *fs_data = &rogue_ctx->stage_data.fs;
+   bool has_onchip_stores = false;
 
    const struct usc_mrt_setup *mrt_setup =
       ctx->load_op->clears_loads_state.mrt_setup;
@@ -573,6 +578,7 @@ pvr_uscgen_load_op_clears_nir(nir_builder *b,
                       sizeof(uint32_t));
 
       struct usc_mrt_resource *mrt_resource = &mrt_setup->mrt_resources[rt_idx];
+      has_onchip_stores |= mrt_resource->type == USC_MRT_RESOURCE_TYPE_OUTPUT_REG;
       nir_def *chans[4];
 
       assert(accum_size_dwords ==
@@ -633,6 +639,8 @@ pvr_uscgen_load_op_clears_nir(nir_builder *b,
       b->shader->info.outputs_written |=
          BITFIELD64_BIT(FRAG_RESULT_DATA0 + depth_idx);
    }
+
+   return has_onchip_stores;
 }
 
 void pvr_uscgen_load_op(struct pvr_device *device,
@@ -686,14 +694,18 @@ void pvr_uscgen_load_op(struct pvr_device *device,
    load_op_properties->shareds_dest_offset = loadop_ctx.next_sh_reg;
    load_op_properties->msaa_mode = ROGUE_MSAA_MODE_PIXEL;
 
+   bool has_onchip_stores = false;
    if (load_op->clears_loads_state.rt_clear_mask || depth_to_reg)
-      pvr_uscgen_load_op_clears_nir(&b, &loadop_ctx, rogue_ctx);
+      has_onchip_stores = pvr_uscgen_load_op_clears_nir(&b, &loadop_ctx, rogue_ctx);
 
    loadop_ctx.next_sh_reg =
       ALIGN_POT(loadop_ctx.next_sh_reg, PVR_SMP_DESCRIPTOR_ALIGNMENT);
 
    if (load_op->clears_loads_state.rt_load_mask)
-      pvr_uscgen_load_op_loads_nir(&b, &loadop_ctx, rogue_ctx);
+      has_onchip_stores = pvr_uscgen_load_op_loads_nir(&b, &loadop_ctx, rogue_ctx);
+
+   if (!has_onchip_stores)
+      nir_dummy_store_img(&b);
 
    rogue_shader *shader = rogue_nir_compile(rogue_ctx, b.shader);
    rogue_set_shader_name(shader, "NIR load_op");

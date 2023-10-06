@@ -2012,6 +2012,8 @@ intrinsic("pass_cov_mask_img", dest_comp=1, src_comp=[1, 1], indices=[BASE], fla
 
 intrinsic("isp_feedback_img", src_comp=[1, 1], bit_sizes=[0, 0], indices=[], flags=[])
 
+intrinsic("dummy_store_img")
+
 # smp:
 # - texture state base
 # - data base

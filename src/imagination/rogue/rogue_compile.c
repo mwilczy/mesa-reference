@@ -618,6 +618,12 @@ static void trans_nir_intrinsic_nop(rogue_builder *b, nir_intrinsic_instr *intr)
    rogue_NOP(b);
 }
 
+static void trans_nir_intrinsic_dummy_store_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   rogue_ref pixout0 = rogue_ref_reg(rogue_pixout_reg(b->shader, 0));
+   rogue_MOV(b, pixout0, pixout0);
+}
+
 static void trans_nir_intrinsic_load_input_fs(rogue_builder *b,
                                               nir_intrinsic_instr *intr)
 {
@@ -2664,6 +2670,9 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_nop:
       return trans_nir_intrinsic_nop(b, intr);
+
+   case nir_intrinsic_dummy_store_img:
+      return trans_nir_intrinsic_dummy_store_img(b, intr);
 
    default:
       break;
