@@ -158,6 +158,100 @@ split_packs = [
 
 algebraic_late += split_packs
 
+# Only 4x8 and 2x16 field packs are natively supported in hardware.
+# Lower the other to the full op + bitfield extract/insert ops
+
+# ('bitfield_insert', 'base', 'insert', 'offset', 'bits')
+# ('ubitfield_extract', 'base', 'offset', 'bits')
+
+# TODO: pck.prog to no longer require this.
+def legalise_r10g10b10a2(fmt):
+   return [
+      (
+         ('pack_' + fmt + '_r10g10b10a2_field', 'base', 'insert', 0),
+         (
+            ('bitfield_insert', 'base',
+               ('ubitfield_extract',
+                  ('pack_' + fmt + '_r10g10b10a2', ('vec4', 'insert', 0, 0, 0)),
+               0, 10),
+            0, 10)
+         )
+      ),
+      (
+         ('pack_' + fmt + '_r10g10b10a2_field', 'base', 'insert', 1),
+         (
+            ('bitfield_insert', 'base',
+               ('ubitfield_extract',
+                  ('pack_' + fmt + '_r10g10b10a2', ('vec4', 0, 'insert', 0, 0)),
+               10, 10),
+            10, 10)
+         )
+      ),
+      (
+         ('pack_' + fmt + '_r10g10b10a2_field', 'base', 'insert', 2),
+         (
+            ('bitfield_insert', 'base',
+               ('ubitfield_extract',
+                  ('pack_' + fmt + '_r10g10b10a2', ('vec4', 0, 0, 'insert', 0)),
+               20, 10),
+            20, 10)
+         )
+      ),
+      (
+         ('pack_' + fmt + '_r10g10b10a2_field', 'base', 'insert', 3),
+         (
+            ('bitfield_insert', 'base',
+               ('ubitfield_extract',
+                  ('pack_' + fmt + '_r10g10b10a2', ('vec4', 0, 0, 0, 'insert')),
+               30, 2),
+            30, 2)
+         )
+      )
+   ]
+
+def legalise_r11g11b10f():
+   return [
+      (
+         ('pack_r11g11b10f_field', 'base', 'insert', 0),
+         (
+            ('bitfield_insert', 'base',
+               ('ubitfield_extract',
+                  ('pack_r11g11b10f', ('vec3', 'insert', 0, 0)),
+               0, 11),
+            0, 11)
+         )
+      ),
+      (
+         ('pack_r11g11b10f_field', 'base', 'insert', 1),
+         (
+            ('bitfield_insert', 'base',
+               ('ubitfield_extract',
+                  ('pack_r11g11b10f', ('vec3', 0, 'insert', 0)),
+               11, 11),
+            11, 11)
+         )
+      ),
+      (
+         ('pack_r11g11b10f_field', 'base', 'insert', 2),
+         (
+            ('bitfield_insert', 'base',
+               ('ubitfield_extract',
+                  ('pack_r11g11b10f', ('vec3', 0, 0, 'insert')),
+               22, 10),
+            22, 10)
+         )
+      )
+   ]
+
+legalise_field_packs = []
+legalise_field_packs += legalise_r10g10b10a2('snorm')
+legalise_field_packs += legalise_r10g10b10a2('unorm')
+legalise_field_packs += legalise_r10g10b10a2('sscaled')
+legalise_field_packs += legalise_r10g10b10a2('uscaled')
+legalise_field_packs += legalise_r11g11b10f()
+
+algebraic_late += legalise_field_packs
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--import-path', required=True)
