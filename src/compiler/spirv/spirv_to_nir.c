@@ -2995,6 +2995,9 @@ vtn_handle_texture(struct vtn_builder *b, SpvOp opcode,
    case nir_texop_txw_img:
       vtn_fail("unexpected nir_texop_txw_img");
       break;
+   case nir_texop_texel_address_img:
+      vtn_fail("unexpected nir_texop_texel_address_img");
+      break;
    }
 
    unsigned idx = 4;

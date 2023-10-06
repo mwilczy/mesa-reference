@@ -2183,6 +2183,7 @@ typedef enum {
    nir_texop_sampler_descriptor_amd,  /**< Returns a sampler descriptor. */
    nir_texop_lod_bias_agx,            /**< Returns the sampler's LOD bias */
    nir_texop_txw_img,                 /**< Texture write */
+   nir_texop_texel_address_img,       /**< Texel address */
 } nir_texop;
 
 /** Represents a texture instruction */

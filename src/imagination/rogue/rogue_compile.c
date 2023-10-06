@@ -3071,7 +3071,6 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_NNCOORDS);
 
 #if 0
-#else
    if (flags & BITFIELD_BIT(ROGUE_SMP_FLAG_INTEGER))
       rogue_set_backend_op_mod(smp, ROGUE_BACKEND_OP_MOD_INTEGER);
 #endif
@@ -3157,6 +3156,7 @@ trans_nir_intrinsic_image_info(rogue_builder *b, nir_intrinsic_instr *intr)
    }
 }
 
+/* TODO: commonise */
 static void
 trans_nir_intrinsic_load_image_state_word_img(rogue_builder *b, nir_intrinsic_instr *intr)
 {
@@ -3167,6 +3167,42 @@ trans_nir_intrinsic_load_image_state_word_img(rogue_builder *b, nir_intrinsic_in
    rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, tex_base + state_word_comp));
 
    rogue_MOV(b, dst, src);
+}
+
+#if 0
+static void
+trans_nir_intrinsic_load_sampler_state_word_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   unsigned smp_base = nir_intrinsic_smp_state_base_img(intr);
+   unsigned state_word_comp = nir_intrinsic_component(intr);
+
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+   rogue_ref src = rogue_ref_reg(rogue_shared_reg(b->shader, smp_base + state_word_comp));
+
+   rogue_MOV(b, dst, src);
+}
+#endif
+
+static void
+trans_nir_intrinsic_shadow_tst_img(rogue_builder *b, nir_intrinsic_instr *intr)
+{
+   rogue_ref dst = intr_dst(b->shader, intr, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+   rogue_ref src0 = intr_src(b->shader, intr, 0, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+   rogue_ref src1 = intr_src(b->shader, intr, 1, &(unsigned){ 1 }, ROGUE_REG_SIZE_BITS);
+
+   unsigned smp_base = nir_intrinsic_smp_state_base_img(intr);
+   rogue_ref smp_state = rogue_ref_reg(rogue_shared_reg(b->shader, smp_base + 2));
+
+   rogue_ALPHATST(b, rogue_ref_io(ROGUE_IO_P0), rogue_ref_drc(0), src0, src1, smp_state);
+
+   unsigned perform_mul_idx = rogue_next_ssa(b->shader);
+   rogue_ref atst_res = rogue_ref_reg(rogue_ssa_reg(b->shader, perform_mul_idx));
+   rogue_GETPRED(b, atst_res, rogue_ref_io(ROGUE_IO_P0));
+
+   rogue_ref imm_1 = rogue_ref_imm_f(1.0f);
+   rogue_ref imm_0 = rogue_ref_imm_f(0.0f);
+
+   rogue_csel(b, &dst, &atst_res, &imm_0, &imm_1, COMPARE_FUNC_EQUAL, nir_type_uint32);
 }
 
 static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
@@ -3325,6 +3361,14 @@ static void trans_nir_intrinsic(rogue_builder *b, nir_intrinsic_instr *intr)
 
    case nir_intrinsic_load_image_state_word_img:
       return trans_nir_intrinsic_load_image_state_word_img(b, intr);
+
+#if 0
+   case nir_intrinsic_load_sampler_state_word_img:
+      return trans_nir_intrinsic_load_sampler_state_word_img(b, intr);
+#endif
+
+   case nir_intrinsic_shadow_tst_img:
+      return trans_nir_intrinsic_shadow_tst_img(b, intr);
 
    default:
       break;
@@ -4201,6 +4245,19 @@ trans_nir_unpack_32_2x16_split(rogue_builder *b, nir_alu_instr *alu, bool hi32)
       rogue_IAND(b, dst, src, rogue_ref_imm(0x0000ffff));
 }
 
+static void
+trans_nir_interleave_agx(rogue_builder *b, nir_alu_instr *alu)
+{
+   rogue_ref dst = alu_dst(b->shader, alu, &(unsigned){ 1 }, 32);
+   rogue_ref src0 = alu_src(b->shader, alu, 0, &(unsigned){ 1 }, 16);
+   rogue_ref src1 = alu_src(b->shader, alu, 1, &(unsigned){ 1 }, 16);
+
+   rogue_bitwise_instr *shfl = rogue_SHFL(b, rogue_ref_io(ROGUE_IO_FT2), src0, src1);
+   rogue_set_instr_group_next(&shfl->instr, true);
+
+   rogue_BYP0C(b, dst, rogue_ref_io(ROGUE_IO_FT2));
+}
+
 enum rogue_storage {
    ROGUE_STORAGE_4x8,
    ROGUE_STORAGE_2x16,
@@ -4810,6 +4867,9 @@ static void trans_nir_alu(rogue_builder *b, nir_alu_instr *alu)
 
    case nir_op_unpack_32_2x16_split_y:
       return trans_nir_unpack_32_2x16_split(b, alu, true);
+
+   case nir_op_interleave_agx:
+      return trans_nir_interleave_agx(b, alu);
 
    default:
       break;

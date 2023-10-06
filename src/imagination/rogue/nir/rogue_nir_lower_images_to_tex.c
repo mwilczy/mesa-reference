@@ -82,9 +82,6 @@ replace_image_type_with_texture(nir_deref_instr *deref)
 static nir_texop image_instr_texop(const nir_intrinsic_instr *intr)
 {
    switch (intr->intrinsic) {
-   /* case nir_intrinsic_image_deref_atomic: */
-   /* case nir_intrinsic_image_deref_atomic_swap: */
-
    case nir_intrinsic_image_deref_load:
       return nir_texop_txf;
 
@@ -99,7 +96,8 @@ static nir_texop image_instr_texop(const nir_intrinsic_instr *intr)
    case nir_intrinsic_image_deref_store:
       return nir_texop_txw_img;
 
-   /* case nir_intrinsic_image_deref_texel_address: */
+   case nir_intrinsic_image_deref_texel_address:
+      return nir_texop_texel_address_img;
 
    default:
       break;
@@ -138,10 +136,6 @@ static void setup_tex_srcs(nir_tex_instr *tex,
    if (info->lod)
       tex->src[src++] = nir_tex_src_for_ssa(nir_tex_src_lod, info->lod);
 }
-
-#if 0
-   replace_image_type_with_texture(deref);
-#endif
 
 static enum util_format_type nir_type_to_util_type(nir_alu_type nir_type)
 {
@@ -187,6 +181,7 @@ static nir_def *lower_image_intrinsic(nir_builder *b,
    tex->is_shadow = false;
    tex->sampler_index = info->sample_index;
    tex->dest_type = info->type;
+   unsigned data_format_bits = nir_alu_type_get_type_size(info->type);
 
    enum pipe_format image_format = var->data.image.format;
    enum pipe_format data_format = type_to_format(info->type);
@@ -197,7 +192,6 @@ static nir_def *lower_image_intrinsic(nir_builder *b,
       /* TODO: support other types. */
       /* assert(data_format == PIPE_FORMAT_R32G32B32A32_FLOAT); */
 
-      unsigned data_format_bits = nir_alu_type_get_type_size(info->type);
       assert(data_format_bits == 32);
 
       /* Pack data to required format. */
@@ -263,7 +257,49 @@ static nir_def *lower_image_intrinsic(nir_builder *b,
 
    setup_tex_srcs(tex, info);
 
-   nir_def_init(&tex->instr, &tex->def, nir_tex_instr_dest_size(tex), 32);
+#if 0
+   enum gl_access_qualifier access = nir_intrinsic_access(intr);
+
+   if (access & ACCESS_CAN_REORDER || access & ACCESS_COHERENT) {
+      tex->backend_flags = 1;
+   }
+#endif
+
+#if 0
+   replace_image_type_with_texture(nir_src_as_deref(nir_src_for_ssa(info->deref)));
+#endif
+
+   /* If we're getting a texel address, ensure that the format is a 32-bit integer, can't work with anything else. */
+   if (intr->intrinsic == nir_intrinsic_image_deref_texel_address) {
+      nir_binding image_binding = nir_chase_binding(nir_src_for_ssa(info->deref));
+      assert(image_binding.success);
+
+      nir_variable *image_var = nir_get_binding_variable(b->shader, image_binding);
+      assert(image_var);
+      assert(image_var->data.mode & nir_var_image);
+
+      enum pipe_format image_fmt = image_var->data.image.format;
+      assert(util_format_is_plain(image_fmt));
+      assert(util_format_is_pure_integer(image_fmt));
+
+      assert(util_format_get_nr_components(image_fmt) == 1);
+      assert(util_format_get_blockwidth(image_fmt) == 1);
+      assert(util_format_get_blockheight(image_fmt) == 1);
+      assert(util_format_get_blockdepth(image_fmt) == 1);
+      assert(util_format_get_blocksizebits(image_fmt) == 32);
+
+#if 0
+      /* TODO: above but better */
+      const struct util_format_description *fmt_desc = util_format_description(image_fmt);
+      assert(fmt_desc->block.width == 1);
+      assert(fmt_desc->block.height == 1);
+      assert(fmt_desc->block.depth == 1);
+      assert(fmt_desc->block.bits == 32);
+      assert(fmt_desc->layout == UTIL_FORMAT_LAYOUT_PLAIN);
+#endif
+   }
+
+   nir_def_init(&tex->instr, &tex->def, nir_tex_instr_dest_size(tex), data_format_bits);
    nir_builder_instr_insert(b, &tex->instr);
 
    unsigned dst_comps = nir_intrinsic_dest_components(intr);
@@ -282,15 +318,13 @@ static bool is_image_instr(const nir_instr *instr, UNUSED const void *cb_data)
 
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
    switch (intr->intrinsic) {
-   /* case nir_intrinsic_image_deref_atomic: */
-   /* case nir_intrinsic_image_deref_atomic_swap: */
    case nir_intrinsic_image_deref_load:
    case nir_intrinsic_image_deref_samples:
    /* case nir_intrinsic_image_deref_samples_identical: */
    case nir_intrinsic_image_deref_size:
-   case nir_intrinsic_image_deref_sparse_load:
+   /* case nir_intrinsic_image_deref_sparse_load: */
    case nir_intrinsic_image_deref_store:
-   /* case nir_intrinsic_image_deref_texel_address: */
+   case nir_intrinsic_image_deref_texel_address:
       return true;
 
    default:
@@ -303,13 +337,11 @@ static bool is_image_instr(const nir_instr *instr, UNUSED const void *cb_data)
 static bool image_instr_has_coords(const nir_intrinsic_instr *intr)
 {
    switch (intr->intrinsic) {
-   /* case nir_intrinsic_image_deref_atomic: */
-   /* case nir_intrinsic_image_deref_atomic_swap: */
    case nir_intrinsic_image_deref_load:
    /* case nir_intrinsic_image_deref_samples_identical: */
-   case nir_intrinsic_image_deref_sparse_load:
+   /* case nir_intrinsic_image_deref_sparse_load: */
    case nir_intrinsic_image_deref_store:
-   /* case nir_intrinsic_image_deref_texel_address: */
+   case nir_intrinsic_image_deref_texel_address:
       return true;
 
    case nir_intrinsic_image_deref_size:
@@ -358,12 +390,10 @@ static nir_def *image_instr_coords(nir_builder *b, const nir_intrinsic_instr *in
 static int image_instr_has_sample_index(const nir_intrinsic_instr *intr)
 {
    switch (intr->intrinsic) {
-   /* case nir_intrinsic_image_deref_atomic: */
-   /* case nir_intrinsic_image_deref_atomic_swap: */
    case nir_intrinsic_image_deref_load:
-   case nir_intrinsic_image_deref_sparse_load:
+   /* case nir_intrinsic_image_deref_sparse_load: */
    case nir_intrinsic_image_deref_store:
-   /* case nir_intrinsic_image_deref_texel_address: */
+   case nir_intrinsic_image_deref_texel_address:
       return true;
 
    case nir_intrinsic_image_deref_size:
@@ -400,18 +430,12 @@ static int image_instr_write_data_src_idx(const nir_intrinsic_instr *intr)
    case nir_intrinsic_image_deref_store:
       return 3;
 
-   /* TODO */
-   /*
-   case nir_intrinsic_image_deref_atomic:
-   case nir_intrinsic_image_deref_atomic_swap:
-   */
-
    case nir_intrinsic_image_deref_load:
    case nir_intrinsic_image_deref_samples:
    /* case nir_intrinsic_image_deref_samples_identical: */
    case nir_intrinsic_image_deref_size:
-   case nir_intrinsic_image_deref_sparse_load:
-   /* case nir_intrinsic_image_deref_texel_address: */
+   /* case nir_intrinsic_image_deref_sparse_load: */
+   case nir_intrinsic_image_deref_texel_address:
       return -1;
 
    default:
@@ -442,20 +466,16 @@ static int image_instr_lod_src_idx(const nir_intrinsic_instr *intr)
    case nir_intrinsic_image_deref_size:
       return 1;
 
-   /* case nir_intrinsic_image_deref_texel_address: */
-      /* return 2; */
-
    case nir_intrinsic_image_deref_load:
-   case nir_intrinsic_image_deref_sparse_load:
-   /* case nir_intrinsic_image_deref_atomic: */
+   /* case nir_intrinsic_image_deref_sparse_load: */
       return 3;
 
    case nir_intrinsic_image_deref_store:
-   /* case nir_intrinsic_image_deref_atomic_swap: */
       return 4;
 
    case nir_intrinsic_image_deref_samples:
    /* case nir_intrinsic_image_deref_samples_identical: */
+   case nir_intrinsic_image_deref_texel_address:
       return -1;
 
    default:
@@ -510,6 +530,10 @@ setup_image_instr_info(nir_builder *b, const nir_intrinsic_instr *intr, struct i
          info->type = nir_type_uint32;
          break;
 
+      case nir_intrinsic_image_deref_texel_address:
+         info->type = nir_type_uint64;
+         break;
+
       default:
          unreachable("Unsupported image intrinsic.");
       }
@@ -519,7 +543,7 @@ setup_image_instr_info(nir_builder *b, const nir_intrinsic_instr *intr, struct i
 static nir_def *lower_image_instr(nir_builder *b, nir_instr *instr, UNUSED void *cb_data)
 {
    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
-   assert(nir_intrinsic_format(intr) == PIPE_FORMAT_NONE);
+   /* assert(nir_intrinsic_format(intr) == PIPE_FORMAT_NONE); */
 
    struct image_instr_info info;
    setup_image_instr_info(b, intr, &info);

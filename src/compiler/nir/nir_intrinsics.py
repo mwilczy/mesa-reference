@@ -2024,6 +2024,8 @@ index("unsigned", "smp_state_base_img")
 index("unsigned", "info_base_img")
 intrinsic("smp_img", src_comp=[16], dest_comp=0, bit_sizes=[32], indices=[TEX_STATE_BASE_IMG, SMP_STATE_BASE_IMG, IMAGE_DIM, FLAGS], flags=[])
 
+# TODO: rename image to tex?
+
 intrinsic("load_image_array_maxidx_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 intrinsic("load_image_array_stride_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 intrinsic("load_image_array_base_addr_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[64])
@@ -2033,3 +2035,6 @@ intrinsic("load_image_height_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_
 intrinsic("load_image_depth_img", src_comp=[], dest_comp=1, indices=[INFO_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
 
 intrinsic("load_image_state_word_img", src_comp=[], dest_comp=1, indices=[TEX_STATE_BASE_IMG, COMPONENT], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])
+
+# shadow_tst_img(src0, src1) [sampler_state] ? 1.0f : 0.0f
+intrinsic("shadow_tst_img", src_comp=[1, 1], dest_comp=1, indices=[SMP_STATE_BASE_IMG], flags=[CAN_ELIMINATE, CAN_REORDER], bit_sizes=[32])

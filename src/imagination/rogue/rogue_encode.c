@@ -1698,6 +1698,11 @@ static void rogue_encode_bitwise_instr(const rogue_bitwise_instr *bitwise,
       instr_encoding->bitwise.ph0.shft = SHFT1_BYP;
       break;
 
+   case ROGUE_BITWISE_OP_SHFL:
+      instr_encoding->bitwise.phase0 = 1;
+      instr_encoding->bitwise.ph0.shft = SHFT1_SHFL;
+      break;
+
    default:
       unreachable("Invalid bitwise op.");
    }

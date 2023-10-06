@@ -43,13 +43,13 @@ static const struct spirv_to_nir_options spirv_options = {
 
    /* TODO: set these from the driver. */
    .caps = {
-      .int16 = true,
-      .int64 = true,
-      .int8 = true,
-      .storage_16bit = true,
-      .storage_8bit = true,
-      .float32_atomic_add = true,
-      .float32_atomic_min_max = true,
+      /* .int16 = true, */
+      /* .int64 = true, */
+      /* .int8 = true, */
+      /* .storage_16bit = true, */
+      /* .storage_8bit = true, */
+      /* .float32_atomic_add = true, */
+      /* .float32_atomic_min_max = true, */
    },
 
    .ubo_addr_format = nir_address_format_64bit_global,
@@ -172,6 +172,7 @@ static const nir_shader_compiler_options nir_options = {
    /* .has_fsub = true, */
    /* .has_isub = true, */
    .lower_fsat = true,
+   .lower_ldexp = true,
    .support_8bit_alu = true,
    .support_16bit_alu = true,
    .max_unroll_iterations = 16,
@@ -474,9 +475,9 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
    /* Lower samplers. */
    NIR_PASS_V(nir, nir_opt_dce);
    NIR_PASS_V(nir, nir_opt_deref);
+   NIR_PASS_V(nir, nir_lower_image_atomics_to_global);
    NIR_PASS_V(nir, rogue_nir_lower_images_to_tex);
    /* NIR_PASS_V(nir, nir_lower_readonly_images_to_tex, true); */
-   /* NIR_PASS_V(nir, nir_lower_image_atomics_to_global); */
    /* NIR_PASS_V(nir, rogue_nir_lower_tex, ctx); */
    /* NIR_PASS_V(nir, nir_lower_samplers); */
    NIR_PASS_V(nir, nir_lower_tex, &(nir_lower_tex_options){ .lower_txd_cube_map = true, });

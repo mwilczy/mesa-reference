@@ -38,19 +38,22 @@
 
 /* TODO: Probably want the binding -> base lookup part of this in rogue_nir_lower_vk_io.c */
 
-#if 0
-static unsigned tex_coord_components(const nir_tex_instr *tex)
+static unsigned tex_coord_components(enum glsl_sampler_dim sampler_dim, bool is_array)
 {
-   if (nir_tex_instr_src_index(tex, nir_tex_src_coord) < 0)
-      return 0;
-
-   unsigned coord_components = glsl_get_sampler_dim_coordinate_components(tex->sampler_dim);
-   if (tex->is_array)
+   unsigned coord_components = glsl_get_sampler_dim_coordinate_components(sampler_dim);
+   if (is_array)
       coord_components++;
 
    return coord_components;
 }
-#endif
+
+static unsigned tex_instr_coord_components(const nir_tex_instr *tex)
+{
+   if (nir_tex_instr_src_index(tex, nir_tex_src_coord) < 0)
+      return 0;
+
+   return tex_coord_components(tex->sampler_dim, tex->is_array);
+}
 
 static nir_def *lower_txs(nir_builder *b, unsigned num_components, unsigned info_base, bool is_array)
 {
@@ -76,10 +79,11 @@ static nir_def *lower_txs(nir_builder *b, unsigned num_components, unsigned info
    return nir_vec(b, size_comp, c);
 }
 
+/* TODO: replace hard-coded offsets, etc. with csbgen defines. */
 static nir_def *lower_texture_samples(nir_builder *b, unsigned tex_base)
 {
    nir_def *image_state_word_0_hi = nir_load_image_state_word_img(b, .tex_state_base_img = tex_base, .component = 1);
-   nir_def *tex_samples_log2 = nir_ubitfield_extract(b, image_state_word_0_hi, nir_imm_int(b, 30), nir_imm_int(b, 2));
+   nir_def *tex_samples_log2 = nir_ubitfield_extract_imm(b, image_state_word_0_hi, 30, 2);
    nir_def *tex_samples = nir_ishl(b, nir_imm_int(b, 1), tex_samples_log2);
 
    return tex_samples;
@@ -88,15 +92,66 @@ static nir_def *lower_texture_samples(nir_builder *b, unsigned tex_base)
 static nir_def *lower_query_levels(nir_builder *b, unsigned tex_base)
 {
    nir_def *image_state_word_1_lo = nir_load_image_state_word_img(b, .tex_state_base_img = tex_base, .component = 2);
-   nir_def *query_levels = nir_ubitfield_extract(b, image_state_word_1_lo, nir_imm_int(b, 0), nir_imm_int(b, 4));
+
+   nir_def *query_levels = nir_ubitfield_extract_imm(b, image_state_word_1_lo, 0, 4);
 
    return query_levels;
+}
+
+static nir_def *lower_texel_address(nir_builder *b, nir_def *int_coords, unsigned tex_base, enum glsl_sampler_dim sampler_dim, bool is_array)
+{
+   /* TODO: N.B. This is extremely limited. */
+   unsigned coord_components = tex_coord_components(sampler_dim, is_array);
+   assert(coord_components == 2);
+
+   /* Only support images for now... */
+   assert(sampler_dim == GLSL_SAMPLER_DIM_2D);
+   assert(!is_array);
+
+   nir_def *image_state_word_1_lo = nir_load_image_state_word_img(b, .tex_state_base_img = tex_base, .component = 2);
+   nir_def *image_state_word_1_hi = nir_load_image_state_word_img(b, .tex_state_base_img = tex_base, .component = 3);
+
+   /* 40-bit address, shifted right by two: */
+
+   /* addr_lo[17..2] */
+   nir_def *image_base_addr_lo_17_2 = nir_ubitfield_extract_imm(b, image_state_word_1_lo, 16, 16);
+   nir_def *image_base_addr_lo = nir_bitfield_insert_imm(b, nir_imm_int(b, 0), image_base_addr_lo_17_2, 2, 16);
+
+   /* addr_lo[31..18] */
+   nir_def *image_base_addr_lo_31_18 = nir_ubitfield_extract_imm(b, image_state_word_1_hi, 0, 14);
+   image_base_addr_lo = nir_bitfield_insert_imm(b, image_base_addr_lo, image_base_addr_lo_31_18, 18, 14);
+
+   /* addr_hi[7..0] */
+   nir_def *image_base_addr_hi_7_0 = nir_ubitfield_extract_imm(b, image_state_word_1_hi, 14, 8);
+   nir_def *image_base_addr_hi = image_base_addr_hi_7_0;
+
+   nir_def *image_base_addr = nir_pack_64_2x32(b, nir_vec2(b, image_base_addr_lo, image_base_addr_hi));
+
+#if 0
+   /* Width and height */
+   nir_def *image_state_word_0_hi = nir_load_image_state_word_img(b, .tex_state_base_img = tex_base, .component = 1);
+
+   nir_def *image_width = nir_iadd_imm(b, nir_ubitfield_extract_imm(b, image_state_word_0_hi, 16, 14), 1);
+   nir_def *image_height = nir_iadd_imm(b, nir_ubitfield_extract_imm(b, image_state_word_0_hi, 2, 14), 1);
+#endif
+
+   /* Calculate untwiddled offset. */
+   nir_def *x = nir_channel(b, int_coords, 0);
+   nir_def *y = nir_channel(b, int_coords, 1);
+   nir_def *twiddled_offset = nir_interleave_agx(b, nir_u2u16(b, y), nir_u2u16(b, x));
+   twiddled_offset = nir_imul_imm(b, twiddled_offset, 4);
+
+   /* Offset the address by the co-ordinates. */
+   nir_def *image_addr = nir_iadd(b, image_base_addr, nir_u2u64(b, twiddled_offset));
+
+   return image_addr;
 }
 
 static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, unsigned *tex_state_base, unsigned *smp_state_base, unsigned *info_base, enum pvr_stage_allocation pvr_stage, const rogue_build_ctx *ctx)
 {
    const struct pvr_pipeline_layout *pipeline_layout = ctx->pipeline_layout;
 
+   /* TODO: rename this from combined_state_binding to something else. */
    nir_binding combined_state_binding = nir_chase_binding(*tex_state_src);
    assert(combined_state_binding.success);
 
@@ -105,7 +160,6 @@ static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, uns
 
    const struct pvr_descriptor_set_layout_binding *combined_binding_layout = pvr_get_descriptor_binding(combined_set_layout, combined_state_binding.binding);
    assert(combined_binding_layout);
-   /* assert(combined_binding_layout->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); */
 
    struct pvr_descriptor_size_info combined_desc_size_info;
    pvr_descriptor_size_info_init(ctx->compiler->dev_info, pipeline_layout->robust_buffer_access, combined_binding_layout->type, &combined_desc_size_info);
@@ -125,36 +179,38 @@ static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, uns
 
    if (smp_state_base) {
       unsigned _smp_state_base = ROGUE_REG_UNUSED;
-      if (smp_state_src) {
+
+      if (combined_binding_layout->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+         /* Combined sampler, located after image. */
+         _smp_state_base = _tex_state_base + PVR_IMAGE_DESCRIPTOR_SIZE;
+      } else if (smp_state_src) {
+         /* Separate sampler. */
+         /* TODO: assert type? */
          nir_binding smp_state_binding = nir_chase_binding(*smp_state_src);
          assert(smp_state_binding.success);
 
-         if (combined_binding_layout->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-            _smp_state_base = _tex_state_base + PVR_IMAGE_DESCRIPTOR_SIZE;
-         } else {
-            /* TODO: commonise this */
-            const struct pvr_descriptor_set_layout *smp_set_layout = pipeline_layout->set_layout[smp_state_binding.desc_set];
-            assert(smp_set_layout);
+         /* TODO: commonise this */
+         const struct pvr_descriptor_set_layout *smp_set_layout = pipeline_layout->set_layout[smp_state_binding.desc_set];
+         assert(smp_set_layout);
 
-            const struct pvr_descriptor_set_layout_binding *smp_binding_layout = pvr_get_descriptor_binding(smp_set_layout, smp_state_binding.binding);
-            assert(smp_binding_layout);
+         const struct pvr_descriptor_set_layout_binding *smp_binding_layout = pvr_get_descriptor_binding(smp_set_layout, smp_state_binding.binding);
+         assert(smp_binding_layout);
 
-            struct pvr_descriptor_size_info smp_desc_size_info;
-            pvr_descriptor_size_info_init(ctx->compiler->dev_info, pipeline_layout->robust_buffer_access, smp_binding_layout->type, &smp_desc_size_info);
+         struct pvr_descriptor_size_info smp_desc_size_info;
+         pvr_descriptor_size_info_init(ctx->compiler->dev_info, pipeline_layout->robust_buffer_access, smp_binding_layout->type, &smp_desc_size_info);
 
-            /* Add the offset of the descriptor within the binding. */
-            unsigned smp_desc_elem = 0;
-            if (smp_binding_layout->descriptor_count > 1) {
-               assert(smp_state_binding.num_indices == 1);
-               smp_desc_elem = nir_src_as_uint(smp_state_binding.indices[0]);
-            }
-
-            _smp_state_base = pvr_get_required_descriptor_primary_sh_reg(pipeline_layout, pvr_stage, smp_state_binding.desc_set, smp_binding_layout);
-            _smp_state_base += smp_desc_elem * smp_desc_size_info.primary;
+         /* Add the offset of the descriptor within the binding. */
+         unsigned smp_desc_elem = 0;
+         if (smp_binding_layout->descriptor_count > 1) {
+            assert(smp_state_binding.num_indices == 1);
+            smp_desc_elem = nir_src_as_uint(smp_state_binding.indices[0]);
          }
 
+         _smp_state_base = pvr_get_required_descriptor_primary_sh_reg(pipeline_layout, pvr_stage, smp_state_binding.desc_set, smp_binding_layout);
+         _smp_state_base += smp_desc_elem * smp_desc_size_info.primary;
       } else {
          /* If not provided, point sampler needed. */
+         /* TODO: assert type? */
          assert(pipeline_layout->point_sampler_in_dwords_per_stage[pvr_stage] != ROGUE_REG_UNUSED);
          _smp_state_base = pipeline_layout->point_sampler_in_dwords_per_stage[pvr_stage];
       }
@@ -169,25 +225,25 @@ static void lookup_base_regs(nir_src *tex_state_src, nir_src *smp_state_src, uns
       *info_base = _info_base;
 }
 
-static nir_def * chase_float_src(nir_builder *b, nir_def *val/* , bool round */)
+static nir_def * chase_float_src(nir_builder *b, nir_def *val, bool round)
 {
+   nir_def *as_float = NULL;
+
    if (val->parent_instr->type == nir_instr_type_alu) {
       nir_alu_instr *alu = nir_instr_as_alu(val->parent_instr);
       if (alu->op == nir_op_f2i32) {
          nir_def *float_src = nir_ssa_for_alu_src(b, alu, 0);
-         /* if (!round) */
-            return float_src;
-
-#if 0
-         nir_def *rounded = nir_convert_alu_types(b, 32, float_src, .src_type = nir_type_float32, .dest_type = nir_type_int32, .rounding_mode = nir_rounding_mode_rtz);
-         rounded = nir_convert_alu_types(b, 32, rounded, .src_type = nir_type_int32, .dest_type = nir_type_float32, .rounding_mode = nir_rounding_mode_rtz);
-         return rounded;
-#endif
+         as_float = float_src;
       }
    }
 
-   unreachable();
-   /* return nir_i2f32(b, val); */
+   if (!as_float)
+      as_float = nir_i2f32(b, val);
+
+   if (round)
+      as_float = nir_ffloor(b, as_float);
+
+   return as_float;
 }
 
 static const int8_t default_tg4_offsets[4][2] = {
@@ -204,8 +260,6 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    nir_tex_instr *tex = nir_instr_as_tex(instr);
 
    enum glsl_sampler_dim sampler_dim = tex->sampler_dim;
-
-   assert(nir_alu_type_get_type_size(tex->dest_type) == 32);
 
    assert(tex->is_shadow == tex->is_new_style_shadow);
    assert(!tex->is_sparse);
@@ -240,7 +294,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 
    unsigned flags = 0;
 
-   bool int_comps = false;
+   nir_def *int_coords = NULL;
    bool is_array = tex->is_array;
    for (unsigned u = 0; u < tex->num_srcs; ++u) {
       switch (tex->src[u].src_type) {
@@ -248,14 +302,9 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
          assert(!coords);
          coords = tex->src[u].src.ssa;
          if (nir_tex_instr_src_type(tex, u) != nir_type_float) {
-#if 0
-            coords = nir_i2f32(b, coords);
+            int_coords = coords;
+            coords = chase_float_src(b, coords, false);
             flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_NNCOORDS);
-#else
-            /* TODO: get rid. this works.. but we don't want to use it. */
-            flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_INTEGER);
-            int_comps = true;
-#endif
          }
          break;
 
@@ -272,15 +321,19 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       case nir_tex_src_lod:
          assert(!lod_replace);
          lod_replace = tex->src[u].src.ssa;
-#if 0
+#if 1
          if (nir_tex_instr_src_type(tex, u) != nir_type_float)
-            lod_replace = nir_i2f32(b, lod_replace);
+            lod_replace = chase_float_src(b, lod_replace, true);
 #endif
          break;
 
       case nir_tex_src_bias:
          assert(!lod_bias);
          lod_bias = tex->src[u].src.ssa;
+#if 1
+         if (nir_tex_instr_src_type(tex, u) != nir_type_float)
+            lod_bias = chase_float_src(b, lod_bias, true);
+#endif
          break;
 
       case nir_tex_src_comparator:
@@ -296,6 +349,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       case nir_tex_src_projector:
          assert(!proj);
          proj = tex->src[u].src.ssa;
+         /* TODO: needs int check as well? */
          break;
 
       case nir_tex_src_ddx:
@@ -332,8 +386,7 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
 
    assert(!!tex_state_src != ((fixed_tex_base != ROGUE_REG_UNUSED) && (fixed_smp_base != ROGUE_REG_UNUSED)));
 
-   /* TODO NEXT: try not needing int flag and see if this is still needed. */
-   if (int_comps && sampler_dim == GLSL_SAMPLER_DIM_CUBE) {
+   if (int_coords && sampler_dim == GLSL_SAMPLER_DIM_CUBE) {
       sampler_dim = GLSL_SAMPLER_DIM_2D;
       is_array = true;
    }
@@ -371,10 +424,17 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
          flags |= BITFIELD_BIT(ROGUE_SMP_FLAG_INFO);
          break;
 
+      case nir_texop_texel_address_img:
+         assert(nir_alu_type_get_type_size(tex->dest_type) == 64);
+         assert(int_coords);
+         return lower_texel_address(b, int_coords, tex_base, sampler_dim, is_array);
+
       default:
          unreachable("Unsupported texture query op.");
       }
    }
+
+   assert(nir_alu_type_get_type_size(tex->dest_type) == 32);
 
    assert(coords);
    assert(coords->num_components == tex->coord_components);
@@ -382,12 +442,14 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
    nir_def *tex_addr_override = NULL;
    if (is_array && !nir_tex_instr_is_query(tex)) {
       /* Separate out the array index component. */
-      /* TODO: nir_f2u32_rte? */
-
-      nir_def *array_idx = nir_channel(b, coords, tex->coord_components - 1);
-
-      if (!int_comps)
+      nir_def *array_idx;
+      if (int_coords) {
+         array_idx = nir_channel(b, int_coords, tex->coord_components - 1);
+      } else {
+         array_idx = nir_channel(b, coords, tex->coord_components - 1);
+         /* TODO: nir_f2u32_rte? */
          array_idx = nir_convert_alu_types(b, 32, array_idx, .src_type = nir_type_float32, .dest_type = nir_type_uint32, .rounding_mode = nir_rounding_mode_rtne);
+      }
 
       coords = nir_trim_vector(b, coords, tex->coord_components - 1);
 
@@ -395,6 +457,11 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       assert(info_base != ROGUE_REG_UNUSED);
       nir_def *image_array_maxidx = nir_load_image_array_maxidx_img(b, .info_base_img = info_base);
       array_idx = nir_bcsel(b, nir_ult(b, array_idx, image_array_maxidx), array_idx, image_array_maxidx);
+
+      if (sampler_dim == GLSL_SAMPLER_DIM_CUBE)
+         array_idx = nir_imul_imm(b, array_idx, 6);
+
+      /* TODO: if image then also array_idx = nir_iadd_imm(b, array_idx, 5); */
 
       /* Calculate the new array address. */
       tex_addr_override = nir_iadd(b, nir_u2u64(b, nir_imul(b, array_idx, nir_load_image_array_stride_img(b, .info_base_img = info_base))), nir_u2u64(b, nir_load_image_array_base_addr_img(b, .info_base_img = info_base)));
@@ -580,7 +647,9 @@ static nir_def *lower_smp(nir_builder *b, nir_instr *instr, void *cb_data)
       if (proj)
          comparator = nir_fdiv(b, comparator, proj);
 
-      sample = nir_bcsel(b, nir_flt(b, comparator, sample), nir_imm_float(b, 1.0f), nir_imm_float(b, 0.0f));
+      /* sample = nir_bcsel(b, nir_flt(b, comparator, sample), nir_imm_float(b, 1.0f), nir_imm_float(b, 0.0f)); */
+
+      sample = nir_shadow_tst_img(b, sample, comparator, .smp_state_base_img = smp_base);
    }
 
    return sample;

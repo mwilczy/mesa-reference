@@ -68,11 +68,7 @@ fmt_pack_scalar(nir_builder *b,
    }
    /* < 32-bit pure integer - extract (with sign-extension if signed). */
    else if (is_pure_int && bits < 32) {
-      packed = nir_bitfield_insert(b,
-                                   base,
-                                   value,
-                                   nir_imm_int(b, offset),
-                                   nir_imm_int(b, bits));
+      packed = nir_bitfield_insert_imm(b, base, value, offset, bits);
    }
    /* < 32-bit float - float pack. */
    else if (is_float && bits < 32) {
@@ -192,14 +188,9 @@ fmt_unpack_scalar(nir_builder *b,
    /* < 32-bit pure integer - extract (with sign-extension if signed). */
    else if (is_pure_int && bits < 32) {
       chan = 0;
-      unpacked = is_signed ? nir_ibitfield_extract(b,
-                                                   raw_load,
-                                                   nir_imm_int(b, offset),
-                                                   nir_imm_int(b, bits))
-                           : nir_ubitfield_extract(b,
-                                                   raw_load,
-                                                   nir_imm_int(b, offset),
-                                                   nir_imm_int(b, bits));
+      unpacked = is_signed
+                    ? nir_ibitfield_extract_imm(b, raw_load, offset, bits)
+                    : nir_ubitfield_extract_imm(b, raw_load, offset, bits);
    }
    /* < 32-bit float - float unpack. */
    else if (is_float && bits < 32) {
@@ -322,7 +313,10 @@ static bool chan_is_float(unsigned chan,
    return !chan_desc->pure_integer;
 }
 
-nir_def *get_unspec_chan(nir_builder *b, enum pipe_swizzle chan, unsigned bit_size, const struct util_format_description *fmt_desc)
+nir_def *get_unspec_chan(nir_builder *b,
+                         enum pipe_swizzle chan,
+                         unsigned bit_size,
+                         const struct util_format_description *fmt_desc)
 {
    if (chan == PIPE_SWIZZLE_0)
       return nir_imm_int(b, 0);

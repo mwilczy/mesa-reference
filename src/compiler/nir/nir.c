@@ -3049,6 +3049,7 @@ nir_tex_instr_result_size(const nir_tex_instr *instr)
    case nir_texop_fragment_mask_fetch_amd:
    case nir_texop_lod_bias_agx:
    case nir_texop_txw_img:
+   case nir_texop_texel_address_img:
       return 1;
 
    case nir_texop_descriptor_amd:
@@ -3076,6 +3077,7 @@ nir_tex_instr_is_query(const nir_tex_instr *instr)
    case nir_texop_descriptor_amd:
    case nir_texop_sampler_descriptor_amd:
    case nir_texop_lod_bias_agx:
+   case nir_texop_texel_address_img:
       return true;
    case nir_texop_tex:
    case nir_texop_txb:
@@ -3123,6 +3125,7 @@ nir_tex_instr_src_type(const nir_tex_instr *instr, unsigned src)
       case nir_texop_fragment_fetch_amd:
       case nir_texop_fragment_mask_fetch_amd:
       case nir_texop_txw_img:
+      case nir_texop_texel_address_img:
          return nir_type_int;
 
       default:

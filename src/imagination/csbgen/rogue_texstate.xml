@@ -296,7 +296,11 @@ SOFTWARE.
       <field name="frame_buffer_compression" start="55" end="55" type="bool"/>
       <field name="frame_buffer_compression_addressing_mode" start="54" end="54" type="bool"/>
     <condition type="endif" check="TPU_IMAGE_STATE_V2"/>
-    <field name="texaddr" start="16" end="53" shift="2" type="address"/>
+    <field name="texaddr" start="16" end="53" shift="2" type="address">
+      <define name="START" value="16"/>
+      <define name="END" value="53"/>
+      <define name="SHIFT" value="2"/>
+    </field>
     <field name="mipmaps_present" start="15" end="15" type="bool"/>
     <field name="depth" start="4" end="14" type="uint">
       <define name="MAX_SIZE" value="2047"/>
@@ -325,7 +329,10 @@ SOFTWARE.
 
   <struct name="SAMPLER" length="2">
     <field name="texaddr_plane2_lo" start="50" end="63" shift="2" type="address"/>
-    <field name="cmp_mode" start="59" end="61" type="CMP_MODE"/>
+    <field name="cmp_mode" start="59" end="61" type="CMP_MODE">
+      <define name="START" value="59"/>
+      <define name="END" value="61"/>
+    </field>
     <field name="addrmode_w" start="56" end="58" type="ADDRMODE"/>
     <field name="bordercolor_index" start="50" end="55" type="uint">
       <define name="MAX_SIZE" value="63"/>

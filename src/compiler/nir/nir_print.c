@@ -1642,6 +1642,9 @@ print_tex_instr(nir_tex_instr *instr, print_state *state)
    case nir_texop_txw_img:
       fprintf(fp, "txw_img ");
       break;
+   case nir_texop_texel_address_img:
+      fprintf(fp, "texel_address_img ");
+      break;
    default:
       unreachable("Invalid texture operation");
       break;

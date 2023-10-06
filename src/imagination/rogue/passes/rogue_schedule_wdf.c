@@ -62,7 +62,7 @@ rogue_insert_wdf(rogue_builder *b, rogue_drc_trxn *drc_trxn, unsigned num)
    if (drc_trxn->release)
       return false;
 
-   b->cursor = rogue_cursor_after_instr(drc_trxn->acquire);
+   b->cursor = rogue_cursor_after_instr_group(drc_trxn->acquire);
    drc_trxn->release = &rogue_WDF(b, rogue_ref_drc_trxn(num, drc_trxn))->instr;
 
    return true;

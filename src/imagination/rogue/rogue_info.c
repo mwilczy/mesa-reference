@@ -541,6 +541,8 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       .src_valnum_mask = B(0),
    },
    /* TODO: Can't co-issue with TST. */
+   /* TODO: Make sure S2 is either constreg (0-7) or non-indexed shared. */
+   /* TODO: Add FTT output */
    [ROGUE_BACKEND_OP_ALPHATST] = { .str = "alphatst", .num_dsts = 1, .num_srcs = 4,
       .io = { .src_set[1] = IO(S0), .src_set[2] = IO(S1), .src_set[3] = IO(S2), },
       .supported_dst_types = { [0] = T(IO), },
@@ -552,6 +554,7 @@ const rogue_backend_op_info rogue_backend_op_infos[ROGUE_BACKEND_OP_COUNT] = {
       },
    },
    /* TODO: Can't co-issue with TST. */
+   /* TODO: Make sure S2 is either constreg (0-7) or non-indexed shared. */
    [ROGUE_BACKEND_OP_ALPHAF] = { .str = "alphaf", .num_srcs = 4,
       .io = { .src_set[1] = IO(S0), .src_set[2] = IO(S1), .src_set[3] = IO(S2), },
       .supported_src_types = {
@@ -859,6 +862,17 @@ const rogue_bitwise_op_info rogue_bitwise_op_infos[ROGUE_BITWISE_OP_COUNT] = {
          [3] = T(REG) | T(REGARRAY) | T(IO) | T(IMM),
       },
    },
+   [ROGUE_BITWISE_OP_SHFL] = { .str = "shfl", .num_dsts = 1, .num_srcs = 2,
+      .phase = PH(0_SHIFT1),
+      .io = { .dst_set[0] = IO(FT2), .src_set[0] = IO(S2), .src_set[1] = IO(S1), },
+      .supported_dst_types = {
+         [0] = T(REG) | T(REGARRAY) | T(IO),
+      },
+      .supported_src_types = {
+         [0] = T(REG) | T(REGARRAY) | T(IO),
+         [1] = T(REG) | T(REGARRAY) | T(IO) | T(IMM),
+      },
+   },
    [ROGUE_BITWISE_OP_REV] = { .str = "rev", .num_dsts = 1, .num_srcs = 1,
       .phase = PH(0_SHIFT1),
       .io = { .dst_set[0] = IO(FT2), .src_set[0] = IO(S2), },
@@ -1120,7 +1134,7 @@ const rogue_alu_op_info rogue_alu_op_infos[ROGUE_ALU_OP_COUNT] = {
       },
       .supported_dst_types = { [0] = T(REG) | T(REGARRAY) | T(IO), },
       .supported_src_types = {
-         [0] = T(REG) | T(REGARRAY) | T(IMM),
+         [0] = T(REG) | T(REGARRAY) | T(IMM) | T(IO),
       },
    },
    [ROGUE_ALU_OP_MBYP1] = { .str = "mbyp1", .num_dsts = 1, .num_srcs = 1,

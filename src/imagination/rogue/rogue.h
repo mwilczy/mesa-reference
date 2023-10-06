@@ -244,7 +244,7 @@ enum rogue_smp_flag {
    ROGUE_SMP_FLAG_PROJ,
    ROGUE_SMP_FLAG_GRADIENT,
    ROGUE_SMP_FLAG_NNCOORDS,
-   ROGUE_SMP_FLAG_INTEGER,
+   /* ROGUE_SMP_FLAG_INTEGER, */
    ROGUE_SMP_FLAG_INFO,
    ROGUE_SMP_FLAG_WRT,
 };
@@ -2143,6 +2143,8 @@ enum rogue_bitwise_op {
    ROGUE_BITWISE_OP_OR,
    ROGUE_BITWISE_OP_XOR,
 
+   ROGUE_BITWISE_OP_SHFL,
+
    ROGUE_BITWISE_OP_REV,
    ROGUE_BITWISE_OP_CBS,
    ROGUE_BITWISE_OP_FTB,
@@ -2809,6 +2811,17 @@ static inline rogue_cursor rogue_cursor_after_instr(rogue_instr *instr)
       .block = false,
       .prev = &instr->link,
    };
+}
+
+/* TODO: rename to ...after_instr_grouping. */
+static inline rogue_cursor rogue_cursor_after_instr_group(rogue_instr *instr)
+{
+   rogue_instr *last_in_group = instr;
+
+   while (last_in_group->group_next)
+      last_in_group = rogue_instr_next(last_in_group);
+
+   return rogue_cursor_after_instr(last_in_group);
 }
 
 /**
