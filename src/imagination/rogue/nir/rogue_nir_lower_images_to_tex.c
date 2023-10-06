@@ -26,6 +26,12 @@
 #include "rogue.h"
 #include "rogue_nir_fmt_utils.h"
 
+/**
+ * \file rogue_nir_lower_images_to_tex.c
+ *
+ * \brief Contains the rogue_nir_lower_images_to_tex pass.
+ */
+
 static bool
 is_undef(nir_def *def)
 {
@@ -358,6 +364,9 @@ static bool image_instr_has_coords(const nir_intrinsic_instr *intr)
 static unsigned image_instr_coord_components(const nir_intrinsic_instr *intr)
 {
    enum glsl_sampler_dim image_dim = nir_intrinsic_image_dim(intr);
+
+   /* TODO NEXT: make sure it's one we can handle! */
+
    bool is_image_array = nir_intrinsic_image_array(intr);
 
    if (!image_instr_has_coords(intr))
@@ -556,3 +565,4 @@ rogue_nir_lower_images_to_tex(nir_shader *shader)
 {
    return nir_shader_lower_instructions(shader, is_image_instr, lower_image_instr, NULL);
 }
+

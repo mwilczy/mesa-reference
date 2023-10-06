@@ -3015,6 +3015,7 @@ trans_nir_intrinsic_smp_img(rogue_builder *b, nir_intrinsic_instr *intr)
       break;
 
    case GLSL_SAMPLER_DIM_2D:
+   case GLSL_SAMPLER_DIM_SUBPASS:
       smp = rogue_SMP2D(b,
                         dst,
                         drc,

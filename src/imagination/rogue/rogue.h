@@ -4223,10 +4223,8 @@ bool rogue_nir_lower_fquantize2f16(nir_shader *shader);
 
 bool rogue_nir_lower_fround_even(nir_shader *shader);
 
-#if 0
 bool rogue_nir_lower_input_attachments(nir_shader *shader,
                                        rogue_build_ctx *ctx);
-#endif
 
 bool rogue_nir_lower_barriers(nir_shader *shader);
 

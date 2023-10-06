@@ -31,6 +31,7 @@ libpowervr_rogue_files = files(
   'nir/rogue_nir_lower_alu.c',
   'nir/rogue_nir_lower_syncops.c',
   'nir/rogue_nir_lower_images_to_tex.c',
+  'nir/rogue_nir_lower_input_attachments.c',
   'nir/rogue_nir_lower_io.c',
  #'nir/rogue_nir_lower_tex.c',
   'nir/rogue_nir_lower_smp.c',

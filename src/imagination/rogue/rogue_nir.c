@@ -327,6 +327,14 @@ rogue_nir_passes(rogue_build_ctx *ctx, nir_shader *nir, gl_shader_stage stage)
       NIR_PASS_V(nir, rogue_nir_lower_input_attachments, ctx);
 #endif
 
+   if (nir->info.stage == MESA_SHADER_FRAGMENT) {
+      /* Lower fb input attachments. */
+      NIR_PASS_V(nir, rogue_nir_lower_input_attachments, ctx);
+
+      /* Lower tex input attachments. */
+      NIR_PASS_V(nir, nir_lower_input_attachments, &(nir_input_attachment_options){ .use_layer_id_sysval = true, });
+   }
+
    NIR_PASS_V(nir,
               nir_remove_dead_variables,
               nir_var_shader_in | nir_var_shader_out | nir_var_system_value,

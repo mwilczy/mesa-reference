@@ -567,7 +567,9 @@ static nir_def *lower_frag_load_out(nir_builder *b,
    assert(store_components == 1);
 
    nir_io_semantics io_sem = nir_intrinsic_io_semantics(intr);
+   /* bool is_input_attachment = io_sem.fb_fetch_output; */
    unsigned l = io_sem.location - FRAG_RESULT_DATA0;
+   /* assert((!is_input_attachment && l < fs_data->num_outputs) || (is_input_attachment && l < fs_data->num_inputs)); */
    assert(l < fs_data->num_outputs);
 
    /* struct util_format_description *fmt_desc = &fs_data->outputs[l].fmt_desc;
