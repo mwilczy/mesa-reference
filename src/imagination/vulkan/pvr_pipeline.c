@@ -2567,6 +2567,9 @@ static inline void pvr_graphics_pipeline_assign_fs_io(
       if (fs_data->inputs[u].type !=
           PVR_RENDERPASS_HWSETUP_INPUT_ACCESS_OFFCHIP) {
          unsigned idx = subpass->input_attachments[u];
+         if (idx == VK_ATTACHMENT_UNUSED)
+            continue;
+
          unsigned mrt_idx = fs_data->inputs[u].on_chip_rt;
          const struct usc_mrt_resource *mrt_resource =
             &hw_subpass->setup.mrt_resources[mrt_idx];
