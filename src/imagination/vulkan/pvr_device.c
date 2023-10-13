@@ -208,7 +208,7 @@ static void pvr_physical_device_get_supported_features(
       .depthBounds = false,
       .wideLines = false,
       .largePoints = false,
-      .alphaToOne = false,
+      .alphaToOne = true,
       .multiViewport = false,
       .samplerAnisotropy = false,
       .textureCompressionETC2 = true,
