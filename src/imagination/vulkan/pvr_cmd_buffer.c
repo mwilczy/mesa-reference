@@ -4240,7 +4240,6 @@ static void pvr_compute_update_shared(struct pvr_cmd_buffer *cmd_buffer,
          DIV_ROUND_UP(PVR_DW_TO_BYTES(const_shared_regs),
                       PVRX(CDMCTRL_KERNEL0_USC_COMMON_SIZE_UNIT_SIZE)),
 
-      
       .global_size = { 1, 1, 1 },
       .local_size = { 1, 1, 1 },
    };
@@ -4431,13 +4430,11 @@ void pvr_compute_update_kernel_private(
    pvr_compute_generate_control_stream(csb, sub_cmd, &info);
 }
 
-/* TODO: Wire up the base_workgroup variant program when implementing
- * VK_KHR_device_group. The values will also need patching into the program.
- */
 static void pvr_compute_update_kernel(
    struct pvr_cmd_buffer *cmd_buffer,
    struct pvr_sub_cmd_compute *const sub_cmd,
    pvr_dev_addr_t indirect_addr,
+   const uint32_t global_base_group[static const PVR_WORKGROUP_DIMENSIONS],
    const uint32_t global_workgroup_size[static const PVR_WORKGROUP_DIMENSIONS])
 {
    const struct pvr_physical_device *pdevice = cmd_buffer->device->pdevice;
@@ -4448,8 +4445,37 @@ static void pvr_compute_update_kernel(
    const struct pvr_compute_pipeline *pipeline = state->compute_pipeline;
    const struct pvr_compute_shader_state *shader_state =
       &pipeline->shader_state;
-   const struct pvr_pds_info *program_info = &pipeline->primary_program_info;
+   const struct pvr_pds_info *program_info;
+   uint32_t code_offset;
+   uint32_t data_offset;
 
+   if (global_base_group[0] || global_base_group[1] || global_base_group[2]) {
+      const struct pvr_pds_base_workgroup_program *workgroup_program =
+         &pipeline->primary_base_workgroup_variant_program;
+      struct pvr_pds_upload data_upload;
+      const uint32_t offset =
+         workgroup_program->base_workgroup_data_patching_offset;
+      uint32_t *program_data;
+
+      program_info = &workgroup_program->info;
+
+      pvr_cmd_buffer_upload_pds_data(cmd_buffer,
+                                     workgroup_program->data_section,
+                                     program_info->data_size_in_dwords,
+                                     16,
+                                     &data_upload);
+      program_data = pvr_bo_suballoc_get_map_addr(data_upload.pvr_bo);
+
+      for (uint32_t i = 0; i < PVR_WORKGROUP_DIMENSIONS; i++)
+         program_data[offset + i] = global_base_group[i];
+
+      code_offset = workgroup_program->code_upload.code_offset;
+      data_offset = data_upload.data_offset;
+   } else {
+      program_info = &pipeline->primary_program_info;
+      code_offset = pipeline->primary_program.code_offset;
+      data_offset = pipeline->primary_program.data_offset;
+   }
    struct pvr_compute_kernel_info info = {
       .indirect_buffer_addr = indirect_addr,
       .usc_target = PVRX(CDMCTRL_USC_TARGET_ANY),
@@ -4460,8 +4486,8 @@ static void pvr_compute_update_kernel(
       .pds_data_size =
          DIV_ROUND_UP(PVR_DW_TO_BYTES(program_info->data_size_in_dwords),
                       PVRX(CDMCTRL_KERNEL0_PDS_DATA_SIZE_UNIT_SIZE)),
-      .pds_data_offset = pipeline->primary_program.data_offset,
-      .pds_code_offset = pipeline->primary_program.code_offset,
+      .pds_data_offset = data_offset,
+      .pds_code_offset = code_offset,
 
       .sd_type = PVRX(CDMCTRL_SD_TYPE_NONE),
 
@@ -4559,6 +4585,7 @@ static VkResult pvr_cmd_upload_push_consts(struct pvr_cmd_buffer *cmd_buffer)
 static void pvr_cmd_dispatch(
    struct pvr_cmd_buffer *const cmd_buffer,
    const pvr_dev_addr_t indirect_addr,
+   const uint32_t base_group[static const PVR_WORKGROUP_DIMENSIONS],
    const uint32_t workgroup_size[static const PVR_WORKGROUP_DIMENSIONS])
 {
    struct pvr_cmd_buffer_state *state = &cmd_buffer->state;
@@ -4630,13 +4657,20 @@ static void pvr_cmd_dispatch(
    }
 
    pvr_compute_update_shared(cmd_buffer, sub_cmd);
-   pvr_compute_update_kernel(cmd_buffer, sub_cmd, indirect_addr, workgroup_size);
+   pvr_compute_update_kernel(cmd_buffer,
+                             sub_cmd,
+                             indirect_addr,
+                             base_group,
+                             workgroup_size);
 }
 
-void pvr_CmdDispatch(VkCommandBuffer commandBuffer,
-                     uint32_t groupCountX,
-                     uint32_t groupCountY,
-                     uint32_t groupCountZ)
+void pvr_CmdDispatchBase(VkCommandBuffer commandBuffer,
+                         uint32_t baseGroupX,
+                         uint32_t baseGroupY,
+                         uint32_t baseGroupZ,
+                         uint32_t groupCountX,
+                         uint32_t groupCountY,
+                         uint32_t groupCountZ)
 {
    PVR_FROM_HANDLE(pvr_cmd_buffer, cmd_buffer, commandBuffer);
 
@@ -4647,6 +4681,7 @@ void pvr_CmdDispatch(VkCommandBuffer commandBuffer,
 
    pvr_cmd_dispatch(cmd_buffer,
                     PVR_DEV_ADDR_INVALID,
+                    (uint32_t[]){ baseGroupX, baseGroupY, baseGroupZ },
                     (uint32_t[]){ groupCountX, groupCountY, groupCountZ });
 }
 
@@ -4661,6 +4696,7 @@ void pvr_CmdDispatchIndirect(VkCommandBuffer commandBuffer,
 
    pvr_cmd_dispatch(cmd_buffer,
                     PVR_DEV_ADDR_OFFSET(buffer->dev_addr, offset),
+                    (uint32_t[]){ 0, 0, 0 },
                     (uint32_t[]){ 1, 1, 1 });
 }
 

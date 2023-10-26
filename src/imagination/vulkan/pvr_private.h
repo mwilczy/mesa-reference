@@ -966,7 +966,7 @@ struct pvr_compute_pipeline {
    struct pvr_pds_base_workgroup_program {
       struct pvr_pds_upload code_upload;
 
-      uint32_t *data_section;
+      const uint32_t *data_section;
       /* Offset within the PDS data section at which the base workgroup id
        * resides.
        */

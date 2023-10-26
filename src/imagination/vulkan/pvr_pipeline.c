@@ -975,11 +975,6 @@ static VkResult pvr_pds_compute_base_workgroup_variant_program_init(
 
    program_out->data_section = buffer;
 
-   /* We'll need to patch the base workgroup in the PDS data section before
-    * dispatch so we save the offsets at which to patch. We only need to save
-    * the offset for the first workgroup id since the workgroup ids are stored
-    * contiguously in the data segment.
-    */
    program_out->base_workgroup_data_patching_offset =
       program.base_workgroup_constant_offset_in_dwords[0];
 
@@ -998,7 +993,7 @@ static void pvr_pds_compute_base_workgroup_variant_program_finish(
    struct pvr_pds_base_workgroup_program *const state)
 {
    pvr_bo_suballoc_free(state->code_upload.pvr_bo);
-   vk_free2(&device->vk.alloc, allocator, state->data_section);
+   vk_free2(&device->vk.alloc, allocator, (uint32_t *)state->data_section);
 }
 
 /******************************************************************************
