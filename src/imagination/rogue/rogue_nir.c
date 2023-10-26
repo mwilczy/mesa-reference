@@ -44,6 +44,7 @@ static const struct spirv_to_nir_options spirv_options = {
 
    /* TODO: set these from the driver. */
    .caps = {
+      .device_group = true,
       /* .int16 = true, */
       /* .int64 = true, */
       /* .int8 = true, */
@@ -148,6 +149,7 @@ static void rogue_sort_varying_cb(struct exec_list *var_list,
 }
 
 static const nir_shader_compiler_options nir_options = {
+   .lower_device_index_to_zero = true,
    .lower_fdiv = true,
    .fuse_ffma32 = true,
    .lower_flrp16 = true,
