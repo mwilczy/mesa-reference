@@ -173,6 +173,7 @@ static void pvr_physical_device_get_supported_extensions(
       .KHR_external_memory_fd = true,
       .KHR_format_feature_flags2 = true,
       .KHR_get_memory_requirements2 = true,
+      .KHR_relaxed_block_layout = true,
       .KHR_shader_float16_int8 = false,
       .KHR_storage_buffer_storage_class = true,
       .KHR_swapchain = PVR_USE_WSI_PLATFORM,
