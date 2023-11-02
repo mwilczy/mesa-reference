@@ -637,6 +637,12 @@ static bool pvr_physical_device_get_properties(
       /* VK_EXT_provoking_vertex */
       .provokingVertexModePerPipeline = true,
       .transformFeedbackPreservesTriangleFanProvokingVertex = false,
+
+      /* Vulkan 1.3 / VK_EXT_texel_buffer_alignment */
+      .storageTexelBufferOffsetAlignmentBytes = 16,
+      .storageTexelBufferOffsetSingleTexelAlignment = true,
+      .uniformTexelBufferOffsetAlignmentBytes = 16,
+      .uniformTexelBufferOffsetSingleTexelAlignment = false,
    };
 
    snprintf(properties->deviceName,
