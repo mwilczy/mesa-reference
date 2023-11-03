@@ -168,6 +168,7 @@ static void pvr_physical_device_get_supported_extensions(
       .KHR_bind_memory2 = true,
       .KHR_copy_commands2 = true,
       .KHR_descriptor_update_template = true,
+      .KHR_device_group = true,
       /* TODO: enable this extension when the conformance tests get
        * updated to version 1.3.6.0, the current version does not
        * include the imagination driver ID, which will make a dEQP
