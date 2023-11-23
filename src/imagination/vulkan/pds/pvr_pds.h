@@ -25,6 +25,7 @@
 #define PVR_PDS_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "pvr_device_info.h"
 #include "pvr_limits.h"
@@ -1024,6 +1025,7 @@ struct pvr_pds_vertex_primary_program_input {
 
 #define PVR_PDS_CONST_MAP_ENTRY_TYPE_ADDR_LITERAL_BUFFER (15)
 #define PVR_PDS_CONST_MAP_ENTRY_TYPE_ADDR_LITERAL (16)
+#define PVR_PDS_CONST_MAP_ENTRY_TYPE_VERTEX_ATTRIBUTE_STRIDE (17)
 
 /* We pack all the following structs tightly into a buffer using += sizeof(x)
  * offsets, this can lead to data that is not native aligned. Supplying the
@@ -1104,6 +1106,12 @@ struct pvr_const_map_entry_vertex_attribute_address {
    uint16_t stride;
    uint8_t binding_index;
    uint8_t size_in_dwords;
+} PVR_ALIGNED;
+
+struct pvr_const_map_entry_vertex_attribute_stride {
+   uint8_t type;
+   uint8_t const_offset;
+   uint8_t binding_index;
 } PVR_ALIGNED;
 
 struct pvr_const_map_entry_robust_vertex_attribute_address {

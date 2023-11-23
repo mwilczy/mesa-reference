@@ -2673,18 +2673,16 @@ void pvr_CmdBindDescriptorSets(VkCommandBuffer commandBuffer,
    }
 }
 
-void pvr_CmdBindVertexBuffers(VkCommandBuffer commandBuffer,
-                              uint32_t firstBinding,
-                              uint32_t bindingCount,
-                              const VkBuffer *pBuffers,
-                              const VkDeviceSize *pOffsets)
+void pvr_CmdBindVertexBuffers2(VkCommandBuffer commandBuffer,
+                               uint32_t firstBinding,
+                               uint32_t bindingCount,
+                               const VkBuffer *pBuffers,
+                               const VkDeviceSize *pOffsets,
+                               const VkDeviceSize *pSizes,
+                               const VkDeviceSize *pStrides)
 {
    PVR_FROM_HANDLE(pvr_cmd_buffer, cmd_buffer, commandBuffer);
    struct pvr_vertex_binding *const vb = cmd_buffer->state.vertex_bindings;
-
-   /* We have to defer setting up vertex buffer since we need the buffer
-    * stride from the pipeline.
-    */
 
    assert(firstBinding < PVR_MAX_VERTEX_INPUT_BINDINGS &&
           bindingCount <= PVR_MAX_VERTEX_INPUT_BINDINGS);
@@ -2692,8 +2690,21 @@ void pvr_CmdBindVertexBuffers(VkCommandBuffer commandBuffer,
    PVR_CHECK_COMMAND_BUFFER_BUILDING_STATE(cmd_buffer);
 
    for (uint32_t i = 0; i < bindingCount; i++) {
-      vb[firstBinding + i].buffer = pvr_buffer_from_handle(pBuffers[i]);
-      vb[firstBinding + i].offset = pOffsets[i];
+      VK_FROM_HANDLE(pvr_buffer, buffer, pBuffers[i]);
+      const uint64_t size = pSizes ? pSizes[i] : VK_WHOLE_SIZE;
+
+      vb[firstBinding + i] = (struct pvr_vertex_binding){
+         .buffer = buffer,
+         .offset = pOffsets[i],
+         .size = vk_buffer_range(&buffer->vk, pOffsets[i], size),
+      };
+   }
+
+   if (pStrides != NULL) {
+      vk_cmd_set_vertex_binding_strides(&cmd_buffer->vk,
+                                        firstBinding,
+                                        bindingCount,
+                                        pStrides);
    }
 
    cmd_buffer->state.dirty.vertex_bindings = true;
@@ -3525,6 +3536,23 @@ pvr_setup_vertex_buffers(struct pvr_cmd_buffer *cmd_buffer,
 
          PVR_WRITE(dword_buffer,
                    max_index,
+                   attribute->const_offset,
+                   pds_info->data_size_in_dwords);
+
+         entries += sizeof(*attribute);
+         break;
+      }
+
+      case PVR_PDS_CONST_MAP_ENTRY_TYPE_VERTEX_ATTRIBUTE_STRIDE: {
+         const struct pvr_const_map_entry_vertex_attribute_stride *attribute =
+            (const struct pvr_const_map_entry_vertex_attribute_stride *)entries;
+         const struct vk_dynamic_graphics_state *dynamic_state =
+            &cmd_buffer->vk.dynamic_graphics_state;
+         const uint32_t stride =
+            dynamic_state->vi_binding_strides[attribute->binding_index];
+
+         PVR_WRITE(dword_buffer,
+                   stride,
                    attribute->const_offset,
                    pds_info->data_size_in_dwords);
 
