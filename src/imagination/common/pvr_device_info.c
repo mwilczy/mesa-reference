@@ -30,6 +30,7 @@
 
 #include "pvr_device_info.h"
 
+#include "device_info/g6110.h"
 #include "device_info/gx6250.h"
 #include "device_info/axe-1-16m.h"
 #include "device_info/bxe-4-32.h"
@@ -61,6 +62,7 @@ int pvr_device_info_init(struct pvr_device_info *info, uint64_t bvnc)
    switch (bvnc) {
       CASE_PACKED_BVNC_DEVICE_INFO(4, 40, 2, 51);
       CASE_PACKED_BVNC_DEVICE_INFO(4, 45, 2, 58);
+      CASE_PACKED_BVNC_DEVICE_INFO(5, 9, 1, 46);
       CASE_PACKED_BVNC_DEVICE_INFO(33, 15, 11, 3);
       CASE_PACKED_BVNC_DEVICE_INFO(36, 50, 54, 182);
       CASE_PACKED_BVNC_DEVICE_INFO(36, 53, 104, 796);

@@ -401,6 +401,10 @@ pvr_get_physical_device_descriptor_limits(
    enum pvr_descriptor_cs_level cs_level;
 
    if (common_size < 408) {
+      /* TODO: For cores with a very limited number of shared registers,
+       * e.g. G6110, descriptors can be stored in memory. This will be slow,
+       * but functional.
+       */
       mesa_loge("This core appears to have a very limited amount of shared "
                 "register space and may not meet the Vulkan spec limits.");
       abort();
