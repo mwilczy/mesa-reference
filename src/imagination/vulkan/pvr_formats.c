@@ -600,7 +600,8 @@ pvr_get_image_format_features2(const struct pvr_format *pvr_format,
 
          flags |= VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT |
                   VK_FORMAT_FEATURE_2_BLIT_SRC_BIT |
-                  VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT;
+                  VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
+                  VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT;
 
          if (!vk_format_is_int(vk_format) &&
              !vk_format_is_depth_or_stencil(vk_format) &&
@@ -611,7 +612,8 @@ pvr_get_image_format_features2(const struct pvr_format *pvr_format,
       } else if (!vk_format_is_block_compressed(vk_format)) {
          flags |= VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT |
                   VK_FORMAT_FEATURE_2_BLIT_SRC_BIT |
-                  VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT;
+                  VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
+                  VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT;
       }
 
       if (vk_format_has_stencil(vk_format))
@@ -721,7 +723,8 @@ pvr_get_buffer_format_features2(const struct pvr_format *pvr_format)
 
    desc = vk_format_description(vk_format);
 
-   flags |= VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT;
+   flags |= VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
+            VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT;
 
    if (desc->layout == UTIL_FORMAT_LAYOUT_PLAIN &&
        desc->colorspace == UTIL_FORMAT_COLORSPACE_RGB) {
