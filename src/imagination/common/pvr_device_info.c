@@ -35,6 +35,7 @@
 #include "device_info/gx6650.h"
 #include "device_info/axe-1-16m.h"
 #include "device_info/bxe-4-32.h"
+#include "device_info/bxm-4-64.h"
 #include "device_info/bxs-4-64.h"
 
 /**
@@ -67,6 +68,7 @@ int pvr_device_info_init(struct pvr_device_info *info, uint64_t bvnc)
       CASE_PACKED_BVNC_DEVICE_INFO(5, 9, 1, 46);
       CASE_PACKED_BVNC_DEVICE_INFO(33, 15, 11, 3);
       CASE_PACKED_BVNC_DEVICE_INFO(36, 50, 54, 182);
+      CASE_PACKED_BVNC_DEVICE_INFO(36, 52, 104, 182);
       CASE_PACKED_BVNC_DEVICE_INFO(36, 53, 104, 796);
    }
 
